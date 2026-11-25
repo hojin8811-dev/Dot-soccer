@@ -722,7 +722,7 @@
       '</div>' +
       '<div class="pitch" id="pitch-squad">' +
       '<canvas id="pitch-bg" class="pitch-bg"></canvas>' +
-      '<div class="pitch-tag">' + S.formation + ' · ' + f.desc + '<br>☆ 핵심 자리 보너스 +3</div>' +
+      '<div class="pitch-tag">' + S.formation + ' · ' + f.desc + '<br>☆ = 핵심 자리 (+3)</div>' +
       playersHTML +
       '</div>' +
       '<div class="bench">' +

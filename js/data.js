@@ -766,7 +766,7 @@
         fill(g, x, y, 3, 1, color);
       } else {
         fill(g, x, y, 3, 1, color);
-        fill(g, x, y + 1, 3, 1, dark);
+        if (style === 'thick') { fill(g, x + 1, y + 1, 2, 1, dark); }
       }
     }
   }
@@ -971,6 +971,7 @@
   Art.paint = function (canvas, p, kit, opt) {
     if (!canvas) { return; }
     opt = opt || {};
+    if (opt.number === true) { opt = { k: opt.k, number: p.number, captain: opt.captain, gk: opt.gk }; }
     var fig = Art.portrait(p, kit, opt);
     var k = opt.k || 2;
     var cw = fig.width * k, ch = fig.height * k;
@@ -1127,32 +1128,32 @@
     g.beginPath(); g.arc(W / 2, fy + fh - fh * 0.1, 2, 0, Math.PI * 2); g.fill();
 
     /* 골대 */
-    var goalW = fw * 0.22, goalD = Math.max(9, m - 2);
+    var goalW = fw * 0.24, goalD = Math.max(8, Math.min(16, fh * 0.045));
     var gx = W / 2 - goalW / 2;
     g.strokeStyle = 'rgba(247,244,226,0.55)';
     g.lineWidth = 1;
-    g.fillStyle = 'rgba(255,255,255,0.09)';
-    g.fillRect(gx, fy - goalD, goalW, goalD);
+    g.fillStyle = 'rgba(255,255,255,0.10)';
+    g.fillRect(gx, fy, goalW, goalD);
     for (i = 0; i <= 7; i++) {
-      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy - goalD); g.lineTo(gx + (goalW / 7) * i, fy); g.stroke();
+      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy); g.lineTo(gx + (goalW / 7) * i, fy + goalD); g.stroke();
     }
     g.lineWidth = 2; g.strokeStyle = '#f7f4e2';
     g.beginPath();
-    g.moveTo(gx, fy - goalD); g.lineTo(gx + goalW, fy - goalD);
-    g.moveTo(gx, fy); g.lineTo(gx, fy - goalD);
-    g.moveTo(gx + goalW, fy); g.lineTo(gx + goalW, fy - goalD);
+    g.moveTo(gx, fy + goalD); g.lineTo(gx + goalW, fy + goalD);
+    g.moveTo(gx, fy); g.lineTo(gx, fy + goalD);
+    g.moveTo(gx + goalW, fy); g.lineTo(gx + goalW, fy + goalD);
     g.stroke();
     g.lineWidth = 1; g.strokeStyle = 'rgba(247,244,226,0.55)';
-    g.fillStyle = 'rgba(255,255,255,0.09)';
-    g.fillRect(gx, fy + fh, goalW, goalD);
+    g.fillStyle = 'rgba(255,255,255,0.10)';
+    g.fillRect(gx, fy + fh - goalD, goalW, goalD);
     for (i = 0; i <= 7; i++) {
-      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy + fh); g.lineTo(gx + (goalW / 7) * i, fy + fh + goalD); g.stroke();
+      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy + fh - goalD); g.lineTo(gx + (goalW / 7) * i, fy + fh); g.stroke();
     }
     g.lineWidth = 2; g.strokeStyle = '#f7f4e2';
     g.beginPath();
-    g.moveTo(gx, fy + fh + goalD); g.lineTo(gx + goalW, fy + fh + goalD);
-    g.moveTo(gx, fy + fh); g.lineTo(gx, fy + fh + goalD);
-    g.moveTo(gx + goalW, fy + fh); g.lineTo(gx + goalW, fy + fh + goalD);
+    g.moveTo(gx, fy + fh - goalD); g.lineTo(gx + goalW, fy + fh - goalD);
+    g.moveTo(gx, fy + fh - goalD); g.lineTo(gx, fy + fh);
+    g.moveTo(gx + goalW, fy + fh - goalD); g.lineTo(gx + goalW, fy + fh);
     g.stroke();
 
     /* 관중석 띠 (위/아래) */
