@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>도트싸커 v5 · 390×844 검증</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #1c1f22; }
+  .wrap { display: flex; gap: 18px; padding: 14px; align-items: flex-start; }
+  .phone {
+    width: 390px; height: 844px;
+    border-radius: 22px; overflow: hidden;
+    border: 6px solid #0c0d0e;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5);
+    background: #08231e;
+  }
+  iframe { width: 390px; height: 844px; border: 0; display: block; }
+  .cap { color: #9aa; font: 12px system-ui; padding-top: 6px; }
+  #err { color: #7fd39a; font: 12px ui-monospace, monospace; padding-top: 4px; }
+  #err.bad { color: #ff8a72; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="phone"><iframe id="f" src="../../index.html?v=5&amp;verify=390"></iframe></div>
+    <div class="cap">390 × 844 (iPhone 13/14 viewport)</div>
+    <div id="err">JS errors: 0</div>
+  </div>
+</div>
+<script>
+  window.__errs = [];
+  window.__warns = [];
+  function paintErr() {
+    var el = document.getElementById('err');
+    el.textContent = 'JS errors: ' + window.__errs.length + ' · warnings: ' + window.__warns.length;
+    el.className = window.__errs.length ? 'bad' : '';
+  }
+  var f = document.getElementById('f');
+  f.addEventListener('load', function () {
+    try {
+      var w = f.contentWindow;
+      w.addEventListener('error', function (e) {
+        window.__errs.push('error: ' + (e.message || '') + ' @' + (e.filename || '') + ':' + (e.lineno || ''));
+        paintErr();
+      });
+      w.addEventListener('unhandledrejection', function (e) {
+        window.__errs.push('rejection: ' + e.reason);
+        paintErr();
+      });
+      var ce = w.console;
+      ['error', 'warn'].forEach(function (k) {
+        var orig = ce[k];
+        ce[k] = function () {
+          var msg = Array.prototype.map.call(arguments, String).join(' ');
+          if (k === 'error') { window.__errs.push('console.error: ' + msg); } else { window.__warns.push(msg); }
+          paintErr();
+          if (orig) { orig.apply(ce, arguments); }
+        };
+      });
+    } catch (e) {
+      window.__errs.push('hook fail: ' + e);
+      paintErr();
+    }
+  });
+</script>
+</body>
+</html>
