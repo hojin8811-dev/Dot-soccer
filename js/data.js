@@ -845,10 +845,12 @@
     fill(g, 12, 20, 2, 3, skin);
     fill(g, 6, 20, 1, 3, skinD);
     fill(g, 12, 20, 1, 3, skinD);
-    fill(g, 5, 22, 3, 2, trim);
-    fill(g, 12, 22, 3, 2, trim);
-    fill(g, 5, 22, 1, 2, shade(trim, -30));
-    fill(g, 14, 22, 1, 2, shade(trim, -30));
+    fill(g, 5, 22, 3, 2, shirt);
+    fill(g, 12, 22, 3, 2, shirt);
+    fill(g, 5, 22, 3, 1, trim);
+    fill(g, 12, 22, 3, 1, trim);
+    fill(g, 5, 22, 1, 2, shade(shirt, 18));
+    fill(g, 14, 22, 1, 2, shade(shirt, -30));
     fill(g, 4, 24, 4, 2, '#3a2c22');
     fill(g, 12, 24, 4, 2, '#3a2c22');
     fill(g, 4, 24, 4, 1, '#5a4634');
@@ -891,7 +893,7 @@
     drawHairFront(g, F.hair || 'short', hair, hairD, hairL);
 
     /* 얼굴 */
-    var browCol = hex2rgb(hair)[0] + hex2rgb(hair)[1] + hex2rgb(hair)[2] < 210 ? shade(hair, 40) : hairD;
+    var browCol = hex2rgb(hair)[0] + hex2rgb(hair)[1] + hex2rgb(hair)[2] < 210 ? '#5a3a24' : shade(hair, -12);
     drawBrows(g, F.brow || 'thick', browCol, shade(hairD, -10));
     drawEyes(g, F.eye || 'round', dark, '#fffdf5');
     if (F.nose === 'wide') { fill(g, 8, 8, 3, 1, skinD); }
@@ -927,10 +929,11 @@
       fill(g, 8, 12, 4, 1, shirtD);
       fill(g, 9, 13, 2, 1, trim);
     } else {
-      fill(g, 7, 12, 1, 2, trim);
-      fill(g, 12, 12, 1, 2, trim);
-      fill(g, 8, 12, 4, 1, trim);
-      fill(g, 9, 12, 2, 2, skinD2);
+      fill(g, 7, 12, 6, 1, trim);
+      fill(g, 7, 13, 1, 1, trim);
+      fill(g, 12, 13, 1, 1, trim);
+      fill(g, 8, 12, 4, 1, skinD2);
+      fill(g, 9, 13, 2, 1, skinD2);
     }
 
     /* 등번호 */
