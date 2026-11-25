@@ -481,8 +481,8 @@ main {
 }
 .tcard:disabled, .tcard.locked { opacity: .45; }
 .tcard.ready { border-color: var(--lime); box-shadow: 0 0 0 1px rgba(200,241,105,.4), 0 6px 16px rgba(0,0,0,.3); }
-.tcard .tag { font-size: 7px; font-weight: 900; letter-spacing: .6px; color: var(--lime); }
-.tcard .nm { font-size: 10.5px; font-weight: 900; letter-spacing: -.4px; margin-top: 2px; line-height: 1.2; }
+.tcard .tag { display: block; font-size: 7px; font-weight: 900; letter-spacing: .6px; color: var(--lime); }
+.tcard .nm { display: block; font-size: 10.5px; font-weight: 900; letter-spacing: -.4px; margin-top: 2px; line-height: 1.2; }
 .tcard .cost { position: absolute; right: 6px; bottom: 6px; font-size: 9px; font-weight: 900; color: #f4fbe9; }
 .tcard .cost em { font-style: normal; color: var(--lime); }
 .tcard .cd { position: absolute; left: 7px; bottom: 6px; font-size: 8px; color: rgba(233,244,221,.55); font-weight: 700; }

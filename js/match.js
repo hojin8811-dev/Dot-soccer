@@ -1101,7 +1101,7 @@
     if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
     else { DS.Art.drawPitch(ctx, W, H, { crowd: true }); }
 
-    var sprH = clamp(W * 0.082, 26, 36);
+    var sprH = clamp(W * 0.108, 34, 44);
     var sc = sprH / 62;
     var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
     var i, p, px, py, sprite, offY;
@@ -1139,8 +1139,8 @@
         ctx.ellipse(px, py - 1, sprH * 0.34, sprH * 0.12, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
-      /* 이름 라벨 */
-      if (p.side === 'home') {
+      /* 이름 라벨 (공 소유 선수만) */
+      if (p.side === 'home' && ball.carrier === p) {
         ctx.font = '600 8px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
         var label = short(p.name);
