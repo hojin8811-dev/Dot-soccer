@@ -682,7 +682,7 @@
     M.phase = 'pass';
     stats.passes++;
     p.passTarget = t;
-    if (p.side === 'home') { charge(1.1 + (buffOf('build') > 0 ? 0.5 : 0)); }
+    if (p.side === 'home') { charge(0.8 + (buffOf('build') > 0 ? 0.4 : 0)); }
     if (chance(0.4)) {
       say(pick([
         U.josa(short(p.name), '이/가') + ' 짧은 패스로 연결합니다!',
@@ -871,7 +871,7 @@
     addRating(carrier, -0.06);
     carrier.stun = 0.35;
     giveBall(defender);
-    if (defender.side === 'home') { charge(2.6); }
+    if (defender.side === 'home') { charge(1.7); }
     say('🦵 ' + U.josa(short(defender.name), '의') + ' 태클! ' + pick([
       '깔끔하게 공을 빼앗습니다!', '몸을 던져 길을 막습니다!', '주머니에 손 넣듯 빼앗아 갑니다!'
     ]), 'tackle');
@@ -926,7 +926,7 @@
     for (var k in buffs) {
       if (buffs.hasOwnProperty(k) && buffs[k] > 0) { buffs[k] -= dt; if (buffs[k] <= 0) { buffs[k] = 0; hudDirty = true; } }
     }
-    momentum = clamp(momentum + dt * 0.55, 0, 100);
+    momentum = clamp(momentum + dt * 0.48, 0, 100);
 
     if (M.phase === 'celebrate') {
       phaseTimer -= dt;
@@ -971,7 +971,7 @@
         var def = near.player;
         var defSkill = def.player.stats.def + 8 + (def.side === 'home' && buffOf('press') > 0 ? 10 : 0);
         var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3 + (c.side === 'home' && buffOf('tempo') > 0 ? 8 : 0);
-        var pTackle = clamp(0.62 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.42);
+        var pTackle = clamp(0.62 * (defSkill / (defSkill + atkSkill)) * dt * 2.5, 0, 0.38);
         if (chance(pTackle)) { tackle(def, c); }
       }
       actionTimer -= dt;
