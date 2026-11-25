@@ -674,7 +674,7 @@
 
   function shoot(p) {
     var gy = attackGoalY(p.side);
-    var acc = 0.40 + p.player.stats.atk / 320 + (p.side === 'home' ? (formFactor - 1) * 0.6 : 0);
+    var acc = 0.35 + p.player.stats.atk / 340 + (p.side === 'home' ? (formFactor - 1) * 0.6 : 0);
     if (p.side === 'home' && buffOf('atk') > 0) { acc += 0.13; }
     if (p.side === 'home' && buffOf('setpiece') > 0) { acc += 0.22; }
     if (p.side === 'home' && p.player.role === 'poacher') { acc += 0.05; }
@@ -710,7 +710,7 @@
     var tac = p.side === 'home' ? tactic : 'balanced';
     var shootRange = tac === 'attack' ? 30 : (tac === 'defense' ? 22 : 26);
     if (p.side === 'home' && anyAtkBuff()) { shootRange += 6; }
-    if (distToGoal < shootRange && chance(tac === 'attack' ? 0.62 : 0.44)) { shoot(p); return; }
+    if (distToGoal < shootRange && chance(tac === 'attack' ? 0.50 : 0.34)) { shoot(p); return; }
     if (pressure) {
       if (chance(0.72)) { if (passBall(p)) { return; } }
       p.tx = p.x + range(-6, 6);
@@ -795,7 +795,7 @@
       goalKick(defSide);
       return;
     }
-    var saveProb = clamp(0.34 + gkDef / 200 + (dist > 20 ? 0.16 : 0) - atk / 560, 0.12, 0.70);
+    var saveProb = clamp(0.42 + gkDef / 210 + (dist > 20 ? 0.14 : 0) - atk / 620, 0.16, 0.76);
     if (gk) { gk.dive = 1; }
     if (chance(saveProb)) {
       if (gk) { save(gk); }
@@ -903,7 +903,7 @@
     for (var k in buffs) {
       if (buffs.hasOwnProperty(k) && buffs[k] > 0) { buffs[k] -= dt; if (buffs[k] <= 0) { buffs[k] = 0; hudDirty = true; } }
     }
-    momentum = clamp(momentum + dt * 0.85, 0, 100);
+    momentum = clamp(momentum + dt * 0.55, 0, 100);
 
     if (M.phase === 'celebrate') {
       phaseTimer -= dt;
