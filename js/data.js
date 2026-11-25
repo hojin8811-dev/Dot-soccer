@@ -289,7 +289,8 @@
   ];
 
   function storyFor(p, clubName) {
-    var t = pick(STORY);
+    if (typeof p.storyTpl !== 'number') { p.storyTpl = rnd(STORY.length); }
+    var t = STORY[p.storyTpl % STORY.length];
     var tr = traitOf(p.trait);
     var nick = p.nickname || '조용한 주인공';
     return t
@@ -530,7 +531,6 @@
     { pair: ['weight', 'tactic'],  name: '주장의 품격', desc: '통솔 +2',     gain: { cap: 2 },      skill: '카리스마',    skillDesc: '동료들이 그를 따라 움직인다' },
     { pair: ['sprint', 'setpiece'], name: '돌파 세트피스', desc: 'S +1 · FK +1', gain: { s: 1, fk: 1 }, skill: '순간 돌파', skillDesc: '세트피스 상황에서 빠져나간다' },
     { pair: ['weight', 'pass'],    name: '피벗 플레이', desc: 'P +1 · T +1', gain: { p: 1, t: 1 }, skill: '볼 지키기',   skillDesc: '압박 속에서도 공을 지킨다' },
-    { pair: ['pass', 'shoot'],     name: '원터치 캐논', desc: 'S +1 · T +1', gain: { s: 1, t: 1 }, skill: '결정력',      skillDesc: '골문 앞에서 흔들리지 않는다' },
     { pair: ['tactic', 'shoot'],   name: '결정적 한 방', desc: 'T +1 · 통솔 +1', gain: { t: 1, cap: 1 }, skill: '승부수',  skillDesc: '필요한 순간에 득점한다' }
   ];
   DS.COMBOS = COMBOS;

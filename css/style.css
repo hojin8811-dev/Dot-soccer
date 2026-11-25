@@ -300,8 +300,9 @@ button:disabled { opacity: .45; filter: grayscale(.5); }
 .pdot.sel .plabel i { color: #5c4208; }
 .pdot.sel .pcanvas { animation: bob .7s infinite alternate; }
 @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+.rbadges { position: absolute; left: -4px; top: -2px; z-index: 4; display: flex; flex-direction: column; gap: 1px; align-items: flex-start; }
 .rolebadge {
-  position: absolute; left: -4px; top: -2px; z-index: 4;
+  position: static; z-index: 4;
   font-size: 7px; font-weight: 900; color: #2c2110;
   background: linear-gradient(#ffe9a0, #e8b62c); border: 1px solid #8a6610;
   border-radius: 2px; padding: 0 2px; letter-spacing: -.2px;
@@ -310,6 +311,9 @@ button:disabled { opacity: .45; filter: grayscale(.5); }
 .rolebadge.fk { background: linear-gradient(#bfe0ff, #6ba6e0); border-color: #2a5a8a; color: #10283f; }
 .rolebadge.ck { background: linear-gradient(#d8f0c0, #86c46a); border-color: #3a6a2a; color: #17300f; }
 .rolebadge.pk { background: linear-gradient(#f8c8c0, #d06a58); border-color: #7a2a1a; color: #3f1008; }
+.embpick { padding: 2px; border-radius: 4px; border: 1px solid transparent; background: rgba(255,255,255,.35); }
+.embpick.on { border-color: #d8a419; background: rgba(216,164,25,.18); }
+.embpick canvas { width: 100%; height: auto; display: block; }
 .keystar {
   position: absolute; right: -4px; top: -2px; z-index: 4;
   font-size: 9px; color: #ffe27a; text-shadow: 0 0 3px #8a5a10, 0 1px 0 #5a3a08;

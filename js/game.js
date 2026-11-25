@@ -678,10 +678,12 @@
       p = byId(S.lineup[i]);
       var badges = '';
       if (p) {
+        badges += '<span class="rbadges">';
         if (S.roles.cap === p.id) { badges += '<span class="rolebadge">CAP</span>'; }
-        else if (S.roles.fk === p.id) { badges += '<span class="rolebadge fk">FK</span>'; }
-        else if (S.roles.ck === p.id) { badges += '<span class="rolebadge ck">CK</span>'; }
-        else if (S.roles.pk === p.id) { badges += '<span class="rolebadge pk">PK</span>'; }
+        if (S.roles.fk === p.id) { badges += '<span class="rolebadge fk">FK</span>'; }
+        if (S.roles.ck === p.id) { badges += '<span class="rolebadge ck">CK</span>'; }
+        if (S.roles.pk === p.id) { badges += '<span class="rolebadge pk">PK</span>'; }
+        badges += '</span>';
       }
       playersHTML += '<button class="pdot ' + (p ? rcls(p) : 'empty') + (selId === (p && p.id) ? ' sel' : '') + '" ' +
         'data-x="' + slot.x + '" data-y="' + slot.y + '" data-act="starter" data-slot="' + i + '" data-id="' + (p ? p.id : '') + '">' +
@@ -851,12 +853,13 @@
 
     var swatches = '', swatches2 = '', e, emb = '';
     for (i = 0; i < DS.KIT_COLORS.length; i++) {
-      swatches += '<button class="swatch" style="background:' + DS.KIT_COLORS[i] + '" data-act="kit" data-c="' + DS.KIT_COLORS[i] + '"></button>';
-      swatches2 += '<button class="swatch" style="background:' + DS.KIT_COLORS[i] + '" data-act="shorts" data-c="' + DS.KIT_COLORS[i] + '"></button>';
+      swatches += '<button class="swatch' + (S.club.kit.shirt === DS.KIT_COLORS[i] ? ' on' : '') + '" style="background:' + DS.KIT_COLORS[i] + '" data-act="kit" data-c="' + DS.KIT_COLORS[i] + '"></button>';
+      swatches2 += '<button class="swatch' + (S.club.kit.shorts === DS.KIT_COLORS[i] ? ' on' : '') + '" style="background:' + DS.KIT_COLORS[i] + '" data-act="shorts" data-c="' + DS.KIT_COLORS[i] + '"></button>';
     }
     for (i = 0; i < DS.EMBLEMS.length; i++) {
       e = DS.EMBLEMS[i];
-      emb += '<canvas width="30" height="34" data-emblem="' + e.id + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '"></canvas>';
+      emb += '<button class="embpick' + (S.club.emblem === e.id ? ' on' : '') + '" data-act="emblem" data-e="' + e.id + '">' +
+        '<canvas width="30" height="34" data-emblem="' + e.id + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '"></canvas></button>';
     }
 
     box.innerHTML =
@@ -1184,7 +1187,7 @@
       var g = r.goals[i];
       goals += '<div class="rline ' + (g.side === 'away' ? 'away' : '') + '">' +
         (g.side === 'away' ? '' : '<span class="ic">⚽</span>') +
-        '<b>' + esc(g.name) + '</b><span class="min">' + (g.side === 'home' ? '전' : '후') + '반 ' + g.min + '분</span>' +
+        '<b>' + esc(g.name) + '</b><span class="min">' + (g.half === 1 ? '후' : '전') + '반 ' + g.min + '분</span>' +
         (g.assist ? '<span class="min">도움 ' + esc(g.assist) + '</span>' : '') +
         (g.side === 'away' ? '<span class="ic">⚽</span>' : '') +
         '</div>';
@@ -1194,7 +1197,7 @@
       var c = r.cautions[i];
       caut += '<div class="rline ' + (c.side === 'away' ? 'away' : '') + '">' +
         (c.side === 'away' ? '' : '<span class="ic">🟨</span>') +
-        '<b>' + esc(c.name) + '</b><span class="min">' + (c.side === 'home' ? '전' : '후') + '반 ' + c.min + '분</span>' +
+        '<b>' + esc(c.name) + '</b><span class="min">' + (c.half === 1 ? '후' : '전') + '반 ' + c.min + '분</span>' +
         (c.side === 'away' ? '<span class="ic">🟨</span>' : '') +
         '</div>';
     }

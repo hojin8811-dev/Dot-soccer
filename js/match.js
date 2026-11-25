@@ -539,7 +539,7 @@
       var ar = ratingOf(ball.passBy);
       if (ar) { ar.assists++; ar.rating = clamp(ar.rating + 0.55, 3.5, 10); assistName = ball.passBy.name; }
     }
-    goals.push({ min: mn, side: side, name: scorer.name, assist: assistName });
+    goals.push({ min: mn, half: half, side: side, name: scorer.name, assist: assistName });
     updateScoreboard();
     var isHome = side === 'home';
     banner('GOAL!', short(scorer.name) + (isHome ? ' ⚽ ' + cfg.homeName : ' · ' + cfg.awayName));
@@ -607,7 +607,7 @@
 
   function caution(p) {
     p.yellows = (p.yellows || 0) + 1;
-    cautions.push({ min: minute(), side: p.side, name: p.name });
+    cautions.push({ min: minute(), half: minute() < 45 ? 0 : 1, side: p.side, name: p.name });
     if (p.yellows >= 2) {
       p.off = true;
       say('🟨🟨 ' + U.josa(short(p.name), '이/가') + ' 경고 누적으로 퇴장! 수적 열세입니다.', 'tackle');
@@ -727,7 +727,7 @@
         var def = near.player;
         var defSkill = def.player.stats.def + 8;
         var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3;
-        var pTackle = clamp(0.5 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.4);
+        var pTackle = clamp(1.6 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.5);
         if (chance(pTackle)) { tackle(def, c); }
       }
       actionTimer -= dt;
