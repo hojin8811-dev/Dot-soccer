@@ -508,6 +508,7 @@
     M.homeScore = 0; M.awayScore = 0; M.clock = 0;
     M.subsLeft = MAX_SUBS;
     M.paused = false;
+    M.halftime = false;
     simTime = 0; acc = 0;
     goalStats = { homeShots: 0, awayShots: 0 };
     homeXg = 0; awayXg = 0;
@@ -555,6 +556,7 @@
   M.pause = function () { M.paused = true; };
   M.resume = function (quiet) {
     M.paused = false;
+    M.halftime = false;
     lastT = 0;
     if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
   };
@@ -1624,6 +1626,7 @@
     if (!halftimeDone && M.clock >= 45) {
       halftimeDone = true;
       M.paused = true;
+      M.halftime = true;
       say('전반 종료! ' + M.homeScore + ' : ' + M.awayScore, 'big');
       say('선수들이 물을 들이킵니다. 하프타임에 교체를 준비하세요.', 'normal');
       if (cfg.onHalftime) { cfg.onHalftime(); }
@@ -2096,7 +2099,7 @@
     ctx.textBaseline = 'alphabetic';
     void dx; void dy;
 
-    if (M.paused && M.running) {
+    if (M.halftime && M.running) {
       ctx.fillStyle = 'rgba(4,20,16,0.55)';
       ctx.fillRect(0, H / 2 - 20, W, 40);
       ctx.fillStyle = '#d6ff8a';
@@ -2121,7 +2124,7 @@
     }
     var pcs = pressConfig('home');
     return {
-      clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey,
+      clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey, paused: M.paused, halftime: M.halftime,
       ball: { x: Math.round(ball.x), y: Math.round(ball.y), kind: ball.kind, shot: !!ball.shot },
       passLine: play.passLine ? true : false,
       formation: {
