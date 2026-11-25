@@ -581,6 +581,21 @@
     if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
   };
   M.handState = hudState;
+  /* 진단용: 경기 상태 스냅샷 (디버깅 · QA리포트) */
+  M.diag = function () {
+    var c = ball.carrier;
+    return {
+      clock: Math.round(M.clock), phase: play.phase, stage: play.stage, kind: ball.kind,
+      carrier: c ? c.name : null, carrierSide: c ? c.side : null,
+      ballX: Math.round(ball.x * 10) / 10, ballY: Math.round(ball.y * 10) / 10,
+      players: players.length,
+      home: players.filter(function (p) { return p.side === 'home'; }).length,
+      away: players.filter(function (p) { return p.side === 'away'; }).length,
+      passes: stats.passes, shots: goalStats.homeShots + goalStats.awayShots,
+      counterT: Math.round(play.counterT * 10) / 10, recoverT: Math.round(play.recoverT * 10) / 10,
+      setpiece: play.setpiece ? play.setpiece.type : null, timer: Math.round(play.timer * 10) / 10
+    };
+  };
   M.stop = function () {
     M.running = false;
     cancelAnimationFrame(rafId);
@@ -1096,10 +1111,9 @@
       if (buffOf('build') > 0 && d < 26) { score += 7; }
       if (p.side === 'away' && buffOf('def') > 0 && isFwdGroup(q)) { score -= 16; }
       if (p.side === 'away' && buffOf('offside') > 0 && isBehindLine(q)) { score -= 12; }
-      /* 감독 조직력 업: 빈 공간에 선 동료를 더 자주 찾는다 */
+      /* 감독 조직력 업: 오프더볼 위치 선정 → 전진 옵션을 먼저 본다(작게) */
       if (p.side === 'home' && mfx('org') > 0) {
-        score += mfx('org') * Math.min(open, 18) * 0.10;
-        if (fwd < -4) { score -= mfx('org') * 0.5; }
+        score += Math.min(18, Math.max(0, fwd)) * mfx('org') * 0.03;
       }
       if (q.mark && q.mark === p) { score -= 4; }
       score += Math.random() * 5;
@@ -1119,8 +1133,8 @@
     var dir = goalDir(p.side);
     var tx, ty, speed;
     var err = buffOf('tiki') > 0 ? 1.2 : (buffOf('build') > 0 ? 2.0 : 3.0);
-    /* 감독 패스율 업: 패스 오차를 줄인다 */
-    if (p.side === 'home' && mfx('pass') > 0) { err *= (1 - clamp(mfx('pass') * 0.05, 0, 0.5)); }
+    /* 감독 패스율 업·조직력 업: 패스 오차를 줄인다 */
+    if (p.side === 'home') { err *= (1 - clamp(mfx('pass') * 0.05 + mfx('org') * 0.015, 0, 0.55)); }
     if (type === 'through') {
       tx = clamp(q.x + (q.baseX < 50 ? 2 : -2) + range(-err, err), q.zone.xMin, q.zone.xMax);
       ty = clamp(q.y + dir * 11, q.zone.yMin, q.zone.yMax);
@@ -1368,8 +1382,21 @@
       d = Math.hypot(players[i].x - ball.x, players[i].y - ball.y);
       if (d < bd) { bd = d; best = players[i]; }
     }
-    if (best && bd < 9) { giveBall(best); }
-    else { play.looseT += 0.5; }
+    if (best && bd < 9) { giveBall(best); return; }
+    /* 아무도 닿지 못한 패스 — 라인 밖이면 스로인, 안이면 루즈볼로 전환 (공이 무한히 날아가는 현상 방지) */
+    if (ball.x < 2 || ball.x > WORLD_W - 2 || ball.y < 2 || ball.y > WORLD_H - 2) {
+      ball.x = clamp(ball.x, 3, WORLD_W - 3);
+      ball.y = clamp(ball.y, 3, WORLD_H - 3);
+      ball.kind = 'idle';
+      ball.vx = 0; ball.vy = 0;
+      ball.flight = 0;
+      throwIn();
+      return;
+    }
+    ball.kind = 'idle';
+    ball.vx = 0; ball.vy = 0;
+    ball.flight = 0;
+    play.looseT = 1.0;
   }
 
   function tryTackle(defender, carrier, dt) {
@@ -1705,6 +1732,17 @@
     if (play.phase === 'kickoff') {
       play.timer -= dt;
       if (play.timer <= 0) { play.phase = 'play'; }
+    }
+
+    /* 안전장치: 공이 경기장 밖으로 크게 벗어나면 루즈볼로 회수 (공이 무한히 날아가는 정지 방지) */
+    if (ball.x < -10 || ball.x > WORLD_W + 10 || ball.y < -10 || ball.y > WORLD_H + 10) {
+      ball.x = clamp(ball.x, 6, WORLD_W - 6);
+      ball.y = clamp(ball.y, 6, WORLD_H - 6);
+      ball.kind = 'idle';
+      ball.vx = 0; ball.vy = 0;
+      ball.flight = 0;
+      ball.shot = null;
+      play.looseT = 1.2;
     }
 
     updateStage(dt);
