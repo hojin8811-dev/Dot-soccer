@@ -701,7 +701,7 @@
 
   function shoot(p) {
     var gy = attackGoalY(p.side);
-    var acc = 0.35 + p.player.stats.atk / 340 + (p.side === 'home' ? (formFactor - 1) * 0.6 : 0);
+    var acc = 0.38 + p.player.stats.atk / 335 + (p.side === 'home' ? (formFactor - 1) * 0.6 : 0);
     if (p.side === 'home' && buffOf('atk') > 0) { acc += 0.13; }
     if (p.side === 'home' && buffOf('setpiece') > 0) { acc += 0.22; }
     if (p.side === 'home' && p.player.role === 'poacher') { acc += 0.05; }
@@ -823,7 +823,7 @@
       goalKick(defSide);
       return;
     }
-    var saveProb = clamp(0.42 + gkDef / 210 + (dist > 20 ? 0.14 : 0) - atk / 620, 0.16, 0.76);
+    var saveProb = clamp(0.34 + gkDef / 215 + (dist > 20 ? 0.14 : 0) - atk / 620, 0.14, 0.68);
     if (gk) { gk.dive = 1; }
     if (chance(saveProb)) {
       if (gk) { save(gk); }

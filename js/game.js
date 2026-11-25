@@ -145,7 +145,7 @@
     var squad = DS.makeInitialSquad();
     var st = {
       v: 3,
-      club: { name: '도트 유나이티드', emblem: 'flame', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
+      club: { name: '도트 유나이티드', emblem: 'bolt', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
       money: 7200,
       fans: 1280,
       morale: 66,
