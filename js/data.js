@@ -22,7 +22,8 @@
   }
   function josa(word, pair) {
     var parts = pair.split('/');
-    return word + (hasJong(word) ? parts[0] : parts[1]);
+    var tail = parts.length > 1 ? (hasJong(word) ? parts[0] : parts[1]) : parts[0];
+    return word + tail;
   }
 
   DS.util = { rnd: rnd, range: range, irange: irange, pick: pick, clamp: clamp, chance: chance, fmt: fmt, hasJong: hasJong, josa: josa };

@@ -512,7 +512,7 @@
       '</div>' +
       '<div class="bench">' +
       '<div class="bench-head"><span>후보 선수</span><span class="muted tiny">탭해서 교체</span></div>' +
-      '<div class="bench-list">' + benchHTML + '</div>' +
+      '<div class="bench-list' + (bench.length > 5 ? ' cols-6' : '') + '">' + benchHTML + '</div>' +
       '</div>' +
       detail;
 
