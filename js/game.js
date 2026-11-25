@@ -703,6 +703,9 @@
           figTag(b, 'pcanvas', 2) +
           '<span class="bn">' + esc(shortName(b.name)) + '</span>' +
           '<span class="br" style="--rc:' + rarityColor(b) + '">' + DS.RARITY[b.rarity].name + ' ' + DS.ratingOf(b) + '</span>' +
+          '<span class="mbars"><i class="s" style="width:' + (b.s * 10) + '%"></i></span>' +
+          '<span class="mbars"><i class="t" style="width:' + (b.t * 10) + '%"></i></span>' +
+          '<span class="mbars"><i class="p" style="width:' + (b.p * 10) + '%"></i></span>' +
           '</button>';
       } else {
         benchHTML += '<div class="bcard empty">벤치<br>공석</div>';
