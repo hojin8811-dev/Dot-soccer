@@ -80,7 +80,7 @@
     AM:  { x: 30, y: 32 }, CM: { x: 62, y: 33 },
     DM:  { x: 50, y: 52 },
     LWB: { x: 9,  y: 62 }, LB: { x: 30, y: 70 }, CB: { x: 56, y: 68 }, RB: { x: 82, y: 70 }, RWB: { x: 93, y: 60 },
-    GK:  { x: 62, y: 90 }
+    GK:  { x: 62, y: 88 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
   var APT_LIST = POS_ORDER.slice();
