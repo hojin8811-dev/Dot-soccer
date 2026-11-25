@@ -124,6 +124,18 @@
       if (!data.club || !data.table || !data.fixtures) { return null; }
       if (!DS.FORMATIONS[data.formation]) { data.formation = '4-3-3'; }
       if (!DS.KIT_COLORS) { return null; }
+      /* 구버전 저장 데이터 보정 */
+      if (!data.totals) { data.totals = { matches: 0, wins: 0, draws: 0, losses: 0, goals: 0, conceded: 0 }; }
+      if (typeof data.challengeLeft !== 'number') { data.challengeLeft = 1; }
+      if (typeof data.morale !== 'number') { data.morale = 60; }
+      if (typeof data.seasonOver !== 'boolean') { data.seasonOver = false; }
+      if (typeof data.fans !== 'number') { data.fans = 1000; }
+      if (typeof data.money !== 'number') { data.money = 3000; }
+      if (!data.table || !data.table.length) { data.table = makeTable(); }
+      if (!data.fixtures || !data.fixtures.length) { data.fixtures = makeFixtures(); }
+      if (!data.lineup || data.lineup.length !== 11) { data.lineup = autoLineup(data.squad, data.formation); }
+      if (!data.club.kit.shorts) { data.club.kit.shorts = '#ffffff'; }
+      if (!data.club.kit.trim) { data.club.kit.trim = '#ffd24a'; }
       return data;
     } catch (e) {
       return null;
