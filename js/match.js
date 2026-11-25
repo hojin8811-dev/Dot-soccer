@@ -614,7 +614,7 @@
 
   function caution(p) {
     p.yellows = (p.yellows || 0) + 1;
-    cautions.push({ min: minute(), half: minute() < 45 ? 0 : 1, side: p.side, name: p.name });
+    cautions.push({ min: minute(), half: minute() < 45 ? 0 : 1, side: p.side, name: p.name, type: p.yellows >= 2 ? 'red' : 'yellow' });
     if (p.yellows >= 2) {
       p.off = true;
       say('🟨🟨 ' + U.josa(short(p.name), '이/가') + ' 경고 누적으로 퇴장! 수적 열세입니다.', 'tackle');
@@ -631,7 +631,7 @@
 
   function tackle(defender, carrier) {
     /* 파울 판정 */
-    var foulP = clamp(0.16 + (defender.player.tough < 4 ? 0.06 : 0) - (defender.player.traits === 'cool' ? 0.06 : 0), 0.06, 0.3);
+    var foulP = clamp(0.14 + (defender.player.tough < 4 ? 0.05 : 0), 0.05, 0.26);
     if (chance(foulP)) {
       say('🦵 ' + U.josa(short(defender.name), '의') + ' 거친 태클! 휘슬이 울립니다.', 'tackle');
       if (chance(0.55)) { caution(defender); }
@@ -734,7 +734,7 @@
         var def = near.player;
         var defSkill = def.player.stats.def + 8;
         var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3;
-        var pTackle = clamp(1.6 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.5);
+        var pTackle = clamp(0.62 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.35);
         if (chance(pTackle)) { tackle(def, c); }
       }
       actionTimer -= dt;

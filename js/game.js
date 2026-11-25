@@ -1198,10 +1198,11 @@
     if (!r.cautions.length) { caut = '<div class="rline empty">경고 없음</div>'; }
     for (i = 0; i < r.cautions.length; i++) {
       var c = r.cautions[i];
+      var cardIc = c.type === 'red' ? '🟥' : '🟨';
       caut += '<div class="rline ' + (c.side === 'away' ? 'away' : '') + '">' +
-        (c.side === 'away' ? '' : '<span class="ic">🟨</span>') +
+        (c.side === 'away' ? '' : '<span class="ic">' + cardIc + '</span>') +
         '<b>' + esc(c.name) + '</b><span class="min">' + (c.half === 1 ? '후' : '전') + '반 ' + c.min + '분</span>' +
-        (c.side === 'away' ? '<span class="ic">🟨</span>' : '') +
+        (c.side === 'away' ? '<span class="ic">' + cardIc + '</span>' : '') +
         '</div>';
     }
     var sorted = r.ratings.slice();
