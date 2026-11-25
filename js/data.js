@@ -280,7 +280,7 @@
   var STORY = [
     '{club}의 {posname} {name}. 어린 시절 마을 잔디밭에서 혼자 공을 차던 시절의 버릇이 아직 남아 있다. {traitdesc} 경기장에 들어서면 표정이 먼저 바뀌고, 동료들은 그 눈빛을 보고 공을 맡긴다.',
     '지방 리그에서 이름을 알린 {name}. 스카우터의 수첩에 "느리지만 절대 틀리지 않는 선수"라고 적혀 있던 것이 인연이 되어 {club}에 입단했다. {traitdesc} 최근에는 후배들에게 먼저 다가가 말을 거는 모습이 자주 보인다.',
-    '{name}은(는) {club}의 자랑인 {nickname}. 훈련이 끝난 뒤에도 골대 앞에 남아 공을 정리하는 성실함으로 유명하다. {traitdesc} 팬들은 그의 등번호가 적힌 유니폼을 입고 관중석 한쪽을 채운다.',
+    '{nameJosa} {club}의 자랑인 {nickname}. 훈련이 끝난 뒤에도 골대 앞에 남아 공을 정리하는 성실함으로 유명하다. {traitdesc} 팬들은 그의 등번호가 적힌 유니폼을 입고 관중석 한쪽을 채운다.',
     '한때 방출 통보를 받고 짐을 싸던 {name}. 마지막 연습 경기에서 보여 준 집념이 감독의 마음을 바꿨고, 그날 이후로 그는 매 경기 출전 명단에 이름을 올린다. {traitdesc}',
     '{club} 유스 출신의 {name}. 구단 시설이 낡아 바닥이 젖은 날에도 혼자 남아 슛을 쏘던 소년은 이제 경기장을 지휘하는 선수가 되었다. {traitdesc}',
     '조용한 성격의 {name}. 인터뷰에서는 말수가 적지만, 라커룸에서 가장 먼저 웃음을 만드는 사람도 그다. {traitdesc} 감독은 그를 두고 "팀의 온도"라고 부른다.',
@@ -296,6 +296,7 @@
     return t
       .replace(/\{club\}/g, clubName || '도트 유나이티드')
       .replace(/\{name\}/g, p.name)
+      .replace(/\{nameJosa\}/g, josa(p.name, '은/는'))
       .replace(/\{posname\}/g, POS[p.pos].name)
       .replace(/\{nickname\}/g, nick)
       .replace(/\{traitdesc\}/g, tr.desc);

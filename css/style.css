@@ -623,7 +623,7 @@ button:disabled { opacity: .45; filter: grayscale(.5); }
 /* 선수 상세 */
 .pd-head {
   position: relative; display: flex; gap: 6px; align-items: flex-start;
-  padding: 6px; border-radius: 5px; overflow: hidden;
+  min-height: 152px; padding: 6px; border-radius: 5px; overflow: hidden;
   background: linear-gradient(120deg, #2f4a72 0%, #26385a 45%, #1d2a48 100%);
   border: 1px solid #101a2c; color: #eaf1ff;
 }
@@ -632,7 +632,7 @@ button:disabled { opacity: .45; filter: grayscale(.5); }
   font-size: 64px; font-weight: 900; color: rgba(255,255,255,.06); letter-spacing: -4px;
 }
 .pd-port {
-  flex: 0 0 92px; width: 92px; border-radius: 4px; overflow: hidden;
+  flex: 0 0 96px; width: 96px; border-radius: 4px; overflow: hidden;
   background: linear-gradient(#79a458, #3f6a2a); border: 1px solid rgba(255,255,255,.22);
   position: relative;
 }
