@@ -99,6 +99,7 @@ main {
   position: relative; z-index: 1;
   flex: 1 1 auto;
   overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding: 10px 11px 16px;
 }
@@ -232,13 +233,13 @@ main {
   padding: 12px 13px;
 }
 .hero-kicker {
-  font-size: 7.5px; font-weight: 800; letter-spacing: 1.4px; line-height: 1.2;
-  color: var(--lime); margin-bottom: 7px; opacity: .95;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 1.4px; line-height: 1.1;
+  color: var(--lime); margin-bottom: 9px; opacity: .95;
   text-shadow: 0 1px 6px rgba(0,0,0,.8);
 }
 .hero-title {
-  margin: 0 0 4px;
-  font-size: 20px; font-weight: 900; letter-spacing: -1.2px; line-height: 1.1;
+  margin: 0 0 5px;
+  font-size: 19px; font-weight: 900; letter-spacing: -1.2px; line-height: 1.05;
   color: #f4fbe9; text-shadow: 0 2px 12px rgba(0,0,0,.5);
 }
 .hero-sub { font-size: 9.5px; color: rgba(233, 244, 221, .78); letter-spacing: .1px; }
@@ -402,7 +403,7 @@ main {
 }
 .deckcard::after { content: ""; position: absolute; right: -20px; top: -20px; width: 44px; height: 44px; border-radius: 50%; background: var(--cc, #c8f169); opacity: .13; }
 .deckcard .tg { font-size: 6.5px; font-weight: 900; letter-spacing: .4px; color: var(--cc, var(--lime)); white-space: nowrap; }
-.deckcard .nm { display: block; font-size: 9px; font-weight: 900; letter-spacing: -.5px; line-height: 1.2; margin-top: 3px; height: 22px; overflow: hidden; color: #eef8e2; }
+.deckcard .nm { display: block; font-size: 8.5px; font-weight: 900; letter-spacing: -.4px; line-height: 1.18; margin-top: 3px; height: 21px; overflow: hidden; color: #eef8e2; }
 .deckcard .mt { position: absolute; left: 6px; bottom: 6px; font-size: 7px; font-weight: 800; color: rgba(233,244,221,.5); letter-spacing: .3px; }
 .deckcard .mt em { font-style: normal; color: var(--lime); font-size: 8.5px; }
 
@@ -826,3 +827,5 @@ main {
 .deckrow .dtxt span { display: block; font-size: 8.5px; line-height: 1.4; color: var(--ink3); margin-top: 1px; }
 .deckrow .dstate { font-size: 8px; font-weight: 900; text-align: center; padding: 4px 0; border-radius: 7px; background: #e7e2d2; color: var(--ink3); }
 .deckrow .dstate.on { background: var(--lime); color: #1d3b07; }
+
+main::-webkit-scrollbar { width: 0; height: 0; }
