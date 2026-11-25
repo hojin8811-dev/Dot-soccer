@@ -1846,7 +1846,11 @@
   /* ─────────────────────────  그리기  ───────────────────────── */
   /* 필드 선수는 구단 유니폼, 골키퍼는 GK 전용 색으로 구분 */
   function kitOf(p) {
-    if (p.pos === 'GK') { return { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' }; }
+    if (p.pos === 'GK') {
+      return p.side === 'home'
+        ? { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' }
+        : { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' };
+    }
     return p.kit;
   }
 

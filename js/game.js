@@ -1576,6 +1576,7 @@
     if (!DS.FORMATIONS[f]) { return; }
     S.formation = f;
     S.lineup = autoLineup(S.squad, f);
+    S.bench = autoBench(S.squad, S.lineup);
     selId = null;
     autoRoles();
     save();
