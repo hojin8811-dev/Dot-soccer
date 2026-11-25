@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>도트싸커 — 도트 축구 구단주 시뮬레이션</title>
+<meta name="description" content="100% 한국어 UI의 도트 축구 구단주 시뮬레이션. 픽셀 잔디 위에서 2.5등신 도트 선수들이 실제로 뛰는 실시간 경기 중계.">
+<meta name="theme-color" content="#0a1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="도트싸커">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+<div id="app">
+  <header id="topbar" class="topbar"></header>
+  <main id="main">
+    <section class="screen on" id="screen-home"></section>
+    <section class="screen" id="screen-squad"></section>
+    <section class="screen" id="screen-match"></section>
+    <section class="screen" id="screen-scout"></section>
+  </main>
+  <nav class="tabbar" id="tabbar">
+    <button data-act="tab" data-tab="home" class="on"><span class="ico">🏠</span><span class="lb">클럽</span></button>
+    <button data-act="tab" data-tab="squad"><span class="ico">⚽</span><span class="lb">스쿼드</span></button>
+    <button data-act="tab" data-tab="match"><span class="ico">🏟️</span><span class="lb">경기</span></button>
+    <button data-act="tab" data-tab="scout"><span class="ico">🔍</span><span class="lb">스카우트</span></button>
+  </nav>
+  <div id="toast" class="toast"></div>
+</div>
+<script src="js/data.js?v=1"></script>
+<script src="js/match.js?v=1"></script>
+<script src="js/game.js?v=1"></script>
+<script>
+/* 서비스워커 등록 (PWA) */
+(function () {
+  if (!('serviceWorker' in navigator)) { return; }
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* 오프라인 캐시는 선택 사항 */ });
+  });
+})();
+</script>
+</body>
+</html>
