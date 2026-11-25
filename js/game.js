@@ -155,6 +155,7 @@
       seasonOver: false,
       formation: '4-2-3-1',
       tactics: 'balanced',
+      uiMode: 'basic',
       deck: DS.DEFAULT_DECK.slice(),
       squad: squad,
       lineup: [],
@@ -212,6 +213,7 @@
       if (!d.career) { d.career = []; }
       if (!d.combos) { d.combos = []; }
       if (!d.deck || !d.deck.length) { d.deck = DS.DEFAULT_DECK.slice(); }
+      if (!d.uiMode) { d.uiMode = 'basic'; }
       if (typeof d.smatchTickets !== 'number') { d.smatchTickets = 3; }
       if (typeof d.smatchStreak !== 'number') { d.smatchStreak = 0; }
       if (typeof d.condition !== 'number') { d.condition = 88; }
@@ -581,6 +583,7 @@
     var box = document.getElementById('screen-squad');
     if (!box) { return; }
     var f = DS.FORMATIONS[S.formation];
+    var master = S.uiMode === 'master';
     var i, slot, p, chips = '', toks = '';
 
     for (i = 0; i < DS.FORMATION_KEYS.length; i++) {
@@ -592,10 +595,11 @@
     for (i = 0; i < f.slots.length; i++) {
       slot = f.slots[i];
       p = byId(S.lineup[i]);
+      var tokBadge = master ? slot.pos : DS.posGroup(slot.pos);
       toks += '<button class="tok ' + (p ? 'r-' + p.rarity : 'empty') + (selId === (p && p.id) ? ' sel' : '') + '" ' +
         'style="left:' + slot.x + '%;top:' + (slot.y * 1.0) + '%" data-act="starter" data-slot="' + i + '" data-id="' + (p ? p.id : '') + '">' +
         (slot.k ? '<span class="key">☆</span>' : '') +
-        (p && p.role ? '<span class="rl">' + (DS.roleOf(p.role) ? DS.roleOf(p.role).name : '') + '</span>' : '') +
+        '<span class="rl' + (master ? ' role' : '') + '">' + tokBadge + '</span>' +
         '<span class="ring">' + (p ? '<img src="' + DS.Art.headSrc(p) + '" alt="">' : '') + '</span>' +
         '<span class="nm">' + (p ? esc(shortName(p.name)) : slot.pos) + '</span>' +
         '</button>';
@@ -608,7 +612,7 @@
         benchHTML += '<button class="pcard ' + (selId === b.id ? 'sel' : '') + '" data-act="bench" data-id="' + b.id + '">' +
           '<span class="ph"><img src="' + DS.Art.headSrc(b) + '" alt=""></span>' +
           '<span class="pn">' + esc(shortName(b.name)) + '</span>' +
-          '<span class="pm">' + posBadge(b.pos) + '<span class="ov">' + DS.ratingOf(b) + '</span></span>' +
+          '<span class="pm">' + posBadge(b.pos, master ? b.pos : DS.posGroup(b.pos)) + '<span class="ov">' + DS.ratingOf(b) + '</span></span>' +
           '</button>';
       } else {
         benchHTML += '<div class="pcard" style="opacity:.5"><span class="ph"></span><span class="pn">공석</span><span class="pm tiny">BENCH</span></div>';
@@ -626,15 +630,28 @@
         '<b style="font-size:10px;color:' + (on ? '#3d6b12' : '#9aa196') + '">' + (on ? '+' + (counts[L.key] >= 5 ? 6 : 3) : '—') + '</b></div>';
     }
 
+    var kpiHTML = master
+      ? '<div class="kpis">' +
+        '<div class="kpi"><b class="lime">' + xgEstimate().toFixed(1) + '</b><span>기대 득점 xG</span></div>' +
+        '<div class="kpi"><b>' + pressLevel() + '</b><span>압박 강도</span></div>' +
+        '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력 소모</span></div></div>'
+      : '<div class="kpis">' +
+        '<div class="kpi"><b class="lime">' + teamPower() + '</b><span>전력</span></div>' +
+        '<div class="kpi"><b>' + chemistry() + '</b><span>조직력</span></div>' +
+        '<div class="kpi"><b>' + ourRank() + '위</b><span>리그 순위</span></div></div>';
+
     box.innerHTML =
+      '<div class="modebar">' +
+      '<div class="seg mode" id="ui-mode">' +
+      '<button data-act="uimode" data-v="basic" class="' + (master ? '' : 'on') + '">기본</button>' +
+      '<button data-act="uimode" data-v="master" class="' + (master ? 'on' : '') + '">마스터</button>' +
+      '</div>' +
+      '<span class="modehint">' + (master ? '세부 포지션 · 롤 · xG 지표' : '직관 포지션 · 핵심 전력만') + '</span>' +
+      '</div>' +
       '<div class="fscroll">' + chips + '</div>' +
       '<div class="card dark tight" style="margin-top:7px">' +
-      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">' + S.formation + ' · ' + f.tag + '</b><span class="meta">' + f.desc + '</span></div>' +
-      '<div class="kpis">' +
-      '<div class="kpi"><b class="lime">' + xgEstimate().toFixed(1) + '</b><span>기대 득점</span></div>' +
-      '<div class="kpi"><b>' + pressLevel() + '</b><span>압박 강도</span></div>' +
-      '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력 소모</span></div>' +
-      '</div></div>' +
+      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">' + S.formation + ' · ' + f.tag + '</b><span class="meta">' + (master ? f.desc : '현대 포메이션') + '</span></div>' +
+      kpiHTML + '</div>' +
       '<div class="pitch" id="pitch-squad">' +
       '<canvas id="pitch-bg"></canvas>' +
       '<div class="pitch-head">조직력 <em>' + chemistry() + '</em> · 전력 <em>' + teamPower() + '</em></div>' +
@@ -1392,6 +1409,7 @@
       '<div id="m-overlay"></div></div>' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b>' +
+      '<span class="uses" id="m-uses">개입 3/3</span>' +
       '<span class="val"><span id="m-mom-val">0</span><small>/100</small></span></div>' +
       '<div class="mom-bar"><i id="m-mom-fill"></i></div>' +
       '<div class="mom-buffs" id="m-buffs"></div>' +
@@ -1430,9 +1448,14 @@
       }
       buffs.innerHTML = html;
     }
+    var usesEl = document.getElementById('m-uses');
+    if (usesEl) {
+      usesEl.textContent = '개입 ' + (st.usesLeft === undefined ? 3 : st.usesLeft) + '/' + (st.limit || 3);
+      usesEl.classList.toggle('out', st.usesLeft === 0);
+    }
     var hand = document.getElementById('m-hand');
     if (hand) {
-      var sig = st.hand.map(function (c) { return c.key; }).join(',');
+      var sig = st.hand.map(function (c) { return c.key; }).join(',') + '|' + (st.usesLeft === 0 ? 'x' : '');
       if (sig !== hand.getAttribute('data-sig')) {
         var h = '', i, c;
         for (i = 0; i < st.hand.length; i++) {
@@ -1448,11 +1471,12 @@
       var btns = hand.querySelectorAll('.tcard'), j, b, cd;
       for (j = 0; j < st.hand.length && j < btns.length; j++) {
         b = btns[j]; c = st.hand[j];
-        b.disabled = !c.ready;
-        b.classList.toggle('ready', !!c.ready);
-        b.classList.toggle('locked', !c.ready);
+        var noUse = st.usesLeft === 0;
+        b.disabled = noUse || !c.ready;
+        b.classList.toggle('ready', !noUse && !!c.ready);
+        b.classList.toggle('locked', noUse || !c.ready);
         cd = b.querySelector('.cd');
-        cd.textContent = c.cooldown > 0 ? ('재장전 ' + c.cooldown + 's') : '';
+        cd.textContent = noUse ? '이번 경기 개입 완료' : (c.cooldown > 0 ? ('재장전 ' + c.cooldown + 's') : '');
       }
     }
   }
@@ -1710,6 +1734,13 @@
     }
     if (act === 'autorole') { autoRoles(); save(); renderSquad(); roleModal(); toast('능력치 기준으로 지정했습니다.'); return; }
 
+    if (act === 'uimode') {
+      S.uiMode = t.getAttribute('data-v') === 'master' ? 'master' : 'basic';
+      save();
+      renderSquad();
+      toast(S.uiMode === 'master' ? '마스터 모드 · 세부 전술 표시' : '기본 모드 · 간단 표시');
+      return;
+    }
     if (act === 'evolvelist') { evolveListModal(); return; }
     if (act === 'evolve') { var ep = byId(t.getAttribute('data-id')); if (ep) { evolveModal(ep); } return; }
     if (act === 'evolvepick') { doEvolve(byId(t.getAttribute('data-p')), t.getAttribute('data-k')); return; }
@@ -1802,7 +1833,10 @@
     if (act === 'playcard') {
       var ck = t.getAttribute('data-k');
       var ok = DS.Match ? DS.Match.playCard(ck) : false;
-      if (!ok) { toast('모멘텀이 부족합니다.'); }
+      if (!ok) {
+        var hs = DS.Match && DS.Match.handState ? DS.Match.handState() : null;
+        toast(hs && hs.usesLeft === 0 ? '이번 경기는 개입 3회를 모두 사용했습니다.' : '모멘텀이 부족합니다.');
+      }
       return;
     }
     if (act === 'speed') {

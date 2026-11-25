@@ -788,3 +788,23 @@ main {
 .gcutin .cutin-art img { height: 100%; }
 .mom-top b { letter-spacing: .3px; }
 .mom-top .val { white-space: nowrap; }
+
+/* 기본 / 마스터 모드 */
+.modebar { display: flex; align-items: center; gap: 8px; margin: 0 2px 6px; }
+.seg.mode { background: rgba(255,255,255,.07); padding: 2px; }
+.seg.mode button { min-width: 46px; height: 24px; font-size: 10px; }
+.modehint { font-size: 8.5px; font-weight: 700; color: rgba(233,244,221,.45); letter-spacing: .2px; }
+.tok .rl {
+  position: absolute; top: -3px; right: -2px;
+  padding: 0 4px; border-radius: 5px;
+  background: rgba(6, 26, 22, .88);
+  border: 1px solid rgba(255,255,255,.22);
+  color: #dff2cb; font-size: 6.5px; font-weight: 900; letter-spacing: .2px;
+}
+.tok .rl.role { background: var(--lime); border-color: var(--lime2); color: #1d3b07; }
+.mom-top .uses {
+  font-size: 8px; font-weight: 900; letter-spacing: .2px;
+  padding: 2px 6px; border-radius: 7px;
+  background: rgba(200,241,105,.16); color: #d8f7a6;
+}
+.mom-top .uses.out { background: rgba(239,106,82,.18); color: #ffb0a0; }

@@ -11,6 +11,7 @@
   var MATCH_SECONDS = 96;      /* ×1 배속에서 96초에 90분 경기 */
   var MAX_SUBS = 5;
   var HAND_SIZE = 3;
+  var CARD_LIMIT = 3;      /* 경기당 전술 카드 개입 최대 횟수 */
 
   var M = {
     running: false,
@@ -162,14 +163,15 @@
   }
 
   function hudState() {
-    var out = { momentum: Math.round(momentum), hand: [], buffs: [], uses: cardUses };
+    var out = { momentum: Math.round(momentum), hand: [], buffs: [], uses: cardUses,
+      usesLeft: Math.max(0, CARD_LIMIT - cardUses), limit: CARD_LIMIT };
     var i;
     for (i = 0; i < hand.length; i++) {
       var def = DS.cardOf(hand[i].key);
       if (!def) { continue; }
       out.hand.push({
         key: def.key, name: def.name, cost: def.cost, tag: def.tag, color: def.color,
-        icon: def.icon, ready: hand[i].readyAt <= 0 && momentum >= def.cost,
+        icon: def.icon, ready: hand[i].readyAt <= 0 && momentum >= def.cost && cardUses < CARD_LIMIT,
         cooldown: Math.max(0, Math.ceil(hand[i].readyAt))
       });
     }
@@ -252,6 +254,7 @@
     if (idx < 0) { return false; }
     var def = DS.cardOf(key);
     if (!def) { return false; }
+    if (cardUses >= CARD_LIMIT) { return false; }
     if (hand[idx].readyAt > 0) { return false; }
     if (momentum < def.cost) { return false; }
 
