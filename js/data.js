@@ -510,9 +510,9 @@
     { key: 'shoot',  name: '슈팅 연습', icon: '🎯', gain: { t: 1 },        desc: '테크닉 +' },
     { key: 'pass',   name: '패스 훈련', icon: '🔁', gain: { t: 1 },        desc: '테크닉 +' },
     { key: 'sprint', name: '스프린트',  icon: '💨', gain: { s: 1 },        desc: '스피드 +' },
-    { key: 'weight', name: '웨이트',    icon: '🏋️', gain: { p: 1 },        desc: '파워 +' },
+    { key: 'weight', name: '웨이트',    icon: '💪', gain: { p: 1 },        desc: '파워 +' },
     { key: 'tactic', name: '전술 회의', icon: '📋', gain: { cap: 1 },      desc: '통솔 +' },
-    { key: 'setpiece', name: '세트피스', icon: '🎪', gain: { fk: 1 },      desc: 'FK +' }
+    { key: 'setpiece', name: '세트피스', icon: '⚑', gain: { fk: 1 },      desc: 'FK +' }
   ];
   DS.TRAIN_MENUS = TRAIN_MENUS;
   DS.trainMenuOf = function (key) {

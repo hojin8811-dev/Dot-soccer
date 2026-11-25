@@ -43,7 +43,9 @@
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').catch(function () { /* 오프라인 캐시는 선택 */ });
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      if (reg && reg.update) { reg.update(); }
+    }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });
 })();
 </script>

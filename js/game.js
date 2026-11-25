@@ -631,13 +631,13 @@
         '<div class="vs-team"><canvas class="vs-emblem" data-emblem="' + opp.emblem + '" data-kit="' + opp.kit.shirt + '|' + opp.kit.trim + '" width="42" height="48"></canvas><span>' + esc(opp.short) + '</span></div>' +
         '</div>' +
         '<div class="muted tiny" style="margin-bottom:4px">' + it.desc + ' · 보상 🪙' + fmt(it.reward) + (S.smatchStreak >= 3 ? ' (+연승 보너스)' : '') + '</div>' +
-        '<button class="btn wide' + (i === 2 ? ' red' : '') + '" data-act="smatch" data-k="' + it.key + '" ' + (S.smatchTickets <= 0 ? 'disabled' : '') + '>S매치 시작 <span style="font-size:9.5px;opacity:.85">🎟 ' + S.smatchTickets + '</span></button>' +
+        '<button class="btn wide' + (i === 2 ? ' red' : '') + '" data-act="smatch" data-k="' + it.key + '" ' + (S.smatchTickets <= 0 ? 'disabled' : '') + '>S매치 시작 <span style="font-size:9.5px;opacity:.85">이용권 ' + S.smatchTickets + '장</span></button>' +
         '</div>';
     }
 
     box.innerHTML =
       '<div class="card">' +
-      '<div class="card-title">🎟️ S매치 <span class="muted">스페셜 매치</span></div>' +
+      '<div class="card-title">S매치 <span class="muted">스페셜 매치</span></div>' +
       '<div class="row-between">' +
       '<div class="muted">리그와 별개로 치르는 특별 경기. 승리하면 팬과 금화를 크게 얻습니다.</div>' +
       '</div>' +
@@ -983,7 +983,7 @@
       '<div class="speech">스페셜 스카우터에서 <b>리스트 갱신 완료</b>! 영입하고 싶은 선수를 선택해 주세요.<br>방출할 선수를 고르면 바로 교환이 진행됩니다.</div>' +
       '</div>' +
       '<div class="card">' +
-      '<div class="card-title">🔭 스페셜 스카우트 <span class="muted">4인 후보</span></div>' +
+      '<div class="card-title">스페셜 스카우트 <span class="muted">4인 후보</span></div>' +
       '<div class="sc-head"><span>POSITION <b>RANDOM</b></span><span>영입 비용 🪙' + fmt(CAND_COST) + '</span></div>' +
       '<div class="sc-list">' + cards + '</div>' +
       '<div class="row-between" style="margin-top:6px">' +
@@ -992,7 +992,7 @@
       '</div>' +
       '</div>' +
       '<div class="card">' +
-      '<div class="card-title">📚 컬렉션 도감 <span class="muted">수집률</span></div>' +
+      '<div class="card-title">컬렉션 도감 <span class="muted">수집률</span></div>' +
       '<div class="row-between"><span class="muted tiny">선수 ' + dexP + '/' + targets.p + '</span><b style="font-size:10px">' + pctP + '%</b></div>' +
       '<div class="dex-bar"><i style="width:' + pctP + '%"></i></div>' +
       '<div class="row-between"><span class="muted tiny">엠블럼 ' + dexE + '/' + targets.e + '</span><b style="font-size:10px">' + pctE + '%</b></div>' +
@@ -1003,7 +1003,7 @@
       '<div class="dex-grid">' + kCells + '</div>' +
       '</div>' +
       '<div class="card">' +
-      '<div class="card-title">🧃 아이템</div>' +
+      '<div class="card-title">아이템</div>' +
       '<div class="row-between" style="margin-bottom:4px"><span class="muted">컨디션 드링크 · 컨디션 +20</span><button class="btn sm" data-act="item" data-k="drink" ' + (S.money < 600 ? 'disabled' : '') + '>🪙600</button></div>' +
       '<div class="row-between"><span class="muted">응원단 파티 · 사기 +12</span><button class="btn sm" data-act="item" data-k="party" ' + (S.money < 900 ? 'disabled' : '') + '>🪙900</button></div>' +
       '</div>';
