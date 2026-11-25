@@ -895,7 +895,7 @@
       '<div class="res-verdict">' + verdict + '</div>' +
       '<div class="res-score">' + res.homeName + ' <b>' + gf + ' : ' + ga + '</b> ' + res.awayShort + '</div>' +
       '<div class="res-mvp">👑 MVP <b>' + esc(res.mvp ? res.mvp.name : '-') + '</b> · 평점 ' + (res.mvpRating || 0).toFixed(1) + '</div>' +
-      '<div class="res-meta">' + (points !== null && points !== undefined ? '승점 +' + points + ' · ' : '') + '보상 🪙 ' + fmt(reward) + '</div>' +
+      '<div class="res-meta">' + ((points !== null && points !== undefined && points > 0) ? '승점 +' + points + ' · ' : '') + '보상 🪙 ' + fmt(reward) + '</div>' +
       '<div class="rt-list">' + list + '</div>' +
       '<div class="res-btns"><button class="cta" data-act="close-result">확인</button>' +
       '<button class="cta ghost" data-act="kickoff">한 번 더</button></div>' +
