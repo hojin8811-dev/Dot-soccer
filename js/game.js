@@ -1648,6 +1648,7 @@
   var subHalf = false;
   function openSubs(halftime) {
     subHalf = !!halftime;
+    if (!halftime && DS.Match && DS.Match.running && DS.Match.pause) { DS.Match.pause(); }
     var st = DS.Match && DS.Match.subState ? DS.Match.subState() : null;
     if (!st) { return; }
     var ov = document.getElementById('m-overlay');
@@ -1850,7 +1851,12 @@
       return;
     }
     if (act === 'subs') { openSubs(false); return; }
-    if (act === 'subclose') { if (subHalf) { if (DS.Match) { DS.Match.resume(); } subHalf = false; } closeSubs(); return; }
+    if (act === 'subclose') {
+      if (DS.Match && DS.Match.running) { DS.Match.resume(subHalf ? false : true); }
+      subHalf = false;
+      closeSubs();
+      return;
+    }
     if (act === 'halftime2') { if (DS.Match) { DS.Match.resume(); } subHalf = false; closeSubs(); return; }
     if (act === 'subpick') {
       var side = t.getAttribute('data-side');

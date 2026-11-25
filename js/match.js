@@ -162,10 +162,17 @@
       (t === 'defense' ? '전술을 수비적으로! 라인을 내립니다.' : '균형 전술로 안정을 찾습니다.');
     say(line, 'tactic');
   };
-  M.resume = function () {
+  M.pause = function () { M.paused = true; };
+  M.resume = function (quiet) {
     M.paused = false;
     lastT = 0;
-    say('후반전 시작! 다시 공을 굴립니다.', 'big');
+    if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
+  };
+  M.stats = function () {
+    return {
+      passes: stats.passes, tackles: stats.tackles, saves: stats.saves,
+      shots: goalStats, cautions: cautions.length, goals: goals.length, minute: minute()
+    };
   };
   M.stop = function () {
     M.running = false;
@@ -392,7 +399,7 @@
   }
 
   function separate() {
-    var i, j, a, b, dx, dy, d, minD = 3.4;
+    var i, j, a, b, dx, dy, d, minD = 3.1;
     for (i = 0; i < players.length; i++) {
       a = players[i];
       for (j = i + 1; j < players.length; j++) {
@@ -722,8 +729,8 @@
       possession[c.side] += dt;
       ball.x = c.x + (50 - c.x) * 0.02;
       ball.y = c.y + goalDir(c.side) * 1.6;
-      var near = nearestOpponent(c, 3.2);
-      if (near.player && near.dist < 2.6) {
+      var near = nearestOpponent(c, 4.2);
+      if (near.player && near.dist < 3.75) {
         var def = near.player;
         var defSkill = def.player.stats.def + 8;
         var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3;
