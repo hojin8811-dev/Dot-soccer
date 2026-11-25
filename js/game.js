@@ -453,7 +453,7 @@
     var g = cv.getContext('2d');
     var W = cv.width, H = cv.height;
     g.clearRect(0, 0, W, H);
-    var cx = W / 2, cy = H / 2 + 1, R = Math.min(W, H) * 0.34;
+    var cx = W / 2, cy = H / 2 + 1, R = Math.min(W, H) * 0.31;
     var axes = [
       { v: tend.int, dx: 0, dy: -1 },
       { v: tend.org, dx: 1, dy: 0 },
@@ -1044,7 +1044,7 @@
         v = p.apt[code] || 1;
         cls = r === 0 ? 'top' : (r === 1 ? 'mid' : (r === 2 ? 'back' : 'gk'));
         html += '<div class="apt-cell ' + cls + (DS.APT_GRID[r].length === 1 ? ' wide' : '') + '" ' +
-          'style="box-shadow:inset 0 0 0 100px rgba(255,255,255,' + (v / 9 * 0.42).toFixed(2) + ')">' +
+          'style="box-shadow:inset 0 0 0 100px rgba(0,0,0,' + ((9 - v) / 9 * 0.36).toFixed(2) + ')">' +
           '<span>' + v + '</span><small>' + code + '</small></div>';
       }
     }
@@ -1088,7 +1088,7 @@
       statRow('스피드', p.s, 's') + statRow('테크닉', p.t, 't') +
       statRow('파워', p.p, 'p') + statRow('개성', tr.val, 'tr') +
       '</div>' +
-      '<div class="tend-wrap"><canvas data-tend="' + p.id + '" width="72" height="66"></canvas>' +
+      '<div class="tend-wrap"><canvas data-tend="' + p.id + '" width="86" height="80"></canvas>' +
       '<div class="tend-cap">지성·조직·감성·개인</div></div>' +
       '</div>' +
       '<div class="band">SET PIECE <span>PK / FK / CK / Cap.</span></div>' +

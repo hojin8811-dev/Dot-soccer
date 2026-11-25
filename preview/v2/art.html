@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>도트싸커 v2 · 일러스트 시트</title>
+<style>
+  html, body { margin: 0; background: #26481d; color: #f5efdd; font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  h2 { font-size: 13px; margin: 10px 8px 4px; color: #ffe9a8; letter-spacing: .5px; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 0 8px 8px; }
+  .cell { background: linear-gradient(#79a458, #3f6a2a); border: 1px solid #1b3413; border-radius: 4px; text-align: center; padding: 3px 0 2px; }
+  .cell canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  .cell span { font-size: 9px; font-weight: 800; color: #f7f2e2; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 10px; align-items: flex-end; }
+  .item { text-align: center; font-size: 9px; color: #e8dfc6; }
+  .item canvas { display: block; background: #f5efdd; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h2>선수 초상화 (20×26, 4배) — 헤어스타일 10종</h2>
+<div class="grid" id="portraits"></div>
+<h2>시설 도트 (3배)</h2>
+<div class="row" id="facilities"></div>
+<h2>엠블럼 8종</h2>
+<div class="row" id="emblems"></div>
+<h2>경기장 스프라이트 (6배)</h2>
+<div class="row" id="sprites"></div>
+<h2>스태프</h2>
+<div class="row" id="staff"></div>
+<script src="../../js/data.js?v=2"></script>
+<script>
+(function () {
+  var DS = window.DS;
+  var kit = { shirt: '#c8432f', shorts: '#f0e6cc', trim: '#ffe9a8' };
+  var hairs = ['short', 'buzz', 'long', 'afro', 'slick', 'twoblock', 'curly', 'ponytail', 'mohawk', 'bald'];
+  var mouths = ['smile', 'flat', 'smirk', 'open', 'grit'];
+  var eyes = ['round', 'sharp', 'sleepy', 'wide', 'happy'];
+  var beards = ['none', 'stubble', 'goatee', 'mustache', 'full'];
+  var skins = ['#f7d3ae', '#e6b285', '#bd7f50', '#9c6238', '#f0c49a', '#d59a6a'];
+
+  var host = document.getElementById('portraits');
+  var i;
+  for (i = 0; i < 12; i++) {
+    var p = DS.makePlayer({ pos: ['GK', 'DF', 'MF', 'FW'][i % 4], rarity: 'geum', s: 6, t: 6, p: 6 });
+    p.face.hair = hairs[i % hairs.length];
+    p.face.hairColor = DS.FACE_OPTS.hairColor[i % DS.FACE_OPTS.hairColor.length];
+    p.face.skin = skins[i % skins.length];
+    p.face.eye = eyes[i % eyes.length];
+    p.face.mouth = mouths[i % mouths.length];
+    p.face.brow = ['thick', 'thin', 'angry', 'raised', 'flat'][i % 5];
+    p.face.beard = beards[i % beards.length];
+    p.face.collar = ['v', 'round', 'polo'][i % 3];
+    p.number = 7 + i;
+    var c = document.createElement('canvas');
+    DS.Art.paint(c, p, kit, { k: 4, number: true });
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.appendChild(c);
+    var lb = document.createElement('span');
+    lb.textContent = p.face.hair;
+    cell.appendChild(lb);
+    host.appendChild(cell);
+  }
+
+  var facs = ['training', 'medical', 'shop', 'fanclub', 'cafe'];
+  for (i = 0; i < facs.length; i++) {
+    var fc = document.createElement('canvas');
+    DS.Art.paintFacility(fc, facs[i], (i % 5) + 1);
+    var wrap = document.createElement('div');
+    wrap.className = 'item';
+    wrap.appendChild(fc);
+    var t = document.createElement('div');
+    t.textContent = facs[i];
+    wrap.appendChild(t);
+    document.getElementById('facilities').appendChild(wrap);
+  }
+
+  var ems = ['flame', 'star', 'bolt', 'crown', 'ball', 'wave', 'claw', 'moon'];
+  for (i = 0; i < ems.length; i++) {
+    var ec = document.createElement('canvas');
+    ec.width = 90; ec.height = 102;
+    DS.Art.drawEmblem(ec, ems[i], kit);
+    var ew = document.createElement('div');
+    ew.className = 'item';
+    ew.appendChild(ec);
+    var et = document.createElement('div');
+    et.textContent = ems[i];
+    ew.appendChild(et);
+    document.getElementById('emblems').appendChild(ew);
+  }
+
+  for (i = 0; i < 4; i++) {
+    var mp = DS.makePlayer({ pos: 'MF', rarity: 'eun' });
+    var mc = DS.Art.matchFig(mp, kit, i, 1);
+    var big = document.createElement('canvas');
+    big.width = mc.width * 6; big.height = mc.height * 6;
+    var g = big.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(mc, 0, 0, big.width, big.height);
+    var mw = document.createElement('div');
+    mw.className = 'item';
+    mw.appendChild(big);
+    var mt = document.createElement('div');
+    mt.textContent = 'frame ' + i;
+    mw.appendChild(mt);
+    document.getElementById('sprites').appendChild(mw);
+  }
+
+  var kinds = ['scout', 'coach', 'medic'];
+  for (i = 0; i < kinds.length; i++) {
+    var sc = document.createElement('canvas');
+    DS.Art.paintStaff(sc, kinds[i]);
+    var sw = document.createElement('div');
+    sw.className = 'item';
+    sw.appendChild(sc);
+    var st = document.createElement('div');
+    st.textContent = kinds[i];
+    sw.appendChild(st);
+    document.getElementById('staff').appendChild(sw);
+  }
+})();
+</script>
+</body>
+</html>
