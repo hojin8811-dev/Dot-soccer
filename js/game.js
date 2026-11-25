@@ -724,7 +724,7 @@
     for (i = 0; i < st.length; i++) {
       var r = DS.roleOf(st[i].role);
       roleHTML += '<div class="role-row">' +
-        '<span class="ph" style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex:0 0 auto;background:#e6e1d1"><img src="' + DS.Art.headSrc(st[i]) + '" style="width:100%;height:100%;object-fit:cover"></span>' +
+        '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
         '<div class="ds">' + (r ? r.name + ' — ' + r.desc : '아직 롤 없음 · Lv.3부터 진화 가능') + '</div></div>' +
         '<button class="btn sm ' + (r ? 'ghost' : 'primary') + '" data-act="evolve" data-id="' + st[i].id + '">' + (r ? '변경' : '진화') + '</button>' +
@@ -1029,7 +1029,7 @@
     for (i = 0; i < st.length; i++) {
       var r = DS.roleOf(st[i].role);
       rows += '<div class="role-row">' +
-        '<span style="width:30px;height:30px;border-radius:50%;overflow:hidden;flex:0 0 auto;background:#e6e1d1"><img src="' + DS.Art.headSrc(st[i]) + '" style="width:100%;height:100%;object-fit:cover"></span>' +
+        '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
         '<div class="ds">' + (r ? r.name : '롤 없음') + '</div></div>' +
         '<button class="btn sm ' + (r ? 'ghost' : 'primary') + '" data-act="evolve" data-id="' + st[i].id + '">' + (r ? '변경' : '진화') + '</button></div>';
@@ -1045,7 +1045,7 @@
     for (i = 0; i < list.length; i++) {
       p = list[i];
       outList += '<button class="out-item' + (ioState.outId === p.id ? ' on' : '') + '" style="display:flex;width:100%;align-items:center;gap:5px;padding:6px;border-radius:8px;border:1px solid ' + (ioState.outId === p.id ? 'var(--lime2)' : 'var(--line)') + ';background:' + (ioState.outId === p.id ? 'rgba(200,241,105,.25)' : 'var(--card2)') + ';margin-bottom:3px;text-align:left" data-act="outpick" data-id="' + p.id + '">' +
-        '<span style="width:26px;height:26px;border-radius:50%;overflow:hidden;background:#e6e1d1;flex:0 0 auto"><img src="' + DS.Art.headSrc(p) + '" style="width:100%;height:100%;object-fit:cover"></span>' +
+        '<span class="minihead" style="width:26px;height:26px"><img src="' + DS.Art.headSrc(p) + '"></span>' +
         '<span style="flex:1 1 auto;font-size:10px;font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.name) + '</span>' +
         posBadge(p.pos) + '<span style="font-size:9.5px;font-weight:900;color:#4f7d13">' + DS.ratingOf(p) + '</span></button>';
     }

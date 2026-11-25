@@ -232,8 +232,8 @@ main {
   padding: 12px 13px;
 }
 .hero-kicker {
-  font-size: 8px; font-weight: 800; letter-spacing: 1.5px;
-  color: var(--lime); margin-bottom: 3px; opacity: .9;
+  font-size: 8px; font-weight: 800; letter-spacing: 1.5px; line-height: 1.6;
+  color: var(--lime); margin-bottom: 5px; opacity: .95;
 }
 .hero-title {
   margin: 0 0 4px;
@@ -383,16 +383,16 @@ main {
   text-align: center; cursor: pointer;
 }
 .pcard.sel { border-color: var(--lime2); box-shadow: 0 0 0 2px rgba(166,216,76,.35); }
-.pcard .ph { width: 46px; height: 46px; margin: 0 auto 3px; border-radius: 50%; overflow: hidden; background: #e6e1d1; border: 2px solid #d5cfbd; }
+.pcard .ph { display: block; width: 46px; height: 46px; margin: 0 auto 3px; border-radius: 50%; overflow: hidden; background: #e6e1d1; border: 2px solid #d5cfbd; }
 .pcard .ph img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; }
-.pcard .pn { font-size: 9.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard .pn { display: block; font-size: 9.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pcard .pm { display: flex; align-items: center; justify-content: center; gap: 3px; margin-top: 1px; font-size: 8px; color: var(--ink3); font-weight: 700; }
 .pcard .ov { font-size: 11px; font-weight: 900; letter-spacing: -.3px; }
 .pcard .mini { height: 3px; border-radius: 2px; background: rgba(20,33,28,.12); margin-top: 3px; overflow: hidden; }
 .pcard .mini i { display: block; height: 100%; background: var(--lime2); }
 
 .deckcard {
-  flex: 0 0 auto; width: 74px; height: 74px;
+  flex: 0 0 auto; width: 86px; height: 74px;
   padding: 6px; border-radius: 11px;
   background: linear-gradient(165deg, #1b463b, #0e2b25);
   border: 1px solid rgba(255, 255, 255, .13);
@@ -400,7 +400,7 @@ main {
 }
 .deckcard::after { content: ""; position: absolute; right: -16px; top: -16px; width: 40px; height: 40px; border-radius: 50%; background: var(--cc, #c8f169); opacity: .22; }
 .deckcard .tg { font-size: 6.5px; font-weight: 900; letter-spacing: .4px; color: var(--cc, var(--lime)); white-space: nowrap; }
-.deckcard .nm { font-size: 9px; font-weight: 900; letter-spacing: -.4px; line-height: 1.15; margin-top: 2px; height: 21px; overflow: hidden; }
+.deckcard .nm { font-size: 8.5px; font-weight: 900; letter-spacing: -.4px; line-height: 1.15; margin-top: 2px; height: 21px; overflow: hidden; }
 .deckcard .mt { position: absolute; left: 6px; bottom: 6px; font-size: 7px; font-weight: 800; color: rgba(233,244,221,.5); letter-spacing: .3px; }
 .deckcard .mt em { font-style: normal; color: var(--lime); font-size: 8.5px; }
 
@@ -651,7 +651,7 @@ main {
 .pd-ov { font-size: 26px; font-weight: 900; letter-spacing: -1.5px; color: #fff; line-height: 1; }
 .pd-ov small { font-size: 8px; font-weight: 800; color: rgba(233,244,221,.5); letter-spacing: .5px; display: block; }
 .pd-rows { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 9px; color: rgba(233,244,221,.72); margin-top: 3px; }
-.pd-rows span { color: rgba(233,244,221,.45); margin-right: 3px; }
+.pd-rows span { color: rgba(233,244,221,.45); margin-right: 5px; }
 
 .band { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; font-size: 9px; font-weight: 900; letter-spacing: 1px; color: var(--ink3); }
 .band::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line); }
@@ -770,3 +770,6 @@ main {
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .stack { display: flex; flex-direction: column; gap: 5px; }
+
+.minihead { display: block; border-radius: 50%; overflow: hidden; background: #e6e1d1; flex: 0 0 auto; }
+.minihead img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; }
