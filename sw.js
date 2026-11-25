@@ -1,12 +1,12 @@
 /*! 도트싸커 v4 — 진짜 축구 AI · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v4-20261126';
+var CACHE = 'dot-soccer-v4b-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=4', './js/data.js?v=4', './js/match.js?v=4', './js/game.js?v=4',
+        './css/style.css?v=4&b=17', './js/data.js?v=4&b=17', './js/match.js?v=4&b=17', './js/game.js?v=4&b=17',
         './assets/hero-banner.jpg'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
