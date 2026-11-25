@@ -1901,8 +1901,8 @@
     ctx.save();
     ctx.globalAlpha = 0.35 + a * 0.6;
     ctx.strokeStyle = pl.color;
-    ctx.lineWidth = 1.6;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 2.2;
+    ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.quadraticCurveTo(mx, my, x2, y2);
@@ -1949,36 +1949,44 @@
     }
   }
 
-  function drawBubble(p, px, py, sprH) {
+  function drawBubble(p, px, py, sprH, extraUp) {
     var b = p.bubble;
     if (!b) { return; }
     var a = clamp(b.t / 0.35, 0, 1);
     var txt = b.text;
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.font = '800 8px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 8.5px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var tw = ctx.measureText(txt).width;
-    var bw = tw + 12, bh = 14;
+    var bw = tw + 14, bh = 15;
     var rise = (1 - clamp(b.t / b.t0, 0, 1)) * 4;
-    var bx = px - bw / 2, by = py - sprH - 9 - rise;
-    if (bx < 2) { bx = 2; }
-    if (bx + bw > W - 2) { bx = W - 2 - bw; }
-    if (by < 2) { by = 2; }
-    ctx.fillStyle = 'rgba(6, 24, 20, 0.88)';
-    roundRect(bx, by, bw, bh, 6);
+    var below = false;
+    var by = py - sprH - 10 - rise - (extraUp || 0);
+    if (by < 4) { by = py + 5 + (extraUp || 0); below = true; }
+    var bx = px - bw / 2;
+    if (bx < 3) { bx = 3; }
+    if (bx + bw > W - 3) { bx = W - 3 - bw; }
+    ctx.fillStyle = 'rgba(5, 22, 18, 0.92)';
+    roundRect(bx, by, bw, bh, 7);
     ctx.fill();
     ctx.strokeStyle = b.color;
-    ctx.lineWidth = 1;
-    roundRect(bx, by, bw, bh, 6);
+    ctx.lineWidth = 1.2;
+    roundRect(bx, by, bw, bh, 7);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(px - 3.5, by + bh);
-    ctx.lineTo(px, by + bh + 4);
-    ctx.lineTo(px + 3.5, by + bh);
+    if (below) {
+      ctx.moveTo(px - 3.5, by);
+      ctx.lineTo(px, by - 4);
+      ctx.lineTo(px + 3.5, by);
+    } else {
+      ctx.moveTo(px - 3.5, by + bh);
+      ctx.lineTo(px, by + bh + 4);
+      ctx.lineTo(px + 3.5, by + bh);
+    }
     ctx.closePath();
-    ctx.fillStyle = 'rgba(6, 24, 20, 0.88)';
+    ctx.fillStyle = 'rgba(5, 22, 18, 0.92)';
     ctx.fill();
     ctx.fillStyle = b.color;
     ctx.fillText(txt, bx + bw / 2, by + bh / 2 + 0.5);
@@ -2015,8 +2023,9 @@
         var aa = clamp(Math.max(p.skillT, p.glow), 0, 1);
         ctx.save();
         ctx.globalAlpha = 0.35 + aa * 0.45;
-        ctx.strokeStyle = p.side === 'home' ? '#c8f169' : '#ff8c78';
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = p.side === 'home' ? '#d8ff8a' : '#ff8c78';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([]);
         ctx.beginPath();
         ctx.ellipse(px, py - 0.5, sprH * 0.33, sprH * 0.125, 0, 0, Math.PI * 2);
         ctx.stroke();
@@ -2066,11 +2075,20 @@
       }
     }
 
-    /* 스킬 태그 말풍선 */
+    /* 스킬 태그 말풍선 (겹치면 위로 쌓는다) */
+    var placed = [];
     for (i = 0; i < arr.length; i++) {
       p = arr[i];
       if (!p.bubble) { continue; }
-      drawBubble(p, sx(p.x), sy(p.y), sprH);
+      var bpx = sx(p.x), bpy = sy(p.y);
+      var up = 0, guard = 0;
+      for (var q = 0; q < placed.length && guard < 4; q++) {
+        if (Math.abs(placed[q].x - bpx) < 46 && Math.abs(placed[q].y - bpy) < 26) {
+          up += 16; guard++;
+        }
+      }
+      placed.push({ x: bpx, y: bpy });
+      drawBubble(p, bpx, bpy, sprH, up);
     }
 
     /* 볼 */
