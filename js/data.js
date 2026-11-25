@@ -580,159 +580,194 @@
 
   var HEAD_ROWS = [
     [6, 13], [5, 14], [4, 15], [4, 15], [4, 15], [4, 15],
-    [4, 15], [4, 15], [5, 14], [5, 14], [6, 13]
+    [4, 15], [5, 14], [5, 14], [6, 13], [7, 12]
   ];
+
+  /* 3×5 픽셀 숫자 */
+  var DIGIT = {
+    '0': [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1],
+    '1': [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1],
+    '2': [1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1],
+    '3': [1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1],
+    '4': [1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1],
+    '5': [1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1],
+    '6': [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+    '7': [1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+    '8': [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
+    '9': [1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1]
+  };
+  function drawNumber(g, cx, y, text, color) {
+    var chars = String(text).split(''), i, j, k, ox;
+    var w = chars.length * 4 - 1;
+    ox = Math.round(cx - w / 2);
+    for (i = 0; i < chars.length; i++) {
+      var d = DIGIT[chars[i]];
+      if (!d) { continue; }
+      for (j = 0; j < 5; j++) {
+        for (k = 0; k < 3; k++) {
+          if (d[j * 3 + k]) { fill(g, ox + i * 4 + k, y + j, 1, 1, color); }
+        }
+      }
+    }
+  }
 
   function drawHairBack(g, style, hair, hairD) {
     if (style === 'long') {
-      fill(g, 3, 4, 1, 11, hairD);
-      fill(g, 16, 4, 1, 11, hairD);
-      fill(g, 3, 13, 3, 3, hairD);
-      fill(g, 14, 13, 3, 3, hairD);
+      fill(g, 3, 3, 2, 8, hairD);
+      fill(g, 15, 3, 2, 8, hairD);
+      fill(g, 3, 10, 3, 3, hairD);
+      fill(g, 14, 10, 3, 3, hairD);
     } else if (style === 'ponytail') {
-      fill(g, 16, 5, 2, 7, hairD);
-      fill(g, 17, 11, 2, 3, shade(hair, -14));
-      fill(g, 15, 5, 1, 2, hair);
+      fill(g, 16, 3, 2, 6, hairD);
+      fill(g, 17, 8, 2, 3, shade(hair, -14));
+      fill(g, 15, 3, 1, 2, hair);
     } else if (style === 'afro') {
-      fill(g, 4, 1, 12, 1, hairD);
-      fill(g, 2, 3, 16, 4, hairD);
-      fill(g, 2, 6, 2, 4, hairD);
-      fill(g, 16, 6, 2, 4, hairD);
+      fill(g, 4, 0, 12, 1, hairD);
+      fill(g, 2, 2, 16, 4, hairD);
+      fill(g, 2, 5, 2, 3, hairD);
+      fill(g, 16, 5, 2, 3, hairD);
     } else if (style === 'curly') {
-      fill(g, 3, 3, 1, 4, hairD);
-      fill(g, 16, 3, 1, 4, hairD);
+      fill(g, 3, 2, 1, 3, hairD);
+      fill(g, 16, 2, 1, 3, hairD);
     }
   }
 
   function drawHairFront(g, style, hair, hairD, hairL) {
     switch (style) {
       case 'buzz':
-        fill(g, 7, 1, 6, 1, hair);
-        fill(g, 6, 2, 8, 2, hair);
-        fill(g, 6, 4, 3, 1, hairD);
-        fill(g, 11, 4, 3, 1, hairD);
+        fill(g, 7, 0, 6, 1, hair);
+        fill(g, 6, 1, 8, 1, hair);
+        fill(g, 5, 2, 10, 1, hair);
+        fill(g, 6, 3, 3, 1, hairD);
+        fill(g, 12, 3, 3, 1, hairD);
         break;
       case 'long':
         fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 2, hair);
+        fill(g, 4, 1, 12, 1, hair);
+        fill(g, 3, 2, 14, 1, hair);
         fill(g, 4, 3, 4, 1, hair);
         fill(g, 12, 3, 4, 1, hair);
-        fill(g, 4, 4, 2, 8, hair);
-        fill(g, 14, 4, 2, 8, hair);
-        fill(g, 5, 4, 2, 1, hairD);
-        fill(g, 13, 4, 2, 1, hairD);
+        fill(g, 3, 3, 2, 7, hair);
+        fill(g, 15, 3, 2, 7, hair);
+        fill(g, 5, 1, 4, 1, hairL);
         break;
       case 'afro':
         fill(g, 4, 0, 12, 1, hair);
         fill(g, 3, 1, 14, 2, hair);
         fill(g, 2, 3, 3, 3, hair);
         fill(g, 15, 3, 3, 3, hair);
-        fill(g, 5, 3, 3, 1, hair);
-        fill(g, 12, 3, 3, 1, hair);
-        fill(g, 7, 3, 2, 1, hairL);
+        fill(g, 5, 2, 3, 1, hair);
+        fill(g, 12, 2, 3, 1, hair);
+        fill(g, 7, 1, 3, 1, hairL);
         break;
       case 'slick':
         fill(g, 6, 0, 8, 1, hair);
         fill(g, 5, 1, 10, 1, hair);
-        fill(g, 4, 2, 5, 1, hair);
-        fill(g, 10, 2, 5, 1, hairD);
-        fill(g, 4, 3, 3, 1, hair);
-        fill(g, 12, 3, 3, 1, hair);
-        fill(g, 6, 2, 4, 1, hairL);
+        fill(g, 4, 2, 6, 1, hair);
+        fill(g, 11, 2, 5, 1, hairD);
+        fill(g, 4, 3, 7, 1, hair);
+        fill(g, 13, 3, 2, 1, hairD);
+        fill(g, 4, 4, 1, 1, hair);
+        fill(g, 15, 4, 1, 1, hair);
+        fill(g, 6, 1, 4, 1, hairL);
         break;
       case 'twoblock':
         fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 3, hair);
-        fill(g, 4, 4, 1, 2, hairD);
-        fill(g, 15, 4, 1, 2, hairD);
-        fill(g, 5, 4, 10, 1, hairD);
+        fill(g, 4, 1, 12, 2, hair);
+        fill(g, 4, 3, 1, 2, hairD);
+        fill(g, 15, 3, 1, 2, hairD);
+        fill(g, 4, 3, 12, 1, hairD);
+        fill(g, 6, 1, 5, 1, hairL);
         break;
       case 'curly':
         fill(g, 5, 0, 2, 1, hair); fill(g, 8, 0, 2, 1, hair); fill(g, 11, 0, 3, 1, hair);
         fill(g, 4, 1, 12, 2, hair);
-        fill(g, 4, 3, 2, 2, hair); fill(g, 14, 3, 2, 2, hair);
-        fill(g, 6, 2, 1, 1, hairL); fill(g, 10, 2, 1, 1, hairL);
+        fill(g, 3, 2, 2, 2, hair); fill(g, 15, 2, 2, 2, hair);
+        fill(g, 5, 3, 3, 1, hairD); fill(g, 12, 3, 3, 1, hairD);
+        fill(g, 6, 1, 1, 1, hairL); fill(g, 10, 1, 1, 1, hairL);
         break;
       case 'mohawk':
         fill(g, 8, 0, 4, 1, hair);
-        fill(g, 8, 1, 4, 3, hair);
+        fill(g, 8, 1, 4, 2, hair);
         fill(g, 9, 1, 1, 2, hairL);
-        fill(g, 5, 2, 3, 2, hairD);
-        fill(g, 12, 2, 3, 2, hairD);
-        fill(g, 4, 3, 1, 2, hairD);
-        fill(g, 15, 3, 1, 2, hairD);
+        fill(g, 5, 2, 3, 1, hairD);
+        fill(g, 12, 2, 3, 1, hairD);
+        fill(g, 4, 3, 1, 1, hairD);
+        fill(g, 15, 3, 1, 1, hairD);
         break;
       case 'ponytail':
         fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 3, hair);
-        fill(g, 4, 4, 1, 3, hairD);
-        fill(g, 15, 4, 1, 3, hairD);
-        fill(g, 5, 4, 3, 1, hairD);
-        fill(g, 12, 4, 3, 1, hairD);
+        fill(g, 4, 1, 12, 1, hair);
+        fill(g, 4, 2, 12, 1, hair);
+        fill(g, 4, 3, 4, 1, hair);
+        fill(g, 12, 3, 4, 1, hair);
+        fill(g, 4, 4, 1, 2, hairD);
+        fill(g, 15, 4, 1, 2, hairD);
+        fill(g, 5, 1, 4, 1, hairL);
         break;
       case 'bald':
-        fill(g, 4, 2, 1, 3, hairD);
-        fill(g, 15, 2, 1, 3, hairD);
+        fill(g, 4, 2, 1, 2, hairD);
+        fill(g, 15, 2, 1, 2, hairD);
         fill(g, 6, 1, 5, 1, hairL);
         fill(g, 5, 2, 2, 1, hairL);
         break;
       default: /* short */
         fill(g, 6, 0, 8, 1, hair);
         fill(g, 5, 1, 10, 1, hair);
-        fill(g, 4, 2, 12, 2, hair);
-        fill(g, 4, 4, 3, 1, hair);
-        fill(g, 8, 4, 4, 1, hair);
-        fill(g, 13, 4, 3, 1, hair);
-        fill(g, 4, 5, 1, 2, hair);
-        fill(g, 15, 5, 1, 2, hair);
+        fill(g, 4, 2, 12, 1, hair);
+        fill(g, 4, 3, 3, 1, hair);
+        fill(g, 8, 3, 4, 1, hair);
+        fill(g, 13, 3, 3, 1, hair);
+        fill(g, 4, 4, 1, 1, hair);
+        fill(g, 15, 4, 1, 1, hair);
         fill(g, 6, 1, 5, 1, hairL);
         break;
     }
   }
 
-  function drawEyes(g, style, x, y, dark, white) {
-    var i;
-    var eyes = [[6, y], [11, y]];
+  function drawEyes(g, style, dark, white) {
+    var xs = [6, 11], i, ex;
     for (i = 0; i < 2; i++) {
-      var ex = eyes[i][0], ey = eyes[i][1];
+      ex = xs[i];
       if (style === 'sleepy') {
-        fill(g, ex, ey + 1, 3, 1, dark);
-        fill(g, ex, ey + 2, 3, 1, shade('#ffffff', 0));
+        fill(g, ex, 7, 2, 1, dark);
+        fill(g, ex, 6, 2, 1, hexAlpha(dark, 0.25));
         continue;
       }
       if (style === 'happy') {
-        fill(g, ex, ey + 1, 1, 1, dark);
-        fill(g, ex + 1, ey, 1, 1, dark);
-        fill(g, ex + 2, ey + 1, 1, 1, dark);
+        fill(g, ex, 7, 1, 1, dark);
+        fill(g, ex + 1, 6, 1, 1, dark);
+        fill(g, ex + 2, 7, 1, 1, dark);
         continue;
       }
-      fill(g, ex, ey, 3, 2, white);
       if (style === 'sharp') {
-        fill(g, ex, ey, 3, 1, dark);
-        fill(g, ex + 1, ey, 1, 2, dark);
-      } else if (style === 'wide') {
-        fill(g, ex + 1, ey, 2, 2, dark);
-        fill(g, ex + 1, ey, 1, 1, white);
-      } else {
-        fill(g, ex + 1, ey, 1, 2, dark);
-        fill(g, ex + 1, ey, 1, 1, '#ffffff');
-        fill(g, ex, ey, 1, 1, shade('#ffffff', 0));
+        fill(g, ex, 6, 2, 1, dark);
+        fill(g, ex, 7, 2, 1, hexAlpha(dark, 0.35));
+        fill(g, ex + 1, 6, 1, 1, white);
+        continue;
       }
+      fill(g, ex, 6, 2, 2, dark);
+      fill(g, ex, 6, 1, 1, white);
+      if (style === 'wide') { fill(g, ex + 1, 6, 1, 1, white); }
     }
   }
 
-  function drawBrows(g, style, color) {
-    var y = style === 'raised' ? 3 : 4;
-    if (style === 'thin') {
-      fill(g, 5, y + 1, 4, 1, color);
-      fill(g, 11, y + 1, 4, 1, color);
-    } else if (style === 'angry') {
-      fill(g, 5, y, 2, 1, color); fill(g, 7, y + 1, 2, 1, color);
-      fill(g, 11, y + 1, 2, 1, color); fill(g, 13, y, 2, 1, color);
-    } else if (style === 'flat') {
-      fill(g, 5, y + 1, 4, 1, color); fill(g, 11, y + 1, 4, 1, color);
-    } else {
-      fill(g, 5, y, 4, 2, color); fill(g, 11, y, 4, 2, color);
+  function drawBrows(g, style, color, dark) {
+    var y = 4, i, xs = [5, 12];
+    if (style === 'raised') { y = 3; }
+    for (i = 0; i < 2; i++) {
+      var x = xs[i];
+      if (style === 'thin') {
+        fill(g, x + 1, y, 2, 1, color);
+      } else if (style === 'angry') {
+        if (i === 0) { fill(g, x, y - 1, 2, 1, color); fill(g, x + 2, y, 1, 1, color); }
+        else { fill(g, x + 1, y, 2, 1, color); fill(g, x - 1, y - 1, 1, 1, color); }
+      } else if (style === 'flat') {
+        fill(g, x, y, 3, 1, color);
+      } else {
+        fill(g, x, y, 3, 1, color);
+        fill(g, x, y + 1, 3, 1, dark);
+      }
     }
   }
 
@@ -740,67 +775,80 @@
     if (style === 'flat') {
       fill(g, 9, 9, 2, 1, dark);
     } else if (style === 'smirk') {
-      fill(g, 9, 9, 2, 1, dark); fill(g, 11, 8, 1, 1, dark);
+      fill(g, 9, 9, 2, 1, dark);
+      fill(g, 11, 8, 1, 1, dark);
     } else if (style === 'open') {
       fill(g, 9, 9, 2, 2, dark);
       fill(g, 9, 9, 2, 1, lip);
     } else if (style === 'grit') {
       fill(g, 8, 9, 4, 1, dark);
-      fill(g, 8, 9, 4, 1, lip);
+      fill(g, 8, 9, 3, 1, lip);
     } else {
-      fill(g, 8, 9, 1, 1, dark); fill(g, 9, 9, 2, 1, dark); fill(g, 11, 9, 1, 1, dark);
-      fill(g, 8, 8, 1, 1, dark); fill(g, 11, 8, 1, 1, dark);
+      fill(g, 8, 9, 1, 1, dark);
+      fill(g, 9, 9, 2, 1, hexAlpha(dark, 0.85));
+      fill(g, 11, 9, 1, 1, dark);
+      fill(g, 7, 8, 1, 1, hexAlpha(dark, 0.5));
+      fill(g, 12, 8, 1, 1, hexAlpha(dark, 0.5));
     }
   }
 
   function drawBeard(g, style, hair, hairD, skin) {
     if (style === 'stubble') {
-      fill(g, 5, 9, 1, 1, hairD); fill(g, 8, 10, 1, 1, hairD); fill(g, 11, 10, 1, 1, hairD);
-      fill(g, 14, 9, 1, 1, hairD); fill(g, 7, 11, 1, 1, hairD); fill(g, 12, 11, 1, 1, hairD);
+      fill(g, 6, 9, 1, 1, hairD); fill(g, 13, 9, 1, 1, hairD);
+      fill(g, 8, 10, 1, 1, hairD); fill(g, 11, 10, 1, 1, hairD);
+      fill(g, 9, 11, 2, 1, hairD);
     } else if (style === 'goatee') {
-      fill(g, 8, 11, 4, 1, hair);
+      fill(g, 8, 10, 4, 1, hair);
       fill(g, 8, 8, 4, 1, hairD);
+      fill(g, 9, 11, 2, 1, hair);
     } else if (style === 'mustache') {
       fill(g, 8, 8, 4, 1, hair);
+      fill(g, 7, 8, 1, 1, hairD);
+      fill(g, 12, 8, 1, 1, hairD);
     } else if (style === 'full') {
-      fill(g, 5, 9, 1, 3, hair);
-      fill(g, 14, 9, 1, 3, hair);
-      fill(g, 6, 10, 8, 2, hair);
+      fill(g, 5, 8, 1, 4, hair);
+      fill(g, 14, 8, 1, 4, hair);
+      fill(g, 6, 9, 8, 2, hair);
+      fill(g, 8, 8, 4, 1, hair);
       fill(g, 9, 9, 2, 1, skin);
+      fill(g, 8, 10, 4, 1, skin);
     }
   }
 
   function drawFigure(g, p, kit, opt) {
     var F = p.face || {};
     var skin = F.skin || '#f0c49a';
-    var skinD = shade(skin, -26);
-    var skinL = shade(skin, 18);
+    var skinD = shade(skin, -24);
+    var skinD2 = shade(skin, -44);
+    var skinL = shade(skin, 16);
     var hair = F.hairColor || '#2b1d14';
-    var hairD = shade(hair, -26);
-    var hairL = shade(hair, 24);
+    var hairD = shade(hair, -22);
+    var hairL = shade(hair, 26);
     var shirt = kit.shirt || '#c8432f';
     var shirtD = shade(shirt, -38);
-    var shirtL = shade(shirt, 26);
+    var shirtL = shade(shirt, 22);
     var trim = kit.trim || '#f2e6c4';
     var shorts = kit.shorts || '#f2e6c4';
     var shortsD = shade(shorts, -30);
     var dark = '#2a2018';
-    var gk = !!opt.gk;
-    var isGk = gk || p.pos === 'GK';
+    var isGk = p.pos === 'GK' || opt.gk;
+    var i, y, row;
 
     /* 그림자 */
-    g.fillStyle = 'rgba(40,24,8,0.20)';
+    g.fillStyle = 'rgba(40,24,8,0.22)';
     g.beginPath();
-    g.ellipse(10, 25, 6.5, 1.6, 0, 0, Math.PI * 2);
+    g.ellipse(10, 25, 6.2, 1.5, 0, 0, Math.PI * 2);
     g.fill();
 
     /* 다리 · 양말 · 축구화 */
     fill(g, 6, 20, 2, 3, skin);
     fill(g, 12, 20, 2, 3, skin);
+    fill(g, 6, 20, 1, 3, skinD);
+    fill(g, 12, 20, 1, 3, skinD);
     fill(g, 5, 22, 3, 2, trim);
     fill(g, 12, 22, 3, 2, trim);
-    fill(g, 5, 22, 1, 2, shade(trim, -34));
-    fill(g, 14, 22, 1, 2, shade(trim, -34));
+    fill(g, 5, 22, 1, 2, shade(trim, -30));
+    fill(g, 14, 22, 1, 2, shade(trim, -30));
     fill(g, 4, 24, 4, 2, '#3a2c22');
     fill(g, 12, 24, 4, 2, '#3a2c22');
     fill(g, 4, 24, 4, 1, '#5a4634');
@@ -811,11 +859,11 @@
 
     /* 반바지 */
     fill(g, 5, 18, 10, 3, shorts);
-    fill(g, 5, 18, 10, 1, shade(shorts, 18));
+    fill(g, 5, 18, 10, 1, shade(shorts, 16));
     fill(g, 9, 18, 2, 3, shortsD);
     fill(g, 5, 20, 10, 1, shortsD);
 
-    /* 몸통 (유니폼) */
+    /* 몸통 */
     fill(g, 4, 12, 12, 7, shirt);
     fill(g, 4, 12, 2, 7, shirtL);
     fill(g, 14, 12, 2, 7, shirtD);
@@ -825,78 +873,67 @@
     fill(g, 8, 10, 4, 2, skinD);
 
     /* 머리 */
-    var i, y, row;
     for (i = 0; i < HEAD_ROWS.length; i++) {
       y = i + 1;
       row = HEAD_ROWS[i];
       fill(g, row[0], y, row[1] - row[0] + 1, 1, skin);
+      if (row[0] > 4) { fill(g, row[0], y, 1, 1, skinD); }
+      if (row[1] < 15) { fill(g, row[1], y, 1, 1, skinD); }
     }
-    fill(g, 4, 8, 1, 3, skinD);          /* 좌 볼 음영 */
-    fill(g, 15, 8, 1, 3, skinD);
-    fill(g, 6, 2, 4, 1, skinL);          /* 이마 광 */
+    fill(g, 4, 7, 1, 3, hexAlpha(skinD, 0.5));
+    fill(g, 15, 7, 1, 3, hexAlpha(skinD, 0.5));
+    fill(g, 6, 2, 4, 1, skinL);
     /* 귀 */
-    fill(g, 3, 5, 1, 2, skin);
-    fill(g, 16, 5, 1, 2, skin);
+    fill(g, 3, 6, 1, 2, skin);
+    fill(g, 16, 6, 1, 2, skin);
 
     /* 앞머리 */
     drawHairFront(g, F.hair || 'short', hair, hairD, hairL);
 
     /* 얼굴 */
-    drawBrows(g, F.brow || 'thick', hairD);
-    drawEyes(g, F.eye || 'round', 0, 6, dark, '#fffdf5');
-    /* 코 */
+    drawBrows(g, F.brow || 'thick', hairD, shade(hairD, -14));
+    drawEyes(g, F.eye || 'round', dark, '#fffdf5');
     if (F.nose === 'wide') { fill(g, 8, 8, 3, 1, skinD); }
     else if (F.nose === 'point') { fill(g, 9, 8, 1, 2, skinD); }
     else if (F.nose === 'flat') { fill(g, 9, 8, 2, 1, skinD); }
-    else { fill(g, 9, 8, 1, 1, skinD); }
+    else { fill(g, 9, 8, 1, 1, skinD); fill(g, 10, 8, 1, 1, hexAlpha(skinD, 0.6)); }
     drawBeard(g, F.beard || 'none', hair, hairD, skin);
     drawMouth(g, F.mouth || 'smile', dark, '#fff6e6');
-    /* 홍조 */
-    fill(g, 5, 8, 1, 1, hexAlpha('#d4674f', 0.45));
-    fill(g, 14, 8, 1, 1, hexAlpha('#d4674f', 0.45));
+    fill(g, 5, 8, 1, 1, hexAlpha('#d4674f', 0.4));
+    fill(g, 14, 8, 1, 1, hexAlpha('#d4674f', 0.4));
 
     /* 팔 */
-    var sleeveEnd = isGk ? 17 : 14;
+    var sleeveEnd = isGk ? 16 : 14;
     fill(g, 2, 12, 2, sleeveEnd - 12, shirt);
     fill(g, 16, 12, 2, sleeveEnd - 12, shirt);
-    fill(g, 2, 12, 2, 1, trim);
-    fill(g, 16, 12, 2, 1, trim);
+    fill(g, 2, 12, 1, sleeveEnd - 12, shirtL);
+    fill(g, 17, 12, 1, sleeveEnd - 12, shirtD);
+    fill(g, 2, sleeveEnd - 1, 2, 1, trim);
+    fill(g, 16, sleeveEnd - 1, 2, 1, trim);
     fill(g, 2, sleeveEnd, 2, 20 - sleeveEnd, skin);
     fill(g, 16, sleeveEnd, 2, 20 - sleeveEnd, skin);
     fill(g, 2, 20, 2, 1, skinD);
     fill(g, 16, 20, 2, 1, skinD);
-    if (isGk) {
-      fill(g, 2, 19, 2, 2, '#f2efe2');
-      fill(g, 16, 19, 2, 2, '#f2efe2');
-    }
 
     /* 칼라 */
-    var collar = isGk ? 'v' : (F.collar || 'v');
+    var collar = F.collar || 'v';
     if (collar === 'round') {
       fill(g, 7, 12, 6, 1, trim);
-      fill(g, 7, 13, 1, 1, trim);
-      fill(g, 12, 13, 1, 1, trim);
-      fill(g, 8, 13, 4, 1, skinD);
+      fill(g, 9, 12, 2, 1, skinD2);
     } else if (collar === 'polo') {
-      fill(g, 7, 12, 6, 1, trim);
-      fill(g, 9, 13, 2, 2, trim);
-      fill(g, 9, 13, 2, 1, shirtD);
+      fill(g, 7, 12, 1, 1, trim);
+      fill(g, 12, 12, 1, 1, trim);
+      fill(g, 8, 12, 4, 1, shirtD);
+      fill(g, 9, 13, 2, 1, trim);
     } else {
-      fill(g, 7, 12, 1, 3, trim);
-      fill(g, 12, 12, 1, 3, trim);
-      fill(g, 10, 12, 2, 2, skinD);
-      fill(g, 8, 12, 2, 1, trim);
-      fill(g, 11, 12, 2, 1, trim);
+      fill(g, 7, 12, 1, 2, trim);
+      fill(g, 12, 12, 1, 2, trim);
+      fill(g, 8, 12, 4, 1, trim);
+      fill(g, 9, 12, 2, 2, skinD2);
     }
 
     /* 등번호 */
-    if (opt.number) {
-      g.fillStyle = 'rgba(255,253,244,0.94)';
-      g.font = 'bold 6px "DungGeunMo", monospace';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(String(opt.number), 10, 16);
-    }
+    if (opt.number) { drawNumber(g, 10, 14, opt.number, 'rgba(255,251,238,0.92)'); }
     /* 주장 완장 */
     if (opt.captain) {
       fill(g, 2, 15, 2, 1, '#e8b62c');
@@ -904,8 +941,8 @@
     }
     /* 골키퍼 장갑 */
     if (isGk) {
-      fill(g, 2, 18, 2, 2, '#f6f2e4');
-      fill(g, 16, 18, 2, 2, '#f6f2e4');
+      fill(g, 2, 19, 2, 2, '#f6f2e4');
+      fill(g, 16, 19, 2, 2, '#f6f2e4');
     }
   }
 
