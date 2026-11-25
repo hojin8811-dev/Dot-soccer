@@ -981,11 +981,10 @@
     for (i = 0; i < DS.CARDS.length; i++) {
       d = DS.CARDS[i];
       on = deckDraft.indexOf(d.key) >= 0;
-      cards += '<button class="role-row" style="width:100%;text-align:left;background:' + (on ? 'rgba(200,241,105,.22)' : 'transparent') + ';border-radius:9px;padding:7px" data-act="deckpick" data-k="' + d.key + '">' +
-        '<span class="chip" style="background:' + d.color + '22;color:' + d.color + '">' + d.tag + '</span>' +
-        '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + d.name + ' <span class="tiny muted">MOMENTUM ' + d.cost + '</span></div>' +
-        '<div class="ds">' + d.desc + '</div></div>' +
-        '<span class="chip ' + (on ? 'lime' : '') + '">' + (on ? '편성' : '대기') + '</span></button>';
+      cards += '<button class="deckrow' + (on ? ' on' : '') + '" data-act="deckpick" data-k="' + d.key + '">' +
+        '<span class="dtag" style="background:' + d.color + '22;color:' + d.color + '">' + d.tag + '</span>' +
+        '<span class="dtxt"><b>' + d.name + ' <em>M ' + d.cost + '</em></b><span>' + d.desc + '</span></span>' +
+        '<span class="dstate' + (on ? ' on' : '') + '">' + (on ? '편성' : '추가') + '</span></button>';
     }
     setSheet('전술 카드 덱 · ' + deckDraft.length + '/6',
       '<div class="tiny muted" style="margin-bottom:6px">경기 중 손패는 덱에서 3장이 뽑힙니다. 모멘텀을 모아 원하는 타이밍에 발동하세요.</div>' +
