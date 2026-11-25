@@ -172,7 +172,7 @@
       if (p.pos === slot.pos) { matched++; } else if (adjacent(p.pos, slot.pos)) { near++; } else { off++; }
       rare += DS.RARITY_ORDER.indexOf(p.rarity);
     }
-    var v = 58 + matched * 3.6 + near * 0.8 - off * 4.2 - missing * 6 + rare * 1.1;
+    var v = 46 + matched * 2.6 + near * 0.4 - off * 4.5 - missing * 6 + rare * 0.55;
     return Math.round(clamp(v, 5, 99));
   }
 

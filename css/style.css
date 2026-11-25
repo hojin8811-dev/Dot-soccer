@@ -197,11 +197,18 @@ button:disabled { opacity: .45; }
 .pill b { color: #fff; }
 .pill b.chem { color: var(--green); }
 
+#screen-squad.on {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 0;
+}
+#screen-squad .squad-top { flex: 0 0 auto; }
+
 .pitch {
   position: relative;
-  height: 46vh;
-  min-height: 280px;
-  max-height: 380px;
+  flex: 1 1 auto;
+  min-height: 240px;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #2a4a2c;
@@ -235,7 +242,7 @@ button:disabled { opacity: .45; }
 .pdot.empty .plabel { background: rgba(255, 90, 90, .25); color: #ffb3b3; border: 1px dashed #ff8080; }
 @keyframes bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
 
-.bench { margin-top: 6px; }
+.bench { flex: 0 0 auto; margin-top: 6px; }
 .bench-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; color: #cfe0f5; margin-bottom: 4px; }
 .bench-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .bench-empty { grid-column: 1 / -1; font-size: 10.5px; color: var(--muted); padding: 8px 0; }
@@ -500,10 +507,10 @@ button:disabled { opacity: .45; }
 
 /* ───────── 작은 화면 보정 ───────── */
 @media (max-height: 720px) {
-  .pitch { height: 42vh; min-height: 250px; }
   .commentary { height: 74px; }
   .club-emblem { width: 46px; height: 54px; }
   .club-name { font-size: 14px; }
+  .pitch { min-height: 210px; }
 }
 @media (max-width: 359px) {
   .hchip.season { display: none; }
