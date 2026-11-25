@@ -10,11 +10,13 @@
 </style>
 </head>
 <body>
-<iframe id="frame" src="../../index.html?v=2"></iframe>
+<iframe id="frame"></iframe>
 <script>
 /* 390×844 뷰포트 검증용 프레임 + 콘솔 오류 수집기 */
 (function () {
   var f = document.getElementById('frame');
+  /* 캐시 회피: 매번 새 쿼리로 index.html 로드 */
+  f.src = '../../index.html?f=' + Date.now();
   f.addEventListener('load', function () {
     var w = f.contentWindow;
     w.__errs = [];
