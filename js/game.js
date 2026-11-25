@@ -932,7 +932,7 @@
       p = S.scoutCandidates[i];
       EXTRA[p.id] = p;
       cards += '<button class="sc-card" data-act="scoutpick" data-id="' + p.id + '">' +
-        '<span class="sc-port"><canvas data-fig="' + p.id + '" data-k="2" data-num="1"></canvas>' +
+        '<span class="sc-port"><canvas data-fig="' + p.id + '" data-k="2"></canvas>' +
         '<span class="sc-pos" style="--pc:' + posColor(p) + '">' + p.pos + '</span></span>' +
         '<span class="sc-main">' +
         '<span class="sc-name">' + esc(p.name) + '</span>' +

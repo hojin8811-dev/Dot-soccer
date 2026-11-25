@@ -891,7 +891,8 @@
     drawHairFront(g, F.hair || 'short', hair, hairD, hairL);
 
     /* 얼굴 */
-    drawBrows(g, F.brow || 'thick', hairD, shade(hairD, -14));
+    var browCol = hex2rgb(hair)[0] + hex2rgb(hair)[1] + hex2rgb(hair)[2] < 210 ? shade(hair, 40) : hairD;
+    drawBrows(g, F.brow || 'thick', browCol, shade(hairD, -10));
     drawEyes(g, F.eye || 'round', dark, '#fffdf5');
     if (F.nose === 'wide') { fill(g, 8, 8, 3, 1, skinD); }
     else if (F.nose === 'point') { fill(g, 9, 8, 1, 2, skinD); }
@@ -952,6 +953,28 @@
       kit.shirt, kit.shorts, kit.trim, opt.number || 0, opt.captain ? 1 : 0, opt.gk ? 1 : 0].join('|');
   }
 
+  function addOutline(g, w, h, color) {
+    var img = g.getImageData(0, 0, w, h);
+    var d = img.data;
+    var out = new Uint8ClampedArray(d);
+    var c = hex2rgb(color);
+    function op(x, y) {
+      return x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 40;
+    }
+    var x, y;
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        if (op(x, y)) { continue; }
+        if (op(x - 1, y) || op(x + 1, y) || op(x, y - 1) || op(x, y + 1)) {
+          var o = (y * w + x) * 4;
+          out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 235;
+        }
+      }
+    }
+    img.data.set(out);
+    g.putImageData(img, 0, 0);
+  }
+
   Art.portrait = function (p, kit, opt) {
     opt = opt || {};
     if (!p || !p.face) { p = { id: 'x', pos: 'MF', face: {}, name: '' }; }
@@ -961,6 +984,7 @@
     var g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
     drawFigure(g, p, kit, opt);
+    addOutline(g, PW, PH, '#3a2a18');
     FIG_N++;
     if (FIG_N > 240) { FIG_CACHE = {}; FIG_N = 0; }
     FIG_CACHE[key] = c;
