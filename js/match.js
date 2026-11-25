@@ -266,7 +266,7 @@
     if (!el) { return; }
     el.innerHTML = '<div class="gb-text">' + text + '</div>' + (sub ? '<div class="gb-sub">' + sub + '</div>' : '');
     el.classList.add('on');
-    phaseTimer = 2.6;
+    phaseTimer = 3.6;
   }
 
   function updateScoreboard() {
@@ -538,7 +538,7 @@
     var tac = p.side === 'home' ? tactic : 'balanced';
     var shootRange = tac === 'attack' ? 30 : (tac === 'defense' ? 22 : 26);
 
-    if (distToGoal < shootRange && chance(tac === 'attack' ? 0.75 : 0.55)) {
+    if (distToGoal < shootRange && chance(tac === 'attack' ? 0.62 : 0.44)) {
       shoot(p);
       return;
     }
@@ -556,7 +556,7 @@
     }
     if (chance(0.34)) { passBall(p); return; }
     /* 슛 기회 탐색 */
-    if (distToGoal < shootRange + 12 && chance(0.3)) { shoot(p); return; }
+    if (distToGoal < shootRange + 10 && chance(0.16)) { shoot(p); return; }
   }
 
   /* ─────────────────────────  골/이벤트  ───────────────────────── */
@@ -594,7 +594,7 @@
       ]), 'goal');
     say(M.homeScore + ' : ' + M.awayScore + ' — ' + pick(['경기의 흐름이 바뀝니다!', '집중력이 필요합니다!', '아직 경기는 끝나지 않았습니다!']), 'normal');
     M.phase = 'celebrate';
-    phaseTimer = 3.0;
+    phaseTimer = 3.6;
     ball.carrier = null;
     ball.vx = 0; ball.vy = 0;
     ball.x = 50; ball.y = WORLD_H / 2;
@@ -634,7 +634,7 @@
       goalKick(defSide);
       return;
     }
-    var saveProb = clamp(0.30 + gkDef / 210 + (dist > 20 ? 0.16 : 0) - atk / 520, 0.12, 0.68);
+    var saveProb = clamp(0.34 + gkDef / 200 + (dist > 20 ? 0.16 : 0) - atk / 560, 0.12, 0.70);
     if (gk) { gk.dive = 1; }
     if (chance(saveProb)) {
       if (gk) { save(gk, p); }

@@ -160,8 +160,8 @@
     }
     if (kind === 'special') {
       var r = Math.random();
-      if (r < 0.55) { return 'eun'; }
-      if (r < 0.92) { return 'geum'; }
+      if (r < 0.40) { return 'eun'; }
+      if (r < 0.86) { return 'geum'; }
       return 'legend';
     }
     /* 완전 랜덤(가중치) */
