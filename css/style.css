@@ -786,3 +786,5 @@ main {
   text-shadow: 0 2px 0 rgba(255,255,255,.35);
 }
 .gcutin .cutin-art img { height: 100%; }
+.mom-top b { letter-spacing: .3px; }
+.mom-top .val { white-space: nowrap; }

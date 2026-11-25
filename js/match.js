@@ -186,20 +186,22 @@
 
   /* 에이스 선택 — 카드 성격에 맞는 선수 */
   function aceFor(fx) {
-    var best = null, bv = -1, i, p, want;
+    var best = null, bv = -1, i, p, want, g;
     for (i = 0; i < players.length; i++) {
       p = players[i];
-      if (p.side !== 'home') { continue; }
-      var g = groupOf(p);
-      want = (fx === 'def' || fx === 'trigger') ? 'DF' : (fx === 'atk' || fx === 'setpiece' || fx === 'through') ? 'FW' : null;
-      var score = DS.ratingOf(p.player) + (want && g === want ? 25 : 0) + (want === 'MF' && g === 'MF' ? 12 : 0);
+      if (p.side !== 'home' || isGK(p)) { continue; }
+      g = groupOf(p);
+      want = (fx === 'atk' || fx === 'setpiece' || fx === 'through') ? 'FW'
+        : (fx === 'press' || fx === 'tempo' || fx === 'build') ? 'MF'
+        : (fx === 'def' || fx === 'trigger') ? 'MF' : null;
+      var score = DS.ratingOf(p.player) + (want === g ? 24 : 0);
       if (score > bv) { bv = score; best = p; }
     }
     return best;
   }
 
   function playCutin(def, ace) {
-    cutinHold = 1.45;
+    cutinHold = 1.55;
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
     var img = ace ? DS.Art.portraitSrc(ace.player) : '';
@@ -218,7 +220,7 @@
     host.classList.add('on');
     global.setTimeout(function () {
       if (host) { host.classList.remove('on'); host.innerHTML = ''; }
-    }, 1700);
+    }, 2000);
   }
 
   /* 골 컷인 — 득점자 일러스트 */

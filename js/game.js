@@ -1391,7 +1391,7 @@
       '<div id="m-cutin"></div>' +
       '<div id="m-overlay"></div></div>' +
       '<div class="mom">' +
-      '<div class="mom-top"><b>MOMENTUM</b><span class="tiny" style="color:rgba(233,244,221,.45)">' + (kind === 'league' ? '공식전' : (kind === 'smatch' ? 'S매치' : '챌린지')) + '</span>' +
+      '<div class="mom-top"><b>MOMENTUM</b>' +
       '<span class="val"><span id="m-mom-val">0</span><small>/100</small></span></div>' +
       '<div class="mom-bar"><i id="m-mom-fill"></i></div>' +
       '<div class="mom-buffs" id="m-buffs"></div>' +
