@@ -77,12 +77,12 @@
   /* 포지션 적성 배치 (미니 피치 위 좌표 %, 위 = 상대 골대) */
   /* 적성 피치맵: 13 포지션 전부, 좌우 완전 대칭 (위 = 상대 골대) */
   var APT_LAYOUT = {
-    LWF: { x: 12, y: 20 }, ST: { x: 41, y: 8 },  CF: { x: 59, y: 8 },  RWF: { x: 88, y: 20 },
-    AM:  { x: 50, y: 34 },
-    LWB: { x: 7,  y: 40 }, RWB: { x: 93, y: 40 },
-    CM:  { x: 37, y: 54 }, DM: { x: 63, y: 54 },
-    LB:  { x: 24, y: 70 }, CB: { x: 50, y: 77 }, RB: { x: 76, y: 70 },
-    GK:  { x: 50, y: 92 }
+    LWF: { x: 12, y: 22 }, ST: { x: 41, y: 11 }, CF: { x: 59, y: 11 }, RWF: { x: 88, y: 22 },
+    AM:  { x: 50, y: 36 },
+    LWB: { x: 7,  y: 42 }, RWB: { x: 93, y: 42 },
+    CM:  { x: 37, y: 55 }, DM: { x: 63, y: 55 },
+    LB:  { x: 24, y: 70 }, CB: { x: 50, y: 75 }, RB: { x: 76, y: 70 },
+    GK:  { x: 50, y: 89 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
   var APT_LIST = POS_ORDER.slice();
@@ -2266,9 +2266,9 @@
     if (img && img.complete && (img.naturalWidth || img.width) > 0) {
       g.save();
       g.beginPath();
-      g.ellipse(22, 11.4, 13.0, 12.8, 0, 0, Math.PI * 2);
+      g.ellipse(22, 11.0, 13.8, 13.2, 0, 0, Math.PI * 2);
       g.clip();
-      g.drawImage(img, 8.4, -1.8, 27.2, 27.2);
+      g.drawImage(img, 6.6, -3.6, 30.8, 30.8);
       g.restore();
     } else {
       /* 이미지 로딩 전 임시 얼굴 */

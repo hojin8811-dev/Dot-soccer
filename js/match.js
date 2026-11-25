@@ -1157,7 +1157,7 @@
 
     /* 1) 슛 */
     if (dist < shootRange) {
-      var pShot = dist < 12 ? 0.66 : (dist < 18 ? 0.44 : 0.28);
+      var pShot = dist < 12 ? 0.52 : (dist < 18 ? 0.36 : 0.22);
       if (pressure < 2.2 && dist > 10) { pShot *= 0.45; }
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
       if (chance(pShot)) { shoot(p, dist); return; }
@@ -1181,7 +1181,7 @@
     if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09; }
     acc -= dist * 0.005;
     var onTarget = chance(clamp(acc, 0.2, 0.86));
-    var xg = clamp(0.34 - dist * 0.022 + p.player.stats.atk / 1600, 0.02, 0.44);
+    var xg = clamp(0.32 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.42);
     if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05; }
     if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035; }
     if (p.side === 'away' && buffOf('def') > 0) { xg -= 0.045; }
@@ -1992,7 +1992,7 @@
     drawPassLine();
     drawShotTrail();
 
-    var sprH = clamp(W * 0.118, 36, 48);
+    var sprH = clamp(W * 0.134, 40, 54);
     var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
     var i, p, px, py, sprite, offY, dx, dy;
 
@@ -2114,14 +2114,16 @@
       p = players[i];
       var row = {
         pos: p.pos, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
-        tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind
+        tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
+        bubble: p.bubble ? p.bubble.text : null
       };
       if (p.side === 'home') { h.push(row); } else { a.push(row); }
     }
     var pcs = pressConfig('home');
     return {
       clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey,
-      ball: { x: Math.round(ball.x), y: Math.round(ball.y), kind: ball.kind },
+      ball: { x: Math.round(ball.x), y: Math.round(ball.y), kind: ball.kind, shot: !!ball.shot },
+      passLine: play.passLine ? true : false,
       formation: {
         home: formationOf('home'), away: formationOf('away'), tactic: tactic,
         lineHome: Math.round(lineYOf('home')), lineAway: Math.round(lineYOf('away')),
