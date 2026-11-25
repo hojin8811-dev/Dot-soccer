@@ -3,9 +3,13 @@
 100% 한국어 UI의 **도트 축구 구단주 시뮬레이션** 1차 프로토타입입니다.
 픽셀 잔디 위에서 2.5등신 도트 선수들이 실제로 뛰고, 코믹한 한국어 중계가 흐릅니다.
 
-- 라이브: https://hojin8811-dev.github.io/dot-soccer/
+- 라이브: https://hojin8811-dev.github.io/Dot-soccer/
 - 모바일 **390×844** 세로 화면 우선 설계 (가로 스크롤 없음)
 - 설치형 PWA (manifest + service worker)
+
+| 클럽 홈 | 스쿼드 | 경기 + 골 연출 |
+| --- | --- | --- |
+| ![클럽 홈](preview/v1/01-home.png) | ![스쿼드](preview/v1/02-squad.png) | ![경기](preview/v1/04-match-goal.png) |
 
 ## 4개 탭
 
@@ -44,3 +48,4 @@ preview/v1/   검증 스크린샷
 
 - 저장 데이터는 브라우저별로 유지됩니다. 스카우트 탭 하단 `게임 초기화`로 새 게임.
 - 문법 검사: `esprima`(ES2017) 파싱 오류 0 — 검증 내역은 `preview/v1/` 참고.
+- 라이브 검증: `preview/v1/` 의 390×844 스크린샷과 `preview/v1/README.md` (콘솔 오류 0, 4탭 전환, 교체·스카우트·훈련, 실제 경기 1판 결산까지)
