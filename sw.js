@@ -1,10 +1,13 @@
-/*! 도트싸커 v1 — 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v1-20261125';
+/*! 도트싸커 × 포켓리그 v2 — 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v2-20261125';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
-      return c.addAll(['./', './index.html', './manifest.webmanifest']).catch(function () {});
+      return c.addAll([
+        './', './index.html', './manifest.webmanifest',
+        './css/style.css?v=2', './js/data.js?v=2', './js/match.js?v=2', './js/game.js?v=2'
+      ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
   );
 });
