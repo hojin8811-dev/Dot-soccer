@@ -1186,15 +1186,18 @@
 
     /* 관중석 띠 (위/아래) */
     if (opt.crowd !== false) {
-      var ch = Math.max(7, Math.round(H * 0.022));
-      var colors = ['#c8432f', '#2f5fa8', '#d8a419', '#2a7a45', '#8a5a3a', '#e6d9b8', '#6a34c0'];
+      var ch = Math.max(5, Math.round(H * 0.014));
+      var colors = ['#8a5a3a', '#a8763c', '#6e7c48', '#5a4634', '#c9b894', '#7a6440'];
+      fill(g, 0, 0, W, ch * 2, 'rgba(24,40,18,0.55)');
+      fill(g, 0, H - ch * 2, W, ch * 2, 'rgba(24,40,18,0.55)');
       for (i = 0; i < Math.floor(W / 3); i++) {
-        fill(g, i * 3, 0, 2, ch, colors[(i * 7 + 3) % colors.length]);
+        fill(g, i * 3, ch * 0.15, 2, ch, colors[(i * 7 + 3) % colors.length]);
         fill(g, i * 3 + 1, ch, 2, ch, colors[(i * 5 + 1) % colors.length]);
-        fill(g, i * 3, H - ch, 2, ch, colors[(i * 3 + 2) % colors.length]);
+        fill(g, i * 3, H - ch * 1.9, 2, ch, colors[(i * 3 + 2) % colors.length]);
+        fill(g, i * 3 + 1, H - ch * 0.9, 2, ch, colors[(i * 5 + 4) % colors.length]);
       }
-      fill(g, 0, 0, W, 1, 'rgba(20,34,16,0.55)');
-      fill(g, 0, H - 1, W, 1, 'rgba(20,34,16,0.55)');
+      fill(g, 0, 0, W, 1, 'rgba(20,34,16,0.6)');
+      fill(g, 0, H - 1, W, 1, 'rgba(20,34,16,0.6)');
     }
   };
 

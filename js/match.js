@@ -879,7 +879,7 @@
     if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
     else { DS.Art.drawPitch(ctx, W, H, { crowd: true }); }
 
-    var scale = clamp(W / 205, 1.35, 2.0);
+    var scale = clamp(W / 192, 1.4, 2.1);
     var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
     var i, p, px, py, sprite, offY;
 
