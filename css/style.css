@@ -886,3 +886,122 @@ main {
 main::-webkit-scrollbar { width: 0; height: 0; }
 .seg button { white-space: nowrap; }
 .aptmap { height: 250px; }
+
+/* ═════════════════  감독 (MANAGER) — v5 ═════════════════ */
+.mgr-wrap {
+  display: flex; align-items: center; gap: 6px;
+  margin: 7px 0 0; padding: 7px 9px 7px 7px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #123e34 0%, #0d2e27 100%);
+  border: 1px solid rgba(200, 241, 105, .22);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .22);
+  cursor: pointer;
+}
+.mgr-wrap .mgr { flex: 1 1 auto; min-width: 0; background: none; border: 0; padding: 0; margin: 0; }
+.mgr-go { flex: 0 0 auto; font-size: 9px; font-weight: 900; color: #cfe89f; letter-spacing: .2px; white-space: nowrap; }
+
+.mgr { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mgr-art {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px; overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, #3c6f5f 0%, #17362e 100%);
+  border: 1.5px solid rgba(200, 241, 105, .45);
+}
+.mgr-art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; display: block; }
+.mgr-main { min-width: 0; display: block; }
+.mgr-top { display: flex; align-items: center; gap: 4px; }
+.mgr-top b { font-size: 11.5px; font-weight: 900; letter-spacing: -.3px; color: #eaf6dd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-sub { display: block; font-size: 8.5px; font-weight: 700; color: rgba(233, 244, 221, .62); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-sub .sync, .mgr-live em.sync, .mhero-form .sync {
+  font-style: normal; font-weight: 900; color: #1d3b07; background: var(--lime);
+  padding: 0 4px; border-radius: 5px; font-size: 8px;
+}
+.mgr-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.mtag {
+  font-size: 8px; font-weight: 900; letter-spacing: -.1px;
+  padding: 1px 5px; border-radius: 6px; white-space: nowrap;
+}
+
+/* 클럽 · 시트 안의 감독 카드 */
+.mgr.club { background: var(--card2); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+.mgr.club .mgr-art { width: 52px; height: 52px; }
+.mgr.club .mgr-top b { color: var(--ink); font-size: 12.5px; }
+.mgr.club .mgr-sub { color: var(--ink2); }
+
+/* 경기 화면 감독 줄 */
+.mgr-live {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin: 6px 0 0; padding: 5px 8px; border-radius: 10px;
+  background: rgba(200, 241, 105, .10);
+  border: 1px solid rgba(200, 241, 105, .22);
+  font-size: 9px; font-weight: 800; color: #d9f0b4;
+  overflow: hidden;
+}
+.mgr-live b { font-weight: 900; color: #eaffd2; }
+.mgr-live span { color: rgba(233, 244, 221, .68); }
+
+/* 감독실 시트 */
+.mhero {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px; border-radius: 14px; margin-bottom: 8px;
+  background: linear-gradient(135deg, #123e34 0%, #0b2b24 100%);
+  border: 1px solid rgba(200, 241, 105, .25);
+}
+.mhero-art {
+  flex: 0 0 auto; width: 92px; height: 92px; border-radius: 13px; object-fit: cover; object-position: 50% 15%;
+  background: radial-gradient(circle at 50% 30%, #3c6f5f 0%, #17362e 100%);
+  border: 2px solid rgba(200, 241, 105, .5);
+}
+.mhero-in { min-width: 0; }
+.mhero-kicker { font-size: 8.5px; font-weight: 900; letter-spacing: .4px; color: #cfe89f; }
+.mhero-name { font-size: 18px; font-weight: 900; letter-spacing: -1px; color: #f2ffe2; line-height: 1.2; }
+.mhero-name small { font-size: 9px; font-weight: 800; color: rgba(233, 244, 221, .6); letter-spacing: 0; }
+.mhero-style { font-size: 10px; font-weight: 800; color: rgba(233, 244, 221, .8); margin-top: 1px; }
+.mhero-form { font-size: 9px; font-weight: 800; color: rgba(233, 244, 221, .62); margin-top: 4px; }
+.mhero-form b { color: #eaffd2; }
+
+.mstory {
+  font-size: 9.5px; line-height: 1.6; color: var(--ink2);
+  padding: 8px 9px; border-radius: 11px; background: var(--card2);
+  border: 1px solid var(--line); margin-bottom: 7px;
+}
+.mfx {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; margin-bottom: 4px; border-radius: 11px;
+  background: var(--card2); border: 1px solid var(--line);
+}
+.mfx-ico {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.mfx-tx { min-width: 0; }
+.mfx-tx b { display: block; font-size: 10.5px; font-weight: 900; letter-spacing: -.2px; }
+.mfx-tx em { display: block; font-style: normal; font-size: 8.5px; font-weight: 700; color: var(--ink3); margin-top: 1px; }
+
+.mlist { display: flex; flex-direction: column; gap: 5px; }
+.mrow {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 6px 8px; border-radius: 11px; border: 1px solid var(--line); background: var(--card2);
+}
+.mrow.on { border-color: var(--lime2); background: rgba(200, 241, 105, .18); }
+.mrow-art { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; overflow: hidden; background: #17362e; }
+.mrow-art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
+.mrow-main { flex: 1 1 auto; min-width: 0; }
+.mrow-main b { display: block; font-size: 11px; font-weight: 900; letter-spacing: -.3px; }
+.mrow-sub { display: block; font-size: 8.5px; font-weight: 700; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow-tr { display: block; font-size: 8.5px; font-weight: 800; color: var(--ink2); margin-top: 1px; }
+.mrow-side { flex: 0 0 auto; text-align: right; font-size: 8.5px; font-weight: 900; }
+.mrow-side em { display: block; font-style: normal; font-size: 8px; font-weight: 900; color: var(--ink3); margin-top: 2px; }
+.mrow-side em.on { color: #3d6b12; }
+
+.mcard {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2);
+}
+.mcard-art { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 11px; overflow: hidden; background: #17362e; }
+.mcard-art img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.mcard-main { flex: 1 1 auto; min-width: 0; }
+.mcard-top { display: flex; align-items: center; gap: 4px; }
+.mcard-top b { font-size: 11.5px; font-weight: 900; letter-spacing: -.3px; }
+.mcard-sub { display: block; font-size: 8.5px; font-weight: 700; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mcard-tr { display: block; font-size: 8.5px; font-weight: 800; color: var(--ink2); margin-top: 1px; }
+.mcard .btn { flex: 0 0 auto; }

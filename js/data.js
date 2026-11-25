@@ -353,6 +353,180 @@
   };
   DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'tikitaka', 'longshot'];
 
+  /* ─────────────────────────  감독 특기 (버프 8종)  ───────────────────────── */
+  /* v: 특기 레벨(2~8) — 수치 효과는 이 값을 기준으로 환산한다 */
+  var MANAGER_TRAITS = {
+    org:   { key: 'org',   name: '조직력 업',  icon: '🤝', color: '#2f8f62',
+      desc: '패스 연계와 오프더볼 위치 선정이 좋아집니다.', mark: 'ORG' },
+    atk:   { key: 'atk',   name: '공격 업',    icon: '⚡', color: '#d1482f',
+      desc: '공격 전개가 빨라지고 슈팅 기회가 늘어납니다.', mark: 'ATK' },
+    def:   { key: 'def',   name: '수비 업',    icon: '🛡️', color: '#3f7fb8',
+      desc: '수비 라인이 촘촘해지고 상대 슈팅 확률이 줄어듭니다.', mark: 'DEF' },
+    pass:  { key: 'pass',  name: '패스율 업',  icon: '🔁', color: '#38a86b',
+      desc: '패스 성공률이 오르고 패스가 발밑에 붙습니다.', mark: 'PAS' },
+    shoot: { key: 'shoot', name: '슛 업',      icon: '🎯', color: '#c1911b',
+      desc: '슈팅 정확도와 결정력이 오릅니다.', mark: 'SHT' },
+    jump:  { key: 'jump',  name: '점프볼 업',  icon: '🙌', color: '#8a5cd6',
+      desc: '코너킥·크로스 공중볼 경합과 헤딩 슛이 강해집니다.', mark: 'JMP' },
+    press: { key: 'press', name: '압박 업',    icon: '🔥', color: '#e2553f',
+      desc: '전방 압박 강도와 태클 성공률이 오릅니다.', mark: 'PRS' },
+    speed: { key: 'speed', name: '스피드 업',  icon: '💨', color: '#4aa8e0',
+      desc: '전 선수 발이 빨라져 역습과 수비 복귀가 좋아집니다.', mark: 'SPD' }
+  };
+  var MANAGER_TRAIT_LIST = ['org', 'atk', 'def', 'pass', 'shoot', 'jump', 'press', 'speed'];
+  DS.MANAGER_TRAITS = MANAGER_TRAITS;
+  DS.MANAGER_TRAIT_LIST = MANAGER_TRAIT_LIST;
+  DS.managerTrait = function (key) { return MANAGER_TRAITS[key] || MANAGER_TRAITS.org; };
+
+  /* ─────────────────────────  감독 32명 (100% 가상 창작)  ───────────────────────── */
+  /* rarity: 동/은/금/전설 · formation: 고유 포메이션 · traits: 특기 1~2종 */
+  var MANAGERS = [
+    /* ── 동급 8명 ── */
+    { id: 'm01', name: '김두식',  age: 58, rarity: 'dong', formation: '4-4-2',
+      style: '무명의 장인', story: '동네 체육관에서 30년을 가르친 지도자. 화려함보다 기본기를 믿고, 매일 같은 훈련을 반복시킨다.',
+      traits: [{ k: 'org', v: 3 }] },
+    { id: 'm02', name: '나승표',  age: 47, rarity: 'dong', formation: '4-1-4-1',
+      style: '짜임새 수비', story: '선수 시절 수비형 미드필더. 실점을 줄이는 재주 하나로 지도자 자리를 지켜 왔다.',
+      traits: [{ k: 'def', v: 3 }] },
+    { id: 'm03', name: '문태산',  age: 52, rarity: 'dong', formation: '3-5-2',
+      style: '산골 압박', story: '산악 마라톤 출신. 체력 훈련 하나는 누구에게도 지지 않는다고 자부한다.',
+      traits: [{ k: 'press', v: 3 }] },
+    { id: 'm04', name: '서을녀',  age: 44, rarity: 'dong', formation: '4-3-3',
+      style: '기본기 신봉자', story: '여자 실업 리그에서 잔뼈가 굵은 지도자. 짧은 패스 하나를 백 번 다시 시킨다.',
+      traits: [{ k: 'pass', v: 3 }] },
+    { id: 'm05', name: '하동철',  age: 55, rarity: 'dong', formation: '5-3-2',
+      style: '공중볼 장인', story: '장신 센터백 출신. 코너킥 Situation만 따로 연구하는 별난 지도자.',
+      traits: [{ k: 'jump', v: 3 }] },
+    { id: 'm06', name: '고만복',  age: 61, rarity: 'dong', formation: '4-2-2-2',
+      style: '두 줄 공격', story: '두 줄로 나란히 서서 밀어붙이는 단순한 축구를 고집한다. 그런데 자주 통한다.',
+      traits: [{ k: 'atk', v: 3 }] },
+    { id: 'm07', name: '진선우',  age: 39, rarity: 'dong', formation: '4-2-3-1',
+      style: '젊은 열정', story: '은퇴 3년 차 초보 감독. 벤치에서 제일 크게 소리치고, 선수들과 같이 뛴다.',
+      traits: [{ k: 'speed', v: 3 }] },
+    { id: 'm08', name: '임복순',  age: 49, rarity: 'dong', formation: '4-4-2',
+      style: '슛 하나만', story: '골문 앞에서의 결정력만 파고드는 지도자. 연습장에 골대를 세 개나 세워 놨다.',
+      traits: [{ k: 'shoot', v: 3 }] },
+    /* ── 은급 10명 ── */
+    { id: 'm09', name: '백인호',  age: 43, rarity: 'eun', formation: '4-2-3-1',
+      style: '구역 압박 설계자', story: '구역별 압박 타이밍을 도면에 그려 지시하는 지도자. 선수들은 그 도면을 외우고 뛴다.',
+      traits: [{ k: 'org', v: 4 }, { k: 'press', v: 3 }] },
+    { id: 'm10', name: '오달수',  age: 50, rarity: 'eun', formation: '4-4-2',
+      style: '투톱 연출가', story: '두 공격수의 움직임을 서로 반대로 엮는 데 열광한다. 수비수들은 늘 헷갈린다.',
+      traits: [{ k: 'atk', v: 4 }, { k: 'shoot', v: 3 }] },
+    { id: 'm11', name: '차민서',  age: 37, rarity: 'eun', formation: '4-3-3',
+      style: '패스 마에스트로', story: '한 번의 패스로 수비 라인을 가르는 그림을 머릿속에 그리고 지시한다.',
+      traits: [{ k: 'pass', v: 4 }, { k: 'org', v: 3 }] },
+    { id: 'm12', name: '노경필',  age: 54, rarity: 'eun', formation: '5-3-2',
+      style: '철벽 스리백', story: '스리백을 두 줄의 벽으로 만든다. “안 넣기면 이긴다”가 좌우명이다.',
+      traits: [{ k: 'def', v: 4 }, { k: 'jump', v: 3 }] },
+    { id: 'm13', name: '문정아',  age: 41, rarity: 'eun', formation: '3-4-2-1',
+      style: '측면 질주', story: '윙백을 미드필더처럼 쓰는 지도자. 측면 한 번 뚫리면 그것으로 끝장을 본다.',
+      traits: [{ k: 'speed', v: 4 }, { k: 'pass', v: 3 }] },
+    { id: 'm14', name: '서강토',  age: 46, rarity: 'eun', formation: '3-5-2',
+      style: '공중전 지배자', story: '크로스만 3천 개를 올려 보고 감각을 잡은 지도자. 공중볼 경합은 그의 영지다.',
+      traits: [{ k: 'jump', v: 4 }, { k: 'press', v: 3 }] },
+    { id: 'm15', name: '이완수',  age: 62, rarity: 'eun', formation: '4-1-4-1',
+      style: '홀딩의 미학', story: '한 명의 홀딩 미드필더가 전체 균형을 잡게 만드는 고전파 지도자.',
+      traits: [{ k: 'org', v: 4 }, { k: 'def', v: 3 }] },
+    { id: 'm16', name: '한지예',  age: 35, rarity: 'eun', formation: '4-2-2-2',
+      style: '박스 침투 요원', story: '박스 안으로 들어가는 경로를 여섯 가지로 나눠 훈련시키는 신세대 지도자.',
+      traits: [{ k: 'shoot', v: 4 }, { k: 'atk', v: 3 }] },
+    { id: 'm17', name: '최돌이',  age: 57, rarity: 'eun', formation: '4-2-3-1',
+      style: '전방 압박 교본', story: '상대 후방 빌드업을 읽는 눈이 남다르다. 백패스가 나오면 벤치가 먼저 뛰어나온다.',
+      traits: [{ k: 'press', v: 4 }, { k: 'speed', v: 3 }] },
+    { id: 'm18', name: '석민관',  age: 48, rarity: 'eun', formation: '4-4-2',
+      style: '원터치 축구', story: '두 번 터치하면 벌점을 주는 훈련을 한다. 패스 속도로 경기를 눌러 버린다.',
+      traits: [{ k: 'pass', v: 4 }, { k: 'shoot', v: 3 }] },
+    /* ── 금급 9명 ── */
+    { id: 'm19', name: '강태오',  age: 45, rarity: 'geum', formation: '4-2-3-1',
+      style: '게겐프레싱 전도사', story: '독일어 교재를 스스로 번역해 훈련에 적용한 지도자. 잃으면 3초 안에 되찾는다.',
+      traits: [{ k: 'org', v: 6 }, { k: 'press', v: 5 }] },
+    { id: 'm20', name: '백만호',  age: 52, rarity: 'geum', formation: '4-4-2',
+      style: '득점 설계사', story: '리그 득점 1위 팀을 세 번 만들었다. 공격수의 버릇을 하루면 간파한다.',
+      traits: [{ k: 'shoot', v: 6 }, { k: 'atk', v: 5 }] },
+    { id: 'm21', name: '윤소라',  age: 38, rarity: 'geum', formation: '4-3-3',
+      style: '티키타카 사제', story: '짧은 패스 200개를 3분 안에 성공시키는 훈련을 매일 돌린다. 경기장이 연습장처럼 보인다.',
+      traits: [{ k: 'pass', v: 6 }, { k: 'org', v: 5 }] },
+    { id: 'm22', name: '도정한',  age: 56, rarity: 'geum', formation: '5-3-2',
+      style: '로우 블록 장인', story: '골문 앞 30미터를 절대 내주지 않는 로우 블록의 대가. 강팀을 상대로 특히 무섭다.',
+      traits: [{ k: 'def', v: 6 }, { k: 'jump', v: 5 }] },
+    { id: 'm23', name: '김세비',  age: 40, rarity: 'geum', formation: '3-4-2-1',
+      style: '윙백 오버래핑', story: '윙백을 최전방까지 밀어 올리는 윙백 축구의 신봉자. 측면에서 수적 우위를 만든다.',
+      traits: [{ k: 'speed', v: 6 }, { k: 'atk', v: 5 }] },
+    { id: 'm24', name: '마재운',  age: 49, rarity: 'geum', formation: '3-5-2',
+      style: '공중볼 제국', story: '장신 자원을 모아 세트피스 제국을 세웠다. 코너킥 한 번이 곧 득점 기회다.',
+      traits: [{ k: 'jump', v: 6 }, { k: 'press', v: 5 }] },
+    { id: 'm25', name: '성민규',  age: 43, rarity: 'geum', formation: '4-1-4-1',
+      style: '균형의 귀재', story: '경기마다 전술을 절반씩 바꿔도 흔들리지 않는 팀을 만든다. 균형 자체가 무기다.',
+      traits: [{ k: 'def', v: 6 }, { k: 'org', v: 5 }] },
+    { id: 'm26', name: '우지환',  age: 51, rarity: 'geum', formation: '4-2-2-2',
+      style: '투톱 투메짤라', story: '없어진 줄 알았던 2-2 배열을 되살린 지도자. 중원에서 숫자로 눌러 버린다.',
+      traits: [{ k: 'atk', v: 6 }, { k: 'shoot', v: 5 }] },
+    { id: 'm27', name: '남궁혁',  age: 47, rarity: 'geum', formation: '4-2-3-1',
+      style: '미친 압박', story: '전반 15분에 경기를 끝내는 압박 축구. 후반 체력은 그의 유일한 약점이다.',
+      traits: [{ k: 'press', v: 6 }, { k: 'speed', v: 5 }] },
+    /* ── 전설 5명 ── */
+    { id: 'm28', name: '조영광',  age: 63, rarity: 'legend', formation: '4-3-3',
+      style: '패스의 신', story: '리그 통산 패스 성공률 1위를 20년째 지키는 전설. 그의 팀은 공이 발에 붙어 다닌다.',
+      traits: [{ k: 'pass', v: 8 }, { k: 'org', v: 7 }] },
+    { id: 'm29', name: '하태봉',  age: 59, rarity: 'legend', formation: '5-3-2',
+      style: '철벽의 전설', story: '한 시즌 최소 실점 기록을 세운 지도자. 상대 공격수들이 그 앞에서 작아진다.',
+      traits: [{ k: 'def', v: 8 }, { k: 'jump', v: 7 }] },
+    { id: 'm30', name: '유일한',  age: 55, rarity: 'legend', formation: '4-2-3-1',
+      style: '결정력의 화신', story: '슛 하나로 경기를 뒤집는 법을 아는 지도자. 찬스가 오면 절대 놓치지 않는 팀을 만든다.',
+      traits: [{ k: 'shoot', v: 8 }, { k: 'atk', v: 7 }] },
+    { id: 'm31', name: '문세진',  age: 46, rarity: 'legend', formation: '3-4-2-1',
+      style: '폭풍의 지휘자', story: '경기장을 세로로 찢는 윙백 축구의 완성자. 벤치에서 손짓 한 번이면 라인이 30미터 올라간다.',
+      traits: [{ k: 'speed', v: 8 }, { k: 'press', v: 7 }] },
+    { id: 'm32', name: '배영달',  age: 66, rarity: 'legend', formation: '4-4-2',
+      style: '무패의 설계자', story: '한 시즌 무패 우승을 두 번 달성한 원로. 화려함 없이도 이기는 법을 안다.',
+      traits: [{ k: 'org', v: 8 }, { k: 'jump', v: 7 }] }
+  ];
+  DS.MANAGERS = MANAGERS;
+  DS.managerOf = function (id) {
+    var i;
+    for (i = 0; i < MANAGERS.length; i++) { if (MANAGERS[i].id === id) { return MANAGERS[i]; } }
+    return MANAGERS[0];
+  };
+  DS.managerIndex = function (id) {
+    var i;
+    for (i = 0; i < MANAGERS.length; i++) { if (MANAGERS[i].id === id) { return i; } }
+    return -1;
+  };
+  /* 영입 가격 (동/은/금/전설) */
+  var MANAGER_PRICE = { dong: 1200, eun: 3200, geum: 6800, legend: 14000 };
+  DS.MANAGER_PRICE = MANAGER_PRICE;
+  DS.managerPrice = function (mgr) { return mgr ? (MANAGER_PRICE[mgr.rarity] || 3200) : 0; };
+  /* 특기 → 경기·전력 수치 (없는 특기는 undefined → 0) */
+  DS.managerFx = function (mgr) {
+    var fx = {}, i, t;
+    if (!mgr || !mgr.traits) { return fx; }
+    for (i = 0; i < mgr.traits.length; i++) {
+      t = mgr.traits[i];
+      fx[t.k] = (fx[t.k] || 0) + t.v;
+    }
+    return fx;
+  };
+  /* 감독 고유 전술 → 포메이션 지표 보정 (압박/라인/폭/템포) */
+  DS.managerTune = function (fx) {
+    fx = fx || {};
+    return {
+      press: (fx.press || 0) * 1.2 - (fx.speed || 0) * 0.2,
+      line: (fx.atk || 0) * 0.6 - (fx.def || 0) * 0.8 + (fx.press || 0) * 0.35,
+      width: (fx.speed || 0) * 0.5 + (fx.jump || 0) * 0.25,
+      tempo: (fx.speed || 0) * 0.9 + (fx.atk || 0) * 0.4
+    };
+  };
+  DS.managerTraitText = function (mgr) {
+    var out = [], i, t, d;
+    if (!mgr || !mgr.traits) { return ''; }
+    for (i = 0; i < mgr.traits.length; i++) {
+      t = mgr.traits[i]; d = MANAGER_TRAITS[t.k];
+      if (d) { out.push(d.name + ' +' + t.v); }
+    }
+    return out.join(' · ');
+  };
+
   /* ─────────────────────────  이름 · 얼굴  ───────────────────────── */
   var SURNAME = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍', '유', '고', '문', '양', '손', '배', '백', '허', '남', '심', '노', '하', '곽', '성', '차', '주', '우', '구', '민', '류'];
   var GIVEN = ['도훈', '민재', '서준', '지훈', '태양', '하늘', '승우', '재민', '우빈', '건우', '현우', '정우', '시우', '태윤', '예준', '준서', '민준', '지후', '로운', '이안', '하준', '은우', '도윤', '주원', '수호', '강민', '찬영', '동현', '성민', '규현', '태민', '영호', '상현', '기범', '재혁', '승민', '다온', '한결', '우진', '시현', '진호', '범석', '경수', '동욱', '석현', '태오', '건율', '무영', '재이', '하람'];
@@ -502,19 +676,38 @@
     { hair: 'spiky',    color: '#2f6bad', skin: '#f2c9a2' },
     { hair: 'spiky',    color: '#e0c377', skin: '#f5d3ac' },
     { hair: 'ponytail', color: '#cfd2d6', skin: '#f6d4ae' },
-    /* p33~p36: 골키퍼 전용 일러스트(장갑) */
     { hair: 'spiky',    color: '#6b4423', skin: '#f3cba4' },
     { hair: 'buzz',     color: '#1e2028', skin: '#f2c9a2' },
     { hair: 'spiky',    color: '#e3c169', skin: '#f7d7b2' },
     { hair: 'ponytail', color: '#d5d8dc', skin: '#f6d4ae' }
   ];
+  DS.PIC_COUNT = 330;
+  /* p37~p330: 일러스트 시트에서 슬라이스된 나머지 선수 — 번호 기반으로 헤어·피부를 고정 배정 */
+  (function () {
+    var HAIRS = [
+      { hair: 'spiky',    color: '#23262e' }, { hair: 'undercut', color: '#6b4423' },
+      { hair: 'swoop',    color: '#e3c169' }, { hair: 'buzz',     color: '#1e2028' },
+      { hair: 'wavy',     color: '#5a3620' }, { hair: 'ponytail', color: '#d9b06a' },
+      { hair: 'afro',     color: '#241f1c' }, { hair: 'silver',   color: '#cfd3d6' },
+      { hair: 'mohawk',   color: '#2b3a63' }, { hair: 'braids',   color: '#8a6034' }
+    ];
+    var SKINS = ['#f7d3ae', '#f2c9a2', '#eec49c', '#e8bd93', '#d59a6a', '#9c6238'];
+    var n, a, b, c;
+    for (n = 37; n <= DS.PIC_COUNT; n++) {
+      a = HAIRS[(n * 7 + 3) % HAIRS.length];
+      b = SKINS[(n * 11 + 5) % SKINS.length];
+      c = HAIRS[(n * 5 + 9) % HAIRS.length];
+      PIC_META[n] = { hair: a.hair, color: (n % 4 === 0 ? c.color : a.color), skin: b };
+    }
+  })();
   DS.PIC_META = PIC_META;
-  DS.PIC_COUNT = 36;
-  /* 골키퍼 장갑을 낀 일러스트는 GK 전용 — 필드 선수와 절대 섞이지 않는다 */
-  var GK_PORTRAITS = [6, 15, 20, 33, 34, 35, 36];
+  /* 골키퍼 장갑을 낀 일러스트는 GK 전용 — 필드 선수와 절대 섞이지 않는다.
+     assets/portraits/pools.json (count 330 · gk 40종) 과 100% 일치해야 한다. */
+  var GK_PORTRAITS = [6, 15, 20];
   var FIELD_PORTRAITS = [];
   (function () {
     var n;
+    for (n = 294; n <= DS.PIC_COUNT; n++) { GK_PORTRAITS.push(n); }
     for (n = 1; n <= DS.PIC_COUNT; n++) {
       if (GK_PORTRAITS.indexOf(n) < 0) { FIELD_PORTRAITS.push(n); }
     }
@@ -1852,14 +2045,25 @@
 
   /* ───────── 일러스트 · SD 스프라이트 ───────── */
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  /* 파일명: p01~p99 (2자리) / p100~p330 (3자리) */
+  function pad3(n) { return n < 10 ? '0' + n : String(n); }
 
   Art.portraitSrc = function (p) {
     var n = (p && p.pic) ? p.pic : 1;
-    return 'assets/portraits/p' + pad2(n) + '.png';
+    return 'assets/portraits/p' + pad3(n) + '.png';
+  };
+  /* 감독 일러스트 (assets/managers/m01~m32) */
+  Art.managerPortrait = function (mgr) {
+    var n = (mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '01';
+    return 'assets/managers/m' + (n.length < 2 ? '0' + n : n) + '.png';
+  };
+  Art.managerHead = function (mgr) {
+    var n = (mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '01';
+    return 'assets/managers/head/m' + (n.length < 2 ? '0' + n : n) + '.png';
   };
   Art.headSrc = function (p) {
     var n = (p && p.pic) ? p.pic : 1;
-    return 'assets/portraits/head/p' + pad2(n) + '.png';
+    return 'assets/portraits/head/p' + pad3(n) + '.png';
   };
   /* 카드 · 전술판용 일러스트 태그 */
   Art.portraitTag = function (p, cls, kind) {
@@ -2106,7 +2310,7 @@
     if (headImgCache[n]) { return headImgCache[n]; }
     if (typeof Image === 'undefined') { return null; }
     var img = new Image();
-    img.src = 'assets/portraits/head/p' + pad2(n) + '.png';
+    img.src = 'assets/portraits/head/p' + pad3(n) + '.png';
     headImgCache[n] = img;
     return img;
   };

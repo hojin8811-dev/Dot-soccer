@@ -144,7 +144,7 @@
     DS.resetNames();
     var squad = DS.makeInitialSquad();
     var st = {
-      v: 4,
+      v: 5,
       club: { name: '도트 유나이티드', emblem: 'bolt', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
       money: 7200,
       fans: 1280,
@@ -174,6 +174,9 @@
       lastResult: null,
       lastReport: null,
       scoutCandidates: [],
+      managers: ['m01'],
+      manager: 'm01',
+      mgrCand: [],
       dex: { players: {}, emblems: {}, kits: {} },
       log: []
     };
@@ -201,7 +204,7 @@
       var raw = localStorage.getItem(SAVE_KEY);
       if (!raw) { return null; }
       var d = JSON.parse(raw);
-      if (!d || (d.v !== 3 && d.v !== 4) || !d.squad || !d.lineup || !d.club) { return null; }
+      if (!d || (d.v !== 3 && d.v !== 4 && d.v !== 5) || !d.squad || !d.lineup || !d.club) { return null; }
       if (!d.table || !d.table.length) { d.table = makeTable(); }
       if (!d.fixtures || !d.fixtures.length) { d.fixtures = makeFixtures(); }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
@@ -220,6 +223,10 @@
       if (typeof d.morale !== 'number') { d.morale = 66; }
       if (!d.sponsor) { d.sponsor = 'kimbap'; }
       if (!d.scoutCandidates) { d.scoutCandidates = []; }
+      /* v5: 감독(매니저) — 기본 감독 1명 지급 */
+      if (!d.managers || !d.managers.length) { d.managers = ['m01']; }
+      if (!d.manager || d.managers.indexOf(d.manager) < 0) { d.manager = d.managers[0]; }
+      if (!d.mgrCand) { d.mgrCand = []; }
       /* v2 → v3 포지션 마이그레이션 */
       var i;
       for (i = 0; i < d.squad.length; i++) {
@@ -227,14 +234,14 @@
         if (p.pos === 'DF') { p.pos = 'CB'; }
         else if (p.pos === 'MF') { p.pos = 'CM'; }
         else if (p.pos === 'FW') { p.pos = 'ST'; }
-        if (!p.pic) { p.pic = (i % 32) + 1; }
+        if (!p.pic) { p.pic = 0; }
         if (!p.lock) { p.lock = DS.LOCKER[i % 4].key; }
       }
       /* v4: 선발 11 + 벤치 5 = 16명의 일러스트(p01~p32) 중복 제거 */
       DS.assignUniquePics(d.squad);
       if (d.scoutCandidates && d.scoutCandidates.length) { DS.assignUniquePics(d.scoutCandidates); }
       if (!d.homeFormation) { d.homeFormation = d.formation; }
-      d.v = 4;
+      d.v = 5;
       return d;
     } catch (e) { return null; }
   }
@@ -294,7 +301,8 @@
       sum += ov; n++;
     }
     var base = n ? sum / n : 40;
-    return Math.round(base + (chemistry() - 55) / 12);
+    var fx = mgrFx();
+    return Math.round(base + (chemistry() - 55) / 12 + (fx.org || 0) * 0.35 + (mgrSync() ? 3 : 0));
   }
 
   function chemistry() {
@@ -307,7 +315,36 @@
     var base = n ? sum / n : 40;
     var syn = DS.lockSynergy(st), bonus = 0;
     for (i = 0; i < syn.length; i++) { bonus += syn[i].value; }
-    return Math.round(clamp(base * 0.8 + 22 + bonus, 5, 99));
+    var fx = mgrFx();
+    return Math.round(clamp(base * 0.8 + 22 + bonus + (fx.org || 0) * 1.2 + (mgrSync() ? 2 : 0), 5, 99));
+  }
+
+  /* ═════════════════  감독 (Manager) ═════════════════ */
+  function mgr() { return DS.managerOf(S.manager); }
+  function mgrFx() { return DS.managerFx(mgr()); }
+  function mgrSync() { return !!(S.formation && mgr().formation === S.formation); }
+  function managerHTML(cls) {
+    var m = mgr(), fx = DS.managerFx(m), i, t, tags = '';
+    for (i = 0; i < m.traits.length; i++) {
+      t = DS.managerTrait(m.traits[i].k);
+      tags += '<span class="mtag" style="background:' + t.color + '22;color:' + t.color + '">' + t.icon + ' ' + t.name + ' +' + m.traits[i].v + '</span>';
+    }
+    return '<div class="mgr ' + (cls || '') + '">' +
+      '<span class="mgr-art"><img src="' + DS.Art.managerHead(m) + '" alt=""></span>' +
+      '<span class="mgr-main"><span class="mgr-top"><b>' + esc(m.name) + ' 감독</b>' +
+      '<span class="chip" style="background:' + DS.RARITY[m.rarity].color + '22;color:' + DS.RARITY[m.rarity].color + '">' + DS.RARITY[m.rarity].name + '</span></span>' +
+      '<span class="mgr-sub">' + esc(m.style) + ' · 고유 ' + m.formation + (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</span>' +
+      '<span class="mgr-tags">' + tags + '</span></span>' +
+      '</div>';
+  }
+  function pickMgrCandidates() {
+    var pool = [], i, pick3;
+    for (i = 0; i < DS.MANAGERS.length; i++) {
+      if (S.managers.indexOf(DS.MANAGERS[i].id) < 0) { pool.push(DS.MANAGERS[i].id); }
+    }
+    pool = U.shuffle(pool);
+    pick3 = pool.slice(0, 4);
+    S.mgrCand = pick3;
   }
 
   function opponentTeam(id) {
@@ -346,6 +383,9 @@
     for (i = 0; i < syn.length; i++) {
       if (syn[i].key === 'fight' || syn[i].key === 'crea') { base += syn[i].value / 26; }
     }
+    var fx = mgrFx();
+    base += (fx.atk || 0) * 0.03 + (fx.shoot || 0) * 0.025 + (fx.org || 0) * 0.012 + (fx.jump || 0) * 0.008;
+    if (mgrSync()) { base += 0.08; }
     return Math.round(clamp(base, 0.3, 3.8) * 10) / 10;
   }
   function xgAgainst(oppStr) {
@@ -355,13 +395,18 @@
     var base = 1.5 + (o - power) / 18 - (f.metrics.press ? 0 : 0);
     var mine = DS.FORMATIONS[S.formation];
     base -= (mine.metrics.press - 70) / 260;
+    var fx = mgrFx();
+    base -= (fx.def || 0) * 0.03 + (fx.jump || 0) * 0.01;
+    if (mgrSync()) { base -= 0.06; }
     return Math.round(clamp(base, 0.2, 3.6) * 10) / 10;
   }
   function pressLevel() {
     var f = DS.FORMATIONS[S.formation];
     var syn = DS.lockSynergy(starters()), i, dev = 0;
     for (i = 0; i < syn.length; i++) { if (syn[i].key === 'dev') { dev = syn[i].value; } }
-    return Math.round(clamp(f.metrics.press + dev * 1.6 + (S.condition - 80) / 3, 20, 99));
+    var fx = mgrFx();
+    return Math.round(clamp(f.metrics.press + dev * 1.6 + (S.condition - 80) / 3 +
+      (fx.press || 0) * 1.2 + (fx.speed || 0) * 0.4, 20, 99));
   }
   function staminaCost() {
     var f = DS.FORMATIONS[S.formation];
@@ -666,6 +711,8 @@
       '</div>' +
       '<span class="modehint">' + (master ? '세부 포지션 · 롤 · xG 지표' : '직관 포지션 · 핵심 전력만') + '</span>' +
       '</div>' +
+      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') +
+      '<span class="mgr-go">감독실 ›</span></div>' +
       '<div class="fscroll">' + chips + '</div>' +
       '<div class="card dark tight" style="margin-top:7px">' +
       '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">' + S.formation + ' · ' + f.tag + '</b><span class="meta">' + (master ? f.desc : '현대 포메이션') + '</span></div>' +
@@ -805,6 +852,12 @@
       '<div class="card">' +
       '<div class="card-head"><b>롤 진화</b><span class="meta">현대 롤 · Lv.3 / Lv.4</span></div>' +
       roleHTML + '</div>' +
+      '<div class="card"><div class="card-head"><b>감독실</b><span class="meta">선임 감독 · 고유 포메이션</span></div>' +
+      managerHTML('club') +
+      '<div class="grid2" style="margin-top:7px">' +
+      '<button class="btn sm ' + (mgrSync() ? 'ghost' : 'primary') + '" data-act="mgrform" ' + (mgrSync() ? 'disabled' : '') + '>' +
+      (mgrSync() ? '고유 포메이션 적용중' : '고유 포메이션 적용') + '</button>' +
+      '<button class="btn sm" data-act="mgrmodal">감독 영입 · 교체</button></div></div>' +
       '<div class="card"><div class="card-head"><b>스폰서</b><span class="meta">경기당 보너스</span></div>' + spHTML + '</div>' +
       '<div class="card">' +
       '<div class="card-head"><b>구단 꾸미기</b><span class="meta">이름 · 유니폼 · 엠블럼</span></div>' +
@@ -950,6 +1003,88 @@
         '<span class="v">' + v + '</span><span class="c">' + code + '</span></div>';
     }
     return '<div class="aptmap">' + html + '</div>';
+  }
+
+  /* ═════════════════  감독실 (영입 · 선임 · 고유 포메이션) ═════════════════ */
+  function traitFxText(k, v) {
+    if (k === 'org') { return '조직력 +' + Math.round(v * 1.2) + ' · 패스 연계·위치 선정 ↑'; }
+    if (k === 'atk') { return '기대 득점 xG +' + (v * 0.03).toFixed(2) + ' · 슈팅 기회 ↑'; }
+    if (k === 'def') { return '상대 xG -' + (v * 0.03).toFixed(2) + ' · 수비 라인 밀착 ↑'; }
+    if (k === 'pass') { return '패스 오차 -' + Math.round(Math.min(0.5, v * 0.05) * 100) + '% · 패스 성공률 ↑'; }
+    if (k === 'shoot') { return '슛 정확도 +' + Math.round(v * 0.8) + '%p · 결정력 ↑'; }
+    if (k === 'jump') { return '공중볼 경합 +' + Math.round(v * 6) + '% · 코너 헤딩 ↑'; }
+    if (k === 'press') { return '압박 강도 +' + Math.round(v * 1.2) + ' · 태클 성공률 +' + Math.round(v * 10) + '%'; }
+    if (k === 'speed') { return '전원 스피드 +' + Math.round(v * 0.6) + '% · 역습·복귀 ↑'; }
+    return '';
+  }
+
+  function managerRoom() {
+    if (!S.mgrCand || !S.mgrCand.length) { pickMgrCandidates(); save(); }
+    var m = mgr(), i, t, ownHTML = '', candHTML = '', fxHTML = '';
+    for (i = 0; i < m.traits.length; i++) {
+      t = DS.managerTrait(m.traits[i].k);
+      fxHTML += '<div class="mfx"><span class="mfx-ico" style="background:' + t.color + '22;color:' + t.color + '">' + t.icon + '</span>' +
+        '<div class="mfx-tx"><b>' + t.name + ' +' + m.traits[i].v + '</b><em>' + traitFxText(m.traits[i].k, m.traits[i].v) + '</em></div></div>';
+    }
+
+    for (i = 0; i < S.managers.length; i++) {
+      var om = DS.managerOf(S.managers[i]);
+      if (!om) { continue; }
+      var on = om.id === m.id;
+      ownHTML += '<button class="mrow' + (on ? ' on' : '') + '" data-act="mgrset" data-id="' + om.id + '">' +
+        '<span class="mrow-art"><img src="' + DS.Art.managerHead(om) + '" alt=""></span>' +
+        '<span class="mrow-main"><b>' + esc(om.name) + '</b>' +
+        '<span class="mrow-sub">' + esc(om.style) + ' · ' + om.formation + '</span>' +
+        '<span class="mrow-tr">' + DS.managerTraitText(om) + '</span></span>' +
+        '<span class="mrow-side" style="color:' + DS.RARITY[om.rarity].color + '">' + DS.RARITY[om.rarity].name +
+        (on ? '<em class="on">선임중</em>' : '<em>선임</em>') + '</span></button>';
+    }
+
+    var cands = 0;
+    for (i = 0; i < S.mgrCand.length; i++) {
+      var cm = DS.managerOf(S.mgrCand[i]);
+      if (!cm || S.managers.indexOf(cm.id) >= 0) { continue; }
+      cands++;
+      var price = DS.managerPrice(cm);
+      candHTML += '<div class="mcard">' +
+        '<span class="mcard-art"><img src="' + DS.Art.managerPortrait(cm) + '" alt=""></span>' +
+        '<span class="mcard-main"><span class="mcard-top"><b>' + esc(cm.name) + '</b>' +
+        '<span class="chip" style="background:' + DS.RARITY[cm.rarity].color + '22;color:' + DS.RARITY[cm.rarity].color + '">' + DS.RARITY[cm.rarity].name + '</span>' +
+        '<span class="tiny muted">' + cm.age + '세</span></span>' +
+        '<span class="mcard-sub">' + esc(cm.style) + ' · 고유 ' + cm.formation + '</span>' +
+        '<span class="mcard-tr">' + DS.managerTraitText(cm) + '</span></span>' +
+        '<button class="btn sm primary" data-act="mgrsign" data-id="' + cm.id + '" ' + (S.money < price ? 'disabled' : '') + '>' + fmt(price) + '</button></div>';
+    }
+    if (!cands) { candHTML = '<div class="tiny muted" style="padding:8px 2px">영입 가능한 후보가 없습니다. 후보를 다시 뽑아보세요.</div>'; }
+
+    var body =
+      '<div class="mhero">' +
+      '<img class="mhero-art" src="' + DS.Art.managerPortrait(m) + '" alt="">' +
+      '<div class="mhero-in">' +
+      '<div class="mhero-kicker">' + DS.RARITY[m.rarity].name + ' · ' + m.age + '세</div>' +
+      '<div class="mhero-name">' + esc(m.name) + ' <small>감독</small></div>' +
+      '<div class="mhero-style">' + esc(m.style) + '</div>' +
+      '<div class="mhero-form">고유 포메이션 <b>' + m.formation + '</b> · ' + DS.FORMATIONS[m.formation].tag +
+      (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</div>' +
+      '</div></div>' +
+      '<div class="mstory">' + esc(m.story) + '</div>' +
+      fxHTML +
+      '<button class="btn wide ' + (mgrSync() ? 'ghost' : 'primary') + '" style="margin:8px 0 4px" data-act="mgrform" ' + (mgrSync() ? 'disabled' : '') + '>' +
+      (mgrSync() ? m.formation + ' · 고유 포메이션 적용중' : m.formation + ' · 고유 포메이션 원클릭 적용') + '</button>' +
+      '<div class="band">보유 감독 <span>' + S.managers.length + '명 / 32명</span></div>' +
+      '<div class="mlist">' + ownHTML + '</div>' +
+      '<div class="band">영입 후보 <span>골드로 영입 · 즉시 선임</span></div>' +
+      '<div class="mlist">' + candHTML + '</div>' +
+      '<div class="row between" style="margin-top:8px">' +
+      '<span class="tiny muted">후보 교체 · ' + fmt(REROLL_COST) + ' 골드</span>' +
+      '<button class="btn ghost sm" data-act="mgrreroll">후보 교체</button></div>';
+
+    var mm = document.getElementById('modal');
+    mm.className = 'on';
+    mm.innerHTML = '<div class="sheet"><div class="sheet-head"><b>감독실</b>' +
+      '<span class="tiny muted">선임 · 영입 · 고유 포메이션</span>' +
+      '<button class="x" data-act="closemodal">닫기 ✕</button></div>' +
+      '<div class="sheet-body">' + body + '</div></div>';
   }
 
   function playerModal(p) {
@@ -1154,6 +1289,10 @@
       '<div class="rline"><span>패스 · 태클 · 선방</span><b style="margin-left:auto">' + r.passes + ' · ' + r.tackles + ' · ' + r.saves + '</b></div>' +
       '<div class="rline"><span>MVP</span><b style="margin-left:auto">' + esc(r.mvp.name) + ' (' + r.mvpRating.toFixed(1) + ')</b></div></div>' +
       '<div class="band">GOALS</div><div class="card tight" style="margin:0 0 8px">' + goals + '</div>' +
+      (r.manager ? '<div class="band">MANAGER</div><div class="card tight" style="margin:0 0 8px">' +
+        '<div class="rline"><span>감독</span><b style="margin-left:auto">' + esc(r.manager.name) + ' · ' + esc(r.manager.style) + '</b></div>' +
+        '<div class="rline"><span>고유 포메이션</span><b style="margin-left:auto">' + esc(r.manager.formation) + (r.manager.sync ? ' · 시너지 ON' : '') + '</b></div>' +
+        '<div class="rline"><span>특기</span><b style="margin-left:auto">' + esc(r.manager.traits) + '</b></div></div>' : '') +
       '<div class="band">CAUTIONS</div><div class="card tight" style="margin:0 0 8px">' + caut + '</div>' +
       '<div class="band">PLAYER RATING</div><div class="card tight" style="margin:0 0 8px">' + pts + '</div>' +
       '<div class="band">CAREER</div><div class="card tight" style="margin:0 0 8px">' +
@@ -1247,6 +1386,12 @@
       condition: S.condition,
       roles: S.roles,
       deck: S.deck.slice(),
+      managerFx: DS.managerFx(mgr()),
+      managerTune: DS.managerTune(DS.managerFx(mgr())),
+      managerName: mgr().name,
+      managerFormation: mgr().formation,
+      managerSync: mgrSync(),
+      managerTraits: DS.managerTraitText(mgr()),
       kind: kind,
       onHalftime: function () { openSubs(true); },
       onHud: function (st) { updateHud(st); },
@@ -1321,6 +1466,10 @@
       possession: res.possession,
       xg: res.xg || [0, 0],
       cards: res.cards || 0,
+      manager: {
+        name: mgr().name, style: mgr().style, formation: mgr().formation,
+        traits: DS.managerTraitText(mgr()), sync: mgrSync()
+      },
       reward: reward,
       points: points,
       kind: kind
@@ -1401,7 +1550,9 @@
       '<img class="hero-img" style="height:132px;object-position:70% 45%" src="assets/hero-banner.jpg" alt="">' +
       '<div class="hero-in"><div class="hero-kicker">MATCH CENTER</div>' +
       '<div class="hero-title" style="font-size:17px">90분의 전술, 한 장의 카드</div>' +
-      '<div class="hero-sub">모멘텀을 모아 경기를 뒤집으세요</div></div></div>';
+      '<div class="hero-sub">모멘텀을 모아 경기를 뒤집으세요</div></div></div>' +
+      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') +
+      '<span class="mgr-go">감독실 ›</span></div>';
     if (S.seasonOver) {
       html += '<div class="card"><div class="card-head"><b>시즌 종료</b></div><div class="tiny muted">공식전 탭에서 새 시즌을 시작하세요.</div></div>';
     } else if (next) {
@@ -1433,6 +1584,8 @@
       '<div class="pitch-wrap"><canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
       '<div id="m-banner" class="goal-banner"></div></div>' +
+      '<div class="mgr-live"><span class="mgr-live-ico">👔</span><b>' + esc(mgr().name) + '</b><span>' +
+      esc(DS.managerTraitText(mgr())) + '</span>' + (mgrSync() ? '<em class="sync">고유 포메이션 시너지</em>' : '') + '</div>' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b>' +
       '<span class="uses" id="m-uses">개입 6/6</span>' +
@@ -1723,6 +1876,40 @@
     if (act === 'backup') { id = t.getAttribute('data-id'); if (selId) { swapSlot(id, findBestSlot(id)); return; } var bp = byId(id); if (bp) { playerModal(bp); } return; }
 
     if (act === 'formation') { doFormation(t.getAttribute('data-f')); return; }
+
+    if (act === 'mgrmodal') { managerRoom(); return; }
+    if (act === 'mgrset') {
+      id = t.getAttribute('data-id');
+      if (!id || S.managers.indexOf(id) < 0) { return; }
+      S.manager = id; save(); renderAll(); managerRoom();
+      toast(DS.managerOf(id).name + ' 감독 선임');
+      return;
+    }
+    if (act === 'mgrsign') {
+      var sm = DS.managerOf(t.getAttribute('data-id'));
+      if (!sm || S.managers.indexOf(sm.id) >= 0) { return; }
+      var mprice = DS.managerPrice(sm);
+      if (S.money < mprice) { toast('금화가 부족합니다.'); return; }
+      S.money -= mprice;
+      S.managers.push(sm.id);
+      S.manager = sm.id;
+      S.mgrCand = (S.mgrCand || []).filter(function (x) { return x !== sm.id; });
+      save(); renderAll(); managerRoom();
+      toast(sm.name + ' 감독 영입 · 선임 완료');
+      return;
+    }
+    if (act === 'mgrreroll') {
+      if (S.money < REROLL_COST) { toast('금화가 부족합니다.'); return; }
+      S.money -= REROLL_COST;
+      pickMgrCandidates(); save(); renderAll(); managerRoom();
+      toast('감독 후보를 새로 뽑았습니다.');
+      return;
+    }
+    if (act === 'mgrform') {
+      closeModal();
+      doFormation(mgr().formation);
+      return;
+    }
     if (act === 'autolineup') {
       S.lineup = autoLineup(S.squad, S.formation);
       S.bench = autoBench(S.squad, S.lineup);
@@ -1972,6 +2159,8 @@
     toast: toast,
     playerModal: playerModal,
     showReport: showReport,
+    managerRoom: managerRoom,
+    act: function (a, el) { onAction(a, el); },
     currentTab: function () { return currentTab; },
     renderAll: renderAll
   };

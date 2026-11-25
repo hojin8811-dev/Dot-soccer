@@ -58,6 +58,8 @@
   var hand = [];
   var drawQueue = [];
   var buffs = {};
+  var mgrFx = {};          /* 감독 특기 (경기 내내 고정) */
+  var homeMetrics = null;  /* 감독 전술 보정이 반영된 우리 팀 포메이션 지표 */
   var cutinHold = 0;
   var cardUses = 0;
   var lastHud = 0;
@@ -161,8 +163,21 @@
       : ((cfg && cfg.awayFormation) || '4-4-2');
   }
   function metricsOf(side) {
+    if (side === 'home' && homeMetrics) { return homeMetrics; }
     var f = DS.FORMATIONS[formationOf(side)];
     return (f && f.metrics) || { press: 70, line: 65, width: 70, tempo: 70 };
+  }
+  function buildHomeMetrics(key) {
+    var f = DS.FORMATIONS[key] || DS.FORMATIONS['4-2-3-1'];
+    var m = f.metrics;
+    var t = DS.managerTune ? DS.managerTune(mgrFx) : { press: 0, line: 0, width: 0, tempo: 0 };
+    homeMetrics = {
+      press: clamp(m.press + t.press, 20, 99),
+      line: clamp(m.line + t.line, 20, 99),
+      width: clamp(m.width + t.width, 20, 99),
+      tempo: clamp(m.tempo + t.tempo, 20, 99)
+    };
+    return homeMetrics;
   }
   function dfBaseAvg(side) {
     var sum = 0, n = 0, i, p;
@@ -199,6 +214,7 @@
     if (side === 'home') {
       press += tactic === 'attack' ? 10 : (tactic === 'defense' ? -14 : 0);
       if (buffOf('press') > 0) { press += 26; }
+      press += mfx('press') * 1.2;
     }
     var n = press >= 80 ? 3 : (press >= 60 ? 2 : 1);
     if (side === 'home' && buffOf('press') > 0) { n = 4; }
@@ -290,6 +306,8 @@
     hudDirty = true;
   }
   function buffOf(fx) { return buffs[fx] || 0; }
+  /* 감독 특기 수치 (없으면 0) */
+  function mfx(k) { return mgrFx[k] || 0; }
   function anyAtkBuff() {
     return buffOf('atk') > 0 || buffOf('through') > 0 || buffOf('tiki') > 0 || buffOf('longshot') > 0;
   }
@@ -518,6 +536,8 @@
     halfScore = [[0, 0], [0, 0]];
     halftimeDone = false;
     tactic = cfg.tactics || 'balanced';
+    mgrFx = cfg.managerFx || {};
+    buildHomeMetrics(cfg.homeFormation);
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
     spriteCache = {};
     setupDeck(cfg.deck);
@@ -941,6 +961,7 @@
     if (ball.carrier === p) { spd *= 0.93; }
     if (buffOf('tempo') > 0) { spd *= 1.18; }
     if (buffOf('roar') > 0) { spd *= 1.1; }
+    if (p.side === 'home' && mfx('speed') > 0) { spd *= 1 + Math.min(0.12, mfx('speed') * 0.006); }
     if (p.stun > 0) { p.stun -= dt; spd *= 0.32; }
     var dx = p.tx - p.x, dy = p.ty - p.y;
     var d = Math.hypot(dx, dy);
@@ -1075,6 +1096,11 @@
       if (buffOf('build') > 0 && d < 26) { score += 7; }
       if (p.side === 'away' && buffOf('def') > 0 && isFwdGroup(q)) { score -= 16; }
       if (p.side === 'away' && buffOf('offside') > 0 && isBehindLine(q)) { score -= 12; }
+      /* 감독 조직력 업: 빈 공간에 선 동료를 더 자주 찾는다 */
+      if (p.side === 'home' && mfx('org') > 0) {
+        score += mfx('org') * Math.min(open, 18) * 0.10;
+        if (fwd < -4) { score -= mfx('org') * 0.5; }
+      }
       if (q.mark && q.mark === p) { score -= 4; }
       score += Math.random() * 5;
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
@@ -1093,6 +1119,8 @@
     var dir = goalDir(p.side);
     var tx, ty, speed;
     var err = buffOf('tiki') > 0 ? 1.2 : (buffOf('build') > 0 ? 2.0 : 3.0);
+    /* 감독 패스율 업: 패스 오차를 줄인다 */
+    if (p.side === 'home' && mfx('pass') > 0) { err *= (1 - clamp(mfx('pass') * 0.05, 0, 0.5)); }
     if (type === 'through') {
       tx = clamp(q.x + (q.baseX < 50 ? 2 : -2) + range(-err, err), q.zone.xMin, q.zone.xMax);
       ty = clamp(q.y + dir * 11, q.zone.yMin, q.zone.yMax);
@@ -1181,12 +1209,15 @@
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
     var acc = 0.46 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
     if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09; }
+    if (p.side === 'home') { acc += mfx('shoot') * 0.008 + mfx('atk') * 0.004; }
     acc -= dist * 0.005;
     var onTarget = chance(clamp(acc, 0.2, 0.86));
     var xg = clamp(0.32 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.42);
     if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05; }
     if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035; }
     if (p.side === 'away' && buffOf('def') > 0) { xg -= 0.045; }
+    if (p.side === 'home') { xg += mfx('shoot') * 0.004 + mfx('atk') * 0.002; }
+    else { xg -= mfx('def') * 0.005 + mfx('press') * 0.001; }
     if (!onTarget) { xg *= 0.12; }
     var isGoal = chance(clamp(xg, 0.01, 0.66));
     var tx = onTarget ? clamp(50 + range(-8, 8), 38, 62) : (chance(0.5) ? range(28, 42) : range(58, 72));
@@ -1345,6 +1376,7 @@
     var d = d2(defender, carrier);
     if (d > 3.1) { return; }
     var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 : 0);
+    if (defender.side === 'home') { defSkill += mfx('def') * 1.2 + mfx('press') * 1.0; }
     var atkSkill = carrier.player.stats.spd * 0.7 + carrier.player.stats.atk * 0.3 + 12;
     var pT = clamp(1.25 * (defSkill / (defSkill + atkSkill)) * dt * 1.9, 0, 0.5);
     if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1.45; }
@@ -1501,6 +1533,9 @@
       tx = clamp(50 + range(-6, 6), 36, 64);
       ty = attackGoalY(side) - dir * 11;
       xg = 0.12 + (side === 'home' && buffOf('setpiece') > 0 ? 0.05 : 0);
+      /* 감독 점프볼 업: 코너·크로스 공중볼 경합에서 이긴다 */
+      if (side === 'home') { xg += mfx('jump') * 0.006; }
+      else { xg -= mfx('def') * 0.003 + mfx('jump') * 0.003; }
       dur = 0.72;
       bubble(taker || scorer, '🚩 코너 크로스!', '#ffd98a', 1.3);
     } else {
@@ -1516,8 +1551,9 @@
     var by = sp.type === 'corner' ? (scorer || taker) : (taker || scorer);
     kickBall(taker || by, tx, ty, speed, 'shot', null);
     ball.dur = dur;
+    var onT = 0.55 + (side === 'home' ? mfx('jump') * 0.01 : 0) - (side === 'away' ? mfx('def') * 0.006 : 0);
     ball.shot = {
-      by: by, xg: xg, onTarget: chance(0.55), isGoal: chance(clamp(xg, 0.02, 0.5)),
+      by: by, xg: xg, onTarget: chance(clamp(onT, 0.2, 0.9)), isGoal: chance(clamp(xg, 0.02, 0.5)),
       long: dist > 26, tx: tx, gy: attackGoalY(side)
     };
     if (side === 'home') { goalStats.homeShots++; homeXg += xg; charge(1.2); }
@@ -1762,6 +1798,8 @@
           var pInt = clamp(1.0 * dt * (1 + q.player.stats.def / 110), 0, 0.45);
           if (buffOf('press') > 0 && q.side === 'home') { pInt *= 1.4; }
           if (buffOf('tiki') > 0 && ball.from && ball.from.side === 'home') { pInt *= 0.7; }
+          if (q.side === 'home') { pInt *= 1 + mfx('press') * 0.02 + mfx('def') * 0.01; }
+          if (ball.from && ball.from.side === 'home') { pInt *= 1 - clamp(mfx('pass') * 0.02, 0, 0.16); }
           if (chance(pInt)) {
             stats.interceptions++;
             bubble(q, '🛡️ 차단!', '#9fd8ff', 1.2);
