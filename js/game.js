@@ -380,9 +380,27 @@
       '<div class="muted">강호와 붙어 보상 2배. 오늘 ' + S.challengeLeft + '회 남음.</div></div>' +
       '<button class="cta ghost small" data-act="challenge" ' + (S.challengeLeft <= 0 ? 'disabled' : '') + '>도전</button>' +
       '</div>' +
+      statCard() +
       (S.lastResult ? lastResultCard() : '');
 
     paintEmblems(box);
+  }
+
+  function statCard() {
+    var t = S.totals;
+    var winRate = t.matches ? Math.round(t.wins / t.matches * 100) : 0;
+    return '<div class="card statcard">' +
+      '<div class="card-title">📊 시즌 기록 <span class="muted">승률 ' + winRate + '%</span></div>' +
+      '<div class="statgrid">' +
+      '<div><b>' + t.matches + '</b><span>경기</span></div>' +
+      '<div><b class="w">' + t.wins + '</b><span>승</span></div>' +
+      '<div><b>' + t.draws + '</b><span>무</span></div>' +
+      '<div><b class="l">' + t.losses + '</b><span>패</span></div>' +
+      '<div><b>' + t.goals + '</b><span>득점</span></div>' +
+      '<div><b>' + t.conceded + '</b><span>실점</span></div>' +
+      '</div>' +
+      '<div class="morale-row"><span>팀 사기</span><div class="morale"><i style="width:' + S.morale + '%"></i></div><b>' + S.morale + '</b></div>' +
+      '</div>';
   }
 
   function lastResultCard() {
@@ -431,16 +449,14 @@
     for (i = 0; i < f.slots.length; i++) {
       var slot = f.slots[i];
       var p = byId(S.lineup[i]);
-      var left = 4 + (slot.x / 100) * 84;
-      var top = 2 + (slot.y / 100) * 84;
       if (p) {
         playersHTML += '<button class="pdot ' + rarityClass(p.rarity) + (selectedId === p.id ? ' sel' : '') + '" ' +
-          'style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%" data-act="starter" data-id="' + p.id + '" data-slot="' + i + '">' +
+          'data-x="' + slot.x + '" data-y="' + slot.y + '" data-act="starter" data-id="' + p.id + '" data-slot="' + i + '">' +
           '<canvas class="pcanvas" width="30" height="40" data-player="' + p.id + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.shorts + '"></canvas>' +
           '<span class="plabel"><i>' + slot.role + '</i>' + esc(shortName(p.name)) + '</span>' +
           '</button>';
       } else {
-        playersHTML += '<button class="pdot empty" style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%" data-act="starter" data-slot="' + i + '"><span class="plabel"><i>' + slot.role + '</i>공석</span></button>';
+        playersHTML += '<button class="pdot empty" data-x="' + slot.x + '" data-y="' + slot.y + '" data-act="starter" data-slot="' + i + '"><span class="plabel"><i>' + slot.role + '</i>공석</span></button>';
       }
     }
 
@@ -489,6 +505,7 @@
       detail;
 
     drawPitchBG();
+    placePitchPlayers();
     var canvases = box.querySelectorAll('canvas[data-player]');
     for (i = 0; i < canvases.length; i++) {
       var cv = canvases[i];
@@ -507,6 +524,8 @@
     return n.slice(1);
   }
 
+  var pitchBox = { x: 0, y: 0, w: 358, h: 320 };
+
   function drawPitchBG() {
     var cv = document.getElementById('pitch-bg');
     if (!cv) { return; }
@@ -520,7 +539,24 @@
     cv.style.height = h + 'px';
     var ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    DS.Art.drawPitch(ctx, w, h);
+    var m = DS.Art.pitchMargin(w, h);
+    pitchBox = { x: m, y: m, w: w - m * 2, h: h - m * 2 };
+    DS.Art.drawPitch(ctx, w, h, { margin: m });
+  }
+
+  /* 피치 위 선수를 경기장 좌표(0~100)에 맞춰 배치 */
+  function placePitchPlayers() {
+    var dots = document.querySelectorAll('#pitch-squad .pdot');
+    var i;
+    for (i = 0; i < dots.length; i++) {
+      var x = parseFloat(dots[i].getAttribute('data-x'));
+      var y = parseFloat(dots[i].getAttribute('data-y'));
+      if (isNaN(x) || isNaN(y)) { continue; }
+      var px = pitchBox.x + (x / 100) * pitchBox.w;
+      var py = pitchBox.y + (y / 100) * pitchBox.h;
+      dots[i].style.left = px.toFixed(1) + 'px';
+      dots[i].style.top = py.toFixed(1) + 'px';
+    }
   }
 
   /* ─────────────────────────  스카우트/구단 관리  ───────────────────────── */
@@ -1052,7 +1088,7 @@
     });
 
     global.addEventListener('resize', function () {
-      if (currentTab === 'squad') { drawPitchBG(); }
+      if (currentTab === 'squad') { drawPitchBG(); placePitchPlayers(); }
       if (DS.Match && DS.Match.running) { DS.Match.resize(); }
     });
 

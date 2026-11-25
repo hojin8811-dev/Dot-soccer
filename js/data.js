@@ -320,7 +320,7 @@
       ctx.fill();
     }
 
-    var top = y - 15 * s;   /* 도트맵(13줄) + 다리(4줄) = 17도트 */
+    var top = y - 17 * s;   /* 도트맵(13줄) + 다리(4줄) = 17도트 */
     var left = x - 6 * s;
 
     /* 다리 */
@@ -403,6 +403,10 @@
   };
 
   /* 경기장 */
+  Art.pitchMargin = function (W, H) {
+    return Math.max(10, Math.round(Math.min(W, H) * 0.028));
+  };
+
   Art.drawPitch = function (ctx, W, H, opt) {
     opt = opt || {};
     var g1 = '#3f9b46';
@@ -422,7 +426,7 @@
       ctx.fillRect((i * 37) % W, 0, 2, H);
     }
 
-    var m = 6;                      /* 경기장 여백 */
+    var m = opt.margin || Art.pitchMargin(W, H);  /* 경기장 여백 */
     var fx = m, fy = m, fw = W - m * 2, fh = H - m * 2;
     ctx.strokeStyle = 'rgba(255,255,255,0.82)';
     ctx.lineWidth = 2;
@@ -455,7 +459,7 @@
 
     /* 골대 + 그물 */
     var goalW = fw * 0.22;
-    var goalD = Math.max(6, fh * 0.035);
+    var goalD = Math.max(6, Math.round(m * 0.72));
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.lineWidth = 1;
@@ -498,6 +502,15 @@
     ctx.restore();
   };
 
+  function shieldPath(ctx, x, y, w, h) {
+    ctx.moveTo(x, y + h * 0.06);
+    ctx.lineTo(x + w, y + h * 0.06);
+    ctx.lineTo(x + w, y + h * 0.52);
+    ctx.quadraticCurveTo(x + w, y + h, x + w / 2, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h * 0.52);
+    ctx.closePath();
+  }
+
   /* 엠블럼 (문양별) */
   Art.drawEmblem = function (canvas, id, kit) {
     var ctx = canvas.getContext('2d');
@@ -509,12 +522,7 @@
     var w = W - pad * 2, h = H - pad * 2;
     /* 방패 */
     ctx.beginPath();
-    ctx.moveTo(pad, pad + h * 0.06);
-    ctx.lineTo(pad + w, pad + h * 0.06);
-    ctx.lineTo(pad + w, pad + h * 0.52);
-    ctx.quadraticCurveTo(pad + w, pad + h, pad + w / 2, pad + h);
-    ctx.quadraticCurveTo(pad, pad + h, pad, pad + h * 0.52);
-    ctx.closePath();
+    shieldPath(ctx, pad, pad, w, h);
     var grd = ctx.createLinearGradient(0, pad, 0, pad + h);
     grd.addColorStop(0, shade(shirt, 30));
     grd.addColorStop(1, shade(shirt, -40));
@@ -523,9 +531,11 @@
     ctx.lineWidth = Math.max(2, W * 0.05);
     ctx.strokeStyle = trim;
     ctx.stroke();
-    /* 내부 링 */
-    ctx.beginPath();
+
+    /* 문양 (방패 모양으로 클리핑) */
     ctx.save();
+    ctx.beginPath();
+    shieldPath(ctx, pad, pad, w, h);
     ctx.clip();
     var cx = W / 2, cy = pad + h * 0.46;
     var u = W / 16;

@@ -221,6 +221,8 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = false;
     field = { x: 4, y: 4, w: W - 8, h: H - 8 };
+    var pm = DS.Art.pitchMargin(W, H);
+    field = { x: pm, y: pm, w: W - pm * 2, h: H - pm * 2 };
     buildPitchLayer();
   }
 
@@ -231,7 +233,7 @@
     var g = pitchLayer.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.imageSmoothingEnabled = false;
-    DS.Art.drawPitch(g, W, H);
+    DS.Art.drawPitch(g, W, H, { margin: field.x });
     /* 관중석 느낌의 테두리 */
     g.fillStyle = 'rgba(8,16,28,0.55)';
     g.fillRect(0, 0, W, 3);
