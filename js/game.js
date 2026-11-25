@@ -1415,7 +1415,7 @@
 
   function updateHud(st) {
     var now = Date.now();
-    if (now - hudStamp < 120) { return; }
+    if (now - hudStamp < 320) { return; }
     hudStamp = now;
     var val = document.getElementById('m-mom-val');
     var fill = document.getElementById('m-mom-fill');
@@ -1432,15 +1432,28 @@
     }
     var hand = document.getElementById('m-hand');
     if (hand) {
-      var h = '', i, c;
-      for (i = 0; i < st.hand.length; i++) {
-        c = st.hand[i];
-        h += '<button class="tcard ' + (c.ready ? 'ready' : 'locked') + '" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '" ' + (c.ready ? '' : 'disabled') + '>' +
-          '<span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
-          (c.cooldown ? '<span class="cd">재장전 ' + c.cooldown + 's</span>' : '<span class="cost"><em>' + c.cost + '</em> M</span>') +
-          '</button>';
+      var sig = st.hand.map(function (c) { return c.key; }).join(',');
+      if (sig !== hand.getAttribute('data-sig')) {
+        var h = '', i, c;
+        for (i = 0; i < st.hand.length; i++) {
+          c = st.hand[i];
+          h += '<button class="tcard" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '">' +
+            '<span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
+            '<span class="cd"></span><span class="cost"><em>' + c.cost + '</em> M</span>' +
+            '</button>';
+        }
+        hand.innerHTML = h;
+        hand.setAttribute('data-sig', sig);
       }
-      hand.innerHTML = h;
+      var btns = hand.querySelectorAll('.tcard'), j, b, cd;
+      for (j = 0; j < st.hand.length && j < btns.length; j++) {
+        b = btns[j]; c = st.hand[j];
+        b.disabled = !c.ready;
+        b.classList.toggle('ready', !!c.ready);
+        b.classList.toggle('locked', !c.ready);
+        cd = b.querySelector('.cd');
+        cd.textContent = c.cooldown > 0 ? ('재장전 ' + c.cooldown + 's') : '';
+      }
     }
   }
 
