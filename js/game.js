@@ -1210,7 +1210,7 @@
     var cfg = {
       homeName: S.club.name,
       awayName: oppTeam.name,
-      homeShort: S.club.name.length > 4 ? S.club.name.slice(0, 4) : S.club.name,
+      homeShort: S.club.name.split(' ')[0],
       awayShort: oppTeam.short,
       homeKit: S.club.kit,
       awayKit: oppTeam.kit,
@@ -1278,7 +1278,7 @@
       attendance: 380 + Math.floor(S.fans / 12),
       homeName: S.club.name,
       awayName: oppTeam.name,
-      homeShort: S.club.name.length > 4 ? S.club.name.slice(0, 4) : S.club.name,
+      homeShort: S.club.name.split(' ')[0],
       awayShort: oppTeam.short,
       homeEmblem: S.club.emblem,
       awayEmblem: oppTeam.emblem,

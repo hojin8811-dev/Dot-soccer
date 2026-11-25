@@ -553,8 +553,8 @@ main {
   color: #0c241d;
 }
 .cutin-tag { font-size: 7.5px; font-weight: 900; letter-spacing: 1.2px; opacity: .62; }
-.cutin-name { font-size: 22px; font-weight: 900; letter-spacing: -1.4px; line-height: 1.05; margin-top: 2px; }
-.cutin-en { font-size: 8.5px; font-weight: 900; letter-spacing: 1.6px; opacity: .55; }
+.cutin-name { font-size: 22px; font-weight: 900; letter-spacing: -.8px; line-height: 1.05; margin-top: 2px; }
+.cutin-en { font-size: 9px; font-weight: 900; letter-spacing: 1.2px; opacity: .55; }
 .cutin-ace { margin-top: 5px; font-size: 10px; font-weight: 900; background: rgba(8, 30, 24, .85); color: var(--lime); display: inline-block; padding: 2px 7px; border-radius: 7px; }
 .cutin-desc { margin-top: 6px; font-size: 9px; font-weight: 700; line-height: 1.45; opacity: .8; }
 
@@ -662,7 +662,7 @@ main {
 .pd-rows { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 9px; color: rgba(233,244,221,.72); margin-top: 3px; }
 .pd-rows span { color: rgba(233,244,221,.45); margin-right: 5px; }
 
-.band { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; font-size: 9.5px; font-weight: 900; letter-spacing: .4px; color: var(--ink3); }
+.band { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; font-size: 11px; font-weight: 900; letter-spacing: .2px; color: var(--ink3); }
 .band::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line); }
 .band span { letter-spacing: 0; font-weight: 700; color: var(--ink3); opacity: .8; }
 
