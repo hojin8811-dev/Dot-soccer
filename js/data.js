@@ -2260,9 +2260,6 @@
     /* 뒤 실루엣 (배경 분리) */
     g.fillStyle = hexAlpha(hair, 0.35);
     g.beginPath(); g.ellipse(22, 11.6, 12.6, 12.4, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = skin; g.globalAlpha = 0.5;
-    g.beginPath(); g.ellipse(22, 13.2, 8.4, 8.8, 0, 0, Math.PI * 2); g.fill();
-    g.globalAlpha = 1;
     if (img && img.complete && (img.naturalWidth || img.width) > 0) {
       g.save();
       g.beginPath();
