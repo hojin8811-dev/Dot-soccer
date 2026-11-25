@@ -1,4 +1,4 @@
-/*! 도트싸커 × 포켓리그 v2 — 도트 경기장 실시간 시뮬레이션 (match.js) */
+/*! 도트싸커 v3 — 현대 전술 축구 RPG · 실시간 경기 엔진 (match.js) */
 (function (global) {
   'use strict';
 
@@ -8,8 +8,9 @@
 
   var WORLD_W = 100;
   var WORLD_H = 120;
-  var MATCH_SECONDS = 92;      /* ×1 배속에서 92초에 90분 경기 */
+  var MATCH_SECONDS = 96;      /* ×1 배속에서 96초에 90분 경기 */
   var MAX_SUBS = 5;
+  var HAND_SIZE = 3;
 
   var M = {
     running: false,
@@ -24,8 +25,8 @@
 
   var canvas = null;
   var ctx = null;
-  var W = 390, H = 460, dpr = 1;
-  var field = { x: 6, y: 6, w: 378, h: 448 };
+  var W = 390, H = 430, dpr = 1;
+  var field = { x: 6, y: 6, w: 378, h: 418 };
   var pitchLayer = null;
 
   var players = [];
@@ -53,6 +54,18 @@
   var possession = { home: 0.001, away: 0.001 };
   var halfScore = [[0, 0], [0, 0]];
   var formFactor = 1;
+  var homeXg = 0, awayXg = 0;
+
+  /* ── 모멘텀 · 전술 카드 ── */
+  var momentum = 0;
+  var hand = [];          /* [{key, readyAt}] */
+  var drawQueue = [];
+  var buffs = {};         /* fx -> 남은 초 */
+  var cutinHold = 0;
+  var cardUses = 0;
+  var lastHud = 0;
+  var hudDirty = true;
+  var bannerQueue = 0;
 
   /* ─────────────────────────  좌표  ───────────────────────── */
   function sx(x) { return field.x + (x / WORLD_W) * field.w; }
@@ -61,6 +74,10 @@
   function ownGoalY(side) { return side === 'home' ? WORLD_H : 0; }
   function attackGoalY(side) { return side === 'home' ? 0 : WORLD_H; }
   function short(n) { return n && n.length > 3 ? n.slice(1) : n; }
+  function groupOf(p) { return DS.posGroup(p.pos); }
+  function isDefGroup(p) { return groupOf(p) === 'DF'; }
+  function isMidGroup(p) { return groupOf(p) === 'MF'; }
+  function isFwdGroup(p) { return groupOf(p) === 'FW'; }
 
   /* ─────────────────────────  초기화  ───────────────────────── */
   function makeHomePlayers(lineup) {
@@ -81,15 +98,16 @@
       vx: 0, vy: 0, phase: Math.random() * 4, frame: 0,
       facing: side === 'home' ? 1 : -1, dive: 0, stun: 0,
       goals: 0, assists: 0, yellows: 0, name: player.name, off: false,
-      moving: false
+      moving: false, glow: 0
     };
   }
 
-  function makeAwayPlayers(list) {
-    var slots = DS.FORMATIONS['4-4-2'].slots;
+  function makeAwayPlayers(list, formationKey) {
+    var f = DS.FORMATIONS[formationKey] || DS.FORMATIONS['4-4-2'];
+    var slots = f.slots;
     var out = [], i;
     for (i = 0; i < list.length; i++) {
-      var s = slots[i] || { role: 'ST', pos: 'FW', x: 50, y: 40 };
+      var s = slots[i] || { role: 'ST', pos: 'ST', x: 50, y: 40 };
       out.push(mkPlayer('away', list[i], cfg.awayKit, s.role, s.pos, s.x, s.y));
     }
     return out;
@@ -118,13 +136,173 @@
   }
   function minute() { return Math.min(90, Math.floor(simTime / MATCH_SECONDS * 90)); }
 
+  /* ─────────────────────────  모멘텀 · 카드  ───────────────────────── */
+  function charge(v) {
+    momentum = clamp(momentum + v, 0, 100);
+    hudDirty = true;
+  }
+
+  function buffOf(fx) { return buffs[fx] || 0; }
+  function anyAtkBuff() { return buffOf('atk') > 0 || buffOf('through') > 0; }
+
+  function setupDeck(deck) {
+    hand = [];
+    drawQueue = [];
+    buffs = {};
+    momentum = 0;
+    cardUses = 0;
+    var list = (deck && deck.length ? deck : DS.DEFAULT_DECK).slice();
+    list = U.shuffle(list);
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (i < HAND_SIZE) { hand.push({ key: list[i], readyAt: 0 }); }
+      else { drawQueue.push(list[i]); }
+    }
+    while (hand.length < HAND_SIZE && drawQueue.length) { hand.push({ key: drawQueue.shift(), readyAt: 0 }); }
+  }
+
+  function hudState() {
+    var out = { momentum: Math.round(momentum), hand: [], buffs: [], uses: cardUses };
+    var i;
+    for (i = 0; i < hand.length; i++) {
+      var def = DS.cardOf(hand[i].key);
+      if (!def) { continue; }
+      out.hand.push({
+        key: def.key, name: def.name, cost: def.cost, tag: def.tag, color: def.color,
+        icon: def.icon, ready: hand[i].readyAt <= 0 && momentum >= def.cost,
+        cooldown: Math.max(0, Math.ceil(hand[i].readyAt))
+      });
+    }
+    for (var k in buffs) {
+      if (buffs.hasOwnProperty(k) && buffs[k] > 0) { out.buffs.push({ key: k, left: Math.ceil(buffs[k]) }); }
+    }
+    return out;
+  }
+
+  function pushHud() {
+    hudDirty = false;
+    if (cfg && cfg.onHud) { cfg.onHud(hudState()); }
+  }
+
+  /* 에이스 선택 — 카드 성격에 맞는 선수 */
+  function aceFor(fx) {
+    var best = null, bv = -1, i, p, want;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home') { continue; }
+      var g = groupOf(p);
+      want = (fx === 'def' || fx === 'trigger') ? 'DF' : (fx === 'atk' || fx === 'setpiece' || fx === 'through') ? 'FW' : null;
+      var score = DS.ratingOf(p.player) + (want && g === want ? 25 : 0) + (want === 'MF' && g === 'MF' ? 12 : 0);
+      if (score > bv) { bv = score; best = p; }
+    }
+    return best;
+  }
+
+  function playCutin(def, ace) {
+    cutinHold = 1.45;
+    var host = document.getElementById('m-cutin');
+    if (!host) { return; }
+    var img = ace ? DS.Art.portraitSrc(ace.player) : '';
+    var pname = ace ? ace.name : '';
+    host.innerHTML =
+      '<div class="cutin" style="--cc:' + def.color + '">' +
+      '<div class="cutin-lines"></div>' +
+      '<div class="cutin-art">' + (img ? '<img src="' + img + '" alt="">' : '') + '</div>' +
+      '<div class="cutin-body">' +
+      '<div class="cutin-tag">MOMENTUM CARD · ' + def.tag + '</div>' +
+      '<div class="cutin-name">' + def.name + '</div>' +
+      '<div class="cutin-en">' + def.en + '</div>' +
+      (pname ? '<div class="cutin-ace">' + pname + ' 발동</div>' : '') +
+      '<div class="cutin-desc">' + def.desc + '</div>' +
+      '</div></div>';
+    host.classList.add('on');
+    global.setTimeout(function () {
+      if (host) { host.classList.remove('on'); host.innerHTML = ''; }
+    }, 1700);
+  }
+
+  M.playCard = function (key) {
+    if (!M.running) { return false; }
+    var idx = -1, i;
+    for (i = 0; i < hand.length; i++) { if (hand[i].key === key) { idx = i; } }
+    if (idx < 0) { return false; }
+    var def = DS.cardOf(key);
+    if (!def) { return false; }
+    if (hand[idx].readyAt > 0) { return false; }
+    if (momentum < def.cost) { return false; }
+
+    momentum = clamp(momentum - def.cost, 0, 100);
+    cardUses++;
+    applyCard(def);
+    hand.splice(idx, 1);
+    /* 덱 순환: 잠시 뒤 새 카드 */
+    hand.push({ key: drawQueue.length ? drawQueue.shift() : key, readyAt: 9 });
+    drawQueue.push(key);
+    hudDirty = true;
+    pushHud();
+    return true;
+  };
+
+  function applyCard(def) {
+    var fx = def.fx;
+    buffs[fx] = Math.max(buffs[fx] || 0, def.dur);
+    var ace = aceFor(fx);
+    if (ace) { ace.glow = 2.4; addRating(ace, 0.12); }
+    playCutin(def, ace);
+    if (fx === 'setpiece') { setPiece(); }
+    if (fx === 'trigger') { pressTrigger(); }
+    if (cfg.onCard) { cfg.onCard(def.key, ace ? ace.name : ''); }
+    say('🎴 ' + def.name + ' 발동! ' + def.desc, 'tactic');
+  }
+
+  function setPiece() {
+    var i, taker = null, bv = -1;
+    for (i = 0; i < players.length; i++) {
+      var q = players[i];
+      if (q.side !== 'home') { continue; }
+      var v = q.player.set.fk + (isFwdGroup(q) ? 2 : 0);
+      if (v > bv) { bv = v; taker = q; }
+    }
+    if (!taker) { return; }
+    ball.carrier = null;
+    ball.shotBy = null;
+    ball.target = null;
+    ball.x = 50 + range(-16, 16);
+    ball.y = WORLD_H * 0.24;
+    taker.x = ball.x - 2; taker.y = ball.y + 6;
+    giveBall(taker);
+    say('🎯 세트피스 패턴 준비 완료 — ' + short(taker.name) + '가 킥을 준비합니다.', 'tactic');
+  }
+
+  function pressTrigger() {
+    var i, list = [];
+    for (i = 0; i < players.length; i++) {
+      if (players[i].side === 'home' && !isGK(players[i])) { list.push(players[i]); }
+    }
+    list.sort(function (a, b) { return (b.player.stats.def + b.player.tough * 3) - (a.player.stats.def + a.player.tough * 3); });
+    var n = 0;
+    for (i = 0; i < players.length; i++) {
+      if (players[i].side === 'away' && !isGK(players[i])) {
+        players[i].stun = 0.9;
+        if (n < 2) { n++; }
+      }
+    }
+    var target = null;
+    for (i = 0; i < players.length; i++) {
+      if (players[i].side === 'away' && ball.carrier === players[i]) { target = players[i]; }
+    }
+    if (target) { giveBall(list[0]); addRating(list[0], 0.25); charge(3); }
+    say('⚡ 압박 트리거! 상대 빌드업을 끊어냅니다.', 'tackle');
+  }
+
   /* ─────────────────────────  시작 · 종료  ───────────────────────── */
   M.start = function (config) {
     cfg = config;
     canvas = document.getElementById('m-pitch');
     if (!canvas) { return; }
     ctx = canvas.getContext('2d');
-    players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers));
+    prepareNeeds();
+    players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
     benchState = (cfg.bench || []).map(function (b) {
       return { player: b.player, pos: b.player.pos, rating: DS.ratingOf(b.player), used: false };
     });
@@ -142,6 +320,8 @@
     tactic = cfg.tactics || 'balanced';
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
     spriteCache = {};
+    setupDeck(cfg.deck);
+    cutinHold = 0;
     updateScoreboard();
     clearCommentary();
     resize();
@@ -150,10 +330,15 @@
     M.phase = 'play';
     lastT = 0;
     say('휘슬이 울립니다! ' + cfg.homeName + ' 대 ' + cfg.awayName + ', 경기 시작!', 'big');
-    say('오늘 중계는 도트싸커 중계석에서 전해드립니다.', 'normal');
+    say('모멘텀을 모아 전술 카드를 터뜨리세요. 손패 3장이 준비됩니다.', 'normal');
+    pushHud();
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(loop);
   };
+
+  function prepareNeeds() {
+    /* away squad 가 포지션 정보를 들고 오면 그대로 사용 */
+  }
 
   M.setSpeed = function (n) { M.speed = clamp(n, 1, 3); };
   M.setTactics = function (t) {
@@ -171,9 +356,11 @@
   M.stats = function () {
     return {
       passes: stats.passes, tackles: stats.tackles, saves: stats.saves,
-      shots: goalStats, cautions: cautions.length, goals: goals.length, minute: minute()
+      shots: goalStats, cautions: cautions.length, goals: goals.length, minute: minute(),
+      momentum: Math.round(momentum), cards: cardUses
     };
   };
+  M.handState = hudState;
   M.stop = function () {
     M.running = false;
     cancelAnimationFrame(rafId);
@@ -212,9 +399,10 @@
       if (benchState[i].player.id === inId && !benchState[i].used) { inB = benchState[i]; }
     }
     if (!outP || !inB) { return false; }
-    var newP = mkPlayer('home', inB.player, cfg.homeKit, outP.role, inB.player.pos, outP.baseX, outP.baseY);
+    var newP = mkPlayer('home', inB.player, cfg.homeKit, outP.role, inB.pos, outP.baseX, outP.baseY);
     newP.x = outP.x; newP.y = outP.y; newP.tx = outP.x; newP.ty = outP.y;
     newP.role = outP.role;
+    newP.pos = outP.pos;
     /* 필드에서 교체 */
     var idx = players.indexOf(outP);
     players.splice(idx, 1, newP);
@@ -228,11 +416,12 @@
       }
     }
     ratings.push({
-      id: inB.player.id, name: inB.player.name, role: outP.role, pos: inB.player.pos,
+      id: inB.player.id, name: inB.player.name, role: outP.role, pos: outP.pos,
       goals: 0, assists: 0, rating: 6.0, mvp: false
     });
     if (ball.carrier === outP) { ball.carrier = null; looseBall(outP.x, outP.y, 0, 0); }
-    say('🔁 교체! ' + short(outP.name) + ' 나가고 ' + short(inB.player.name) + ' 투입됩니다. (' + minute() + "')", 'tactic');
+    charge(2);
+    say('🔁 교체! ' + short(outP.name) + ' 나가고 ' + short(inB.player.name) + ' 투입됩니다. (' + minute() + "'", 'tactic');
     return true;
   };
 
@@ -242,7 +431,7 @@
     if (!canvas) { return; }
     var rect = canvas.parentNode.getBoundingClientRect();
     W = Math.max(280, Math.round(rect.width));
-    H = Math.max(240, Math.round(rect.height));
+    H = Math.max(220, Math.round(rect.height));
     dpr = Math.min(2, global.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
@@ -250,7 +439,7 @@
     canvas.style.height = H + 'px';
     ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
     var pm = DS.Art.pitchMargin(W, H);
     field = { x: pm, y: pm, w: W - pm * 2, h: H - pm * 2 };
     buildPitchLayer();
@@ -262,7 +451,6 @@
     pitchLayer.height = Math.round(H * dpr);
     var g = pitchLayer.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.imageSmoothingEnabled = false;
     DS.Art.drawPitch(g, W, H, { margin: field.x, crowd: true });
   }
 
@@ -306,7 +494,7 @@
   function goalkeeper(side) {
     var i;
     for (i = 0; i < players.length; i++) {
-      if (players[i].side === side && players[i].pos === 'GK' && !players[i].off) { return players[i]; }
+      if (players[i].side === side && isGK(players[i]) && !players[i].off) { return players[i]; }
     }
     return null;
   }
@@ -331,7 +519,7 @@
   }
 
   function updateTargets() {
-    var i, p, shift, near, carrier = ball.carrier;
+    var i, p, shift, carrier = ball.carrier;
     var chase = [], looseChase = [];
     if (!carrier) {
       var hq = nearestToBall('home', 999), aq = nearestToBall('away', 999);
@@ -340,17 +528,17 @@
     }
     if (carrier) {
       var defSide = carrier.side === 'home' ? 'away' : 'home';
-      var cand = players.filter(function (q) { return q.side === defSide && q.pos !== 'GK'; });
+      var cand = players.filter(function (q) { return q.side === defSide && !isGK(q); });
       cand.sort(function (a, b) {
         return Math.hypot(a.x - carrier.x, a.y - carrier.y) - Math.hypot(b.x - carrier.x, b.y - carrier.y);
       });
-      chase = cand.slice(0, 2);
+      chase = cand.slice(0, buffOf('press') > 0 ? 3 : 2);
     }
     for (i = 0; i < players.length; i++) {
       p = players[i];
       shift = tacticShift(p.side);
       if (isGK(p)) {
-        p.tx = clamp(ball.x, 42, 58);
+        p.tx = clamp(ball.x, 40, 60);
         p.ty = p.side === 'home' ? WORLD_H - 6 : 6;
         continue;
       }
@@ -367,9 +555,11 @@
         p.ty = carrier.y + carrier.vy * 0.12;
         continue;
       }
-      var bx = p.baseX + (ball.x - 50) * (p.pos === 'DF' ? 0.20 : (p.pos === 'MF' ? 0.34 : 0.22));
-      var by = p.baseY + (ball.y - WORLD_H / 2) * (p.pos === 'DF' ? 0.16 : (p.pos === 'MF' ? 0.26 : 0.20)) + shift;
-      if (p.pos === 'FW' && carrier && carrier.side === p.side) { by += goalDir(p.side) * 5; }
+      var g = groupOf(p);
+      var bx = p.baseX + (ball.x - 50) * (g === 'DF' ? 0.20 : (g === 'MF' ? 0.34 : 0.22));
+      var by = p.baseY + (ball.y - WORLD_H / 2) * (g === 'DF' ? 0.16 : (g === 'MF' ? 0.26 : 0.20)) + shift;
+      if (g === 'FW' && carrier && carrier.side === p.side) { by += goalDir(p.side) * 5; }
+      if (buffOf('atk') > 0 && g === 'FW' && carrier && carrier.side === p.side) { by += goalDir(p.side) * 4; }
       p.tx = clamp(bx, 5, 95);
       p.ty = clamp(by, 4, WORLD_H - 4);
     }
@@ -377,7 +567,8 @@
 
   function movePlayer(p, dt) {
     var spd = 9.5 + (p.player.stats.spd / 99) * 8.5;
-    if (p.pos === 'GK') { spd = 11 + p.player.stats.spd / 40; }
+    if (isGK(p)) { spd = 11 + p.player.stats.spd / 40; }
+    if (buffOf('tempo') > 0) { spd *= 1.18; }
     if (p.stun > 0) { p.stun -= dt; spd *= 0.35; }
     var dx = p.tx - p.x, dy = p.ty - p.y;
     var d = Math.hypot(dx, dy);
@@ -417,6 +608,7 @@
 
   /* ─────────────────────────  볼  ───────────────────────── */
   function giveBall(p) {
+    if (!p) { return; }
     if (ball.carrier && ball.carrier !== p) { ball.carrier.stun = 0.12; }
     ball.carrier = p;
     ball.shotBy = null;
@@ -426,6 +618,7 @@
     looseTimer = 0;
     lastTouchName = p.name;
     actionTimer = 0.25 + Math.random() * 0.3;
+    if (p.side === 'home') { charge(0.5); }
   }
   function looseBallPublic(x, y, vx, vy) { looseBall(x, y, vx, vy); }
   function looseBall(x, y, vx, vy) {
@@ -438,12 +631,12 @@
     var best = null, bestScore = -999, i, q, d, forward, oppNear;
     for (i = 0; i < players.length; i++) {
       q = players[i];
-      if (q.side !== p.side || q === p || q.pos === 'GK') { continue; }
+      if (q.side !== p.side || q === p || isGK(q)) { continue; }
       d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 8 || d > 42) { continue; }
       forward = (p.y - q.y) * -goalDir(p.side);
       oppNear = nearestOpponent(q, 6).dist;
-      var score = forward * 1.1 + (oppNear < 6 ? -14 : oppNear * 1.2) - d * 0.12 + Math.random() * 6;
+      var score = forward * (buffOf('through') > 0 ? 1.9 : 1.1) + (oppNear < 6 ? -14 : oppNear * 1.2) - d * 0.12 + Math.random() * 6;
       if (score > bestScore) { bestScore = score; best = q; }
     }
     return best;
@@ -467,6 +660,7 @@
     M.phase = 'pass';
     stats.passes++;
     p.passTarget = t;
+    if (p.side === 'home') { charge(1.1 + (buffOf('build') > 0 ? 0.5 : 0)); }
     if (chance(0.4)) {
       say(pick([
         U.josa(short(p.name), '이/가') + ' 짧은 패스로 연결합니다!',
@@ -481,7 +675,11 @@
   function shoot(p) {
     var gy = attackGoalY(p.side);
     var acc = 0.40 + p.player.stats.atk / 320 + (p.side === 'home' ? (formFactor - 1) * 0.6 : 0);
-    var onTarget = chance(clamp(acc, 0.2, 0.7));
+    if (p.side === 'home' && buffOf('atk') > 0) { acc += 0.13; }
+    if (p.side === 'home' && buffOf('setpiece') > 0) { acc += 0.22; }
+    if (p.side === 'home' && p.player.role === 'poacher') { acc += 0.05; }
+    if (p.side === 'away' && buffOf('def') > 0) { acc -= 0.11; }
+    var onTarget = chance(clamp(acc, 0.2, 0.78));
     var tx = onTarget ? range(45.5, 54.5) : (chance(0.5) ? range(32, 43) : range(57, 68));
     var ang = Math.atan2(gy - ball.y, tx - ball.x);
     var dist = Math.hypot(tx - ball.x, gy - ball.y);
@@ -494,7 +692,8 @@
     ball.onTarget = onTarget;
     ball.flight = 0;
     M.phase = 'shot';
-    if (p.side === 'home') { goalStats.homeShots++; } else { goalStats.awayShots++; }
+    if (p.side === 'home') { goalStats.homeShots++; charge(1.8); homeXg += onTarget ? 0.22 : 0.05; }
+    else { goalStats.awayShots++; awayXg += onTarget ? 0.2 : 0.05; }
     say(U.josa(short(p.name), '이/가') + ' 과감하게 슛! ' + pick([
       '발끝에서 불꽃이 튑니다!', '각도가 좁은데도 밀어 넣습니다!',
       '수비수 머리 위로 감아 찹니다!', '있는 힘껏 때렸습니다!'
@@ -510,6 +709,7 @@
     var pressure = near.dist < 5.5;
     var tac = p.side === 'home' ? tactic : 'balanced';
     var shootRange = tac === 'attack' ? 30 : (tac === 'defense' ? 22 : 26);
+    if (p.side === 'home' && anyAtkBuff()) { shootRange += 6; }
     if (distToGoal < shootRange && chance(tac === 'attack' ? 0.62 : 0.44)) { shoot(p); return; }
     if (pressure) {
       if (chance(0.72)) { if (passBall(p)) { return; } }
@@ -531,12 +731,15 @@
       M.homeScore++;
       halfScore[half][0]++;
       addRating(scorer, 1.05 + scoringBonus(scorer));
+      charge(14);
+      if (scorer.player.role === 'poacher') { charge(3); }
     } else {
       M.awayScore++;
       halfScore[half][1]++;
       for (i = 0; i < players.length; i++) {
-        if (players[i].side === 'home' && (players[i].pos === 'GK' || players[i].pos === 'DF')) { addRating(players[i], -0.12); }
+        if (players[i].side === 'home' && (isGK(players[i]) || isDefGroup(players[i]))) { addRating(players[i], -0.12); }
       }
+      charge(8);
     }
     lastScorerSide = side;
     var r = ratingOf(scorer);
@@ -549,7 +752,7 @@
     goals.push({ min: mn, half: half, side: side, name: scorer.name, assist: assistName });
     updateScoreboard();
     var isHome = side === 'home';
-    banner('GOAL!', short(scorer.name) + (isHome ? ' ⚽ ' + cfg.homeName : ' · ' + cfg.awayName));
+    banner('GOAL!', short(scorer.name) + (isHome ? ' · ' + cfg.homeName : ' · ' + cfg.awayName));
     say((isHome ? '⚽ GOAL!! ' : '😱 실점... ') + U.josa(short(scorer.name), '이/가') + ' 골망을 흔듭니다! ' + pick([
       '관중석이 들썩입니다!', '완벽한 마무리였습니다!', '골키퍼가 손을 쓸 수 없었습니다!', '중계석도 목이 쉬겠습니다!'
     ]), 'goal');
@@ -571,6 +774,7 @@
   function save(gk) {
     stats.saves++;
     addRating(gk, 0.55);
+    if (gk.side === 'home') { charge(2.2); }
     say('🧤 ' + U.josa(short(gk.name), '이/가') + ' 슈퍼 세이브! ' + pick([
       '새끼손가락으로 쳐냅니다!', '몸을 날려 막아냅니다!', '반사 신경이 미쳤습니다!', '골문을 닫아버립니다!'
     ]), 'save');
@@ -644,6 +848,7 @@
     addRating(carrier, -0.06);
     carrier.stun = 0.35;
     giveBall(defender);
+    if (defender.side === 'home') { charge(2.6); }
     say('🦵 ' + U.josa(short(defender.name), '의') + ' 태클! ' + pick([
       '깔끔하게 공을 빼앗습니다!', '몸을 던져 길을 막습니다!', '주머니에 손 넣듯 빼앗아 갑니다!'
     ]), 'tackle');
@@ -661,11 +866,11 @@
     ball.shotBy = null; ball.passBy = null; ball.target = null;
     var starter = null;
     for (i = 0; i < players.length; i++) {
-      if (players[i].side === side && players[i].pos === 'MF') { starter = players[i]; break; }
+      if (players[i].side === side && isMidGroup(players[i])) { starter = players[i]; break; }
     }
     if (!starter) {
       for (i = 0; i < players.length; i++) {
-        if (players[i].side === side && players[i].pos !== 'GK') { starter = players[i]; break; }
+        if (players[i].side === side && !isGK(players[i])) { starter = players[i]; break; }
       }
     }
     if (starter) { starter.x = 50; starter.y = WORLD_H / 2 + goalDir(side) * 4; giveBall(starter); }
@@ -690,6 +895,16 @@
 
   function step(dt) {
     if (M.phase === 'ended') { return; }
+    if (cutinHold > 0) { cutinHold -= dt; return; }
+
+    /* 카드 재장전 · 버프 타이머 */
+    var i;
+    for (i = 0; i < hand.length; i++) { if (hand[i].readyAt > 0) { hand[i].readyAt -= dt; hudDirty = true; } }
+    for (var k in buffs) {
+      if (buffs.hasOwnProperty(k) && buffs[k] > 0) { buffs[k] -= dt; if (buffs[k] <= 0) { buffs[k] = 0; hudDirty = true; } }
+    }
+    momentum = clamp(momentum + dt * 0.85, 0, 100);
+
     if (M.phase === 'celebrate') {
       phaseTimer -= dt;
       if (phaseTimer <= 0) {
@@ -698,8 +913,8 @@
         resetKickoff(lastScorerSide === 'home' ? 'away' : 'home');
       }
       updateTargets();
-      var k;
-      for (k = 0; k < players.length; k++) { movePlayer(players[k], dt); }
+      var k2;
+      for (k2 = 0; k2 < players.length; k2++) { movePlayer(players[k2], dt); }
       separate();
       return;
     }
@@ -720,7 +935,6 @@
     if (M.clock >= 90) { endMatch(); return; }
 
     updateTargets();
-    var i;
     for (i = 0; i < players.length; i++) { movePlayer(players[i], dt); }
     separate();
 
@@ -732,9 +946,9 @@
       var near = nearestOpponent(c, 4.2);
       if (near.player && near.dist < 3.75) {
         var def = near.player;
-        var defSkill = def.player.stats.def + 8;
-        var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3;
-        var pTackle = clamp(0.62 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.35);
+        var defSkill = def.player.stats.def + 8 + (def.side === 'home' && buffOf('press') > 0 ? 10 : 0);
+        var atkSkill = c.player.stats.spd + c.player.stats.atk * 0.3 + (c.side === 'home' && buffOf('tempo') > 0 ? 8 : 0);
+        var pTackle = clamp(0.62 * (defSkill / (defSkill + atkSkill)) * dt * 3.2, 0, 0.42);
         if (chance(pTackle)) { tackle(def, c); }
       }
       actionTimer -= dt;
@@ -781,14 +995,16 @@
             var pr = ratingOf(ball.passBy);
             if (pr) { pr.rating = clamp(pr.rating + 0.03, 3.5, 10); }
             addRating(tgt, 0.02);
+            if (ball.passBy.side === 'home') { charge(buffOf('through') > 0 ? 1.8 : 0.8); }
           }
           M.phase = 'play';
         }
         var i2;
+        var intercept = chance(0.5 * dt * 4) * (buffOf('build') > 0 ? 0.55 : 1);
         for (i2 = 0; i2 < players.length && !ball.carrier; i2++) {
           var q = players[i2];
           if (ball.passBy && q.side === ball.passBy.side) { continue; }
-          if (Math.hypot(q.x - ball.x, q.y - ball.y) < 2.2 && chance(0.5 * dt * 4)) {
+          if (Math.hypot(q.x - ball.x, q.y - ball.y) < 2.2 && chance(intercept)) {
             giveBall(q);
             M.phase = 'play';
             say(U.josa(short(q.name), '이/가') + ' 패스를 읽고 차단합니다!', 'tackle');
@@ -824,6 +1040,9 @@
         say('공이 공중에 뜹니다! 모두 머리를 향해 달려갑니다!', 'normal');
       }
     }
+
+    lastHud += dt;
+    if (hudDirty || lastHud > 0.5) { lastHud = 0; pushHud(); }
   }
 
   /* ─────────────────────────  종료  ───────────────────────── */
@@ -859,16 +1078,19 @@
       passes: stats.passes,
       tackles: stats.tackles,
       saves: stats.saves,
-      possession: [homePoss, 100 - homePoss]
+      possession: [homePoss, 100 - homePoss],
+      cards: cardUses,
+      momentum: Math.round(momentum),
+      xg: [Math.round(homeXg * 10) / 10, Math.round(awayXg * 10) / 10]
     };
     if (cfg.onEnd) { cfg.onEnd(res); }
   }
 
   /* ─────────────────────────  그리기  ───────────────────────── */
-  function spriteOf(p, frame, face) {
-    var key = p.player.id + '_' + (frame % 4) + '_' + (face > 0 ? 1 : 0) + '_' + p.kit.shirt;
+  function spriteOf(p) {
+    var key = p.player.id + '|' + p.kit.shirt + '|' + (p.moving ? p.frame : 0) + '|' + (p.facing > 0 ? 1 : 0) + '|' + p.pos;
     if (spriteCache[key]) { return spriteCache[key]; }
-    var c = DS.Art.matchFig(p.player, p.kit, frame % 4, face);
+    var c = DS.Art.chibi(p.player, p.kit, p.moving ? p.frame : 0, p.facing);
     spriteCache[key] = c;
     return c;
   }
@@ -879,7 +1101,8 @@
     if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
     else { DS.Art.drawPitch(ctx, W, H, { crowd: true }); }
 
-    var scale = clamp(W / 192, 1.4, 2.1);
+    var sprH = clamp(W * 0.082, 26, 36);
+    var sc = sprH / 62;
     var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
     var i, p, px, py, sprite, offY;
 
@@ -887,69 +1110,94 @@
       p = arr[i];
       px = sx(p.x); py = sy(p.y);
       offY = 0;
-      if (p.dive > 0) { offY = -Math.sin(Math.min(1, p.dive) * Math.PI) * 6; }
+      if (p.dive > 0) { offY = -Math.sin(Math.min(1, p.dive) * Math.PI) * 7; }
       /* 그림자 */
-      ctx.fillStyle = 'rgba(20,32,10,0.24)';
+      ctx.fillStyle = 'rgba(4,20,16,0.32)';
       ctx.beginPath();
-      ctx.ellipse(px, py - 1, 7 * scale / 2, 2.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(px, py - 1, sprH * 0.30, sprH * 0.10, 0, 0, Math.PI * 2);
       ctx.fill();
-      sprite = spriteOf(p, p.moving ? p.frame : 0, p.facing);
-      ctx.imageSmoothingEnabled = false;
+      /* 발동 아우라 */
+      if (p.glow > 0) {
+        p.glow -= 0.02;
+        var gr = ctx.createRadialGradient(px, py - sprH * 0.5, 2, px, py - sprH * 0.5, sprH * 0.85);
+        gr.addColorStop(0, 'rgba(200,241,105,0.55)');
+        gr.addColorStop(1, 'rgba(200,241,105,0)');
+        ctx.fillStyle = gr;
+        ctx.beginPath(); ctx.arc(px, py - sprH * 0.5, sprH * 0.85, 0, Math.PI * 2); ctx.fill();
+      }
+      sprite = spriteOf(p);
+      ctx.imageSmoothingEnabled = true;
       ctx.drawImage(sprite,
-        Math.round(px - sprite.width * scale / 2),
-        Math.round(py - sprite.height * scale + 3 + offY),
-        Math.round(sprite.width * scale), Math.round(sprite.height * scale));
-      if (p.dive > 0) { p.dive = Math.max(0, p.dive - 0.02); }
+        Math.round(px - sprH * 0.355),
+        Math.round(py - sprH + 3 + offY),
+        Math.round(sprH * 0.71), Math.round(sprH));
       /* 공 보유 표시 */
       if (ball.carrier === p) {
-        ctx.strokeStyle = 'rgba(255,240,150,0.9)';
-        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = p.side === 'home' ? 'rgba(200,241,105,0.95)' : 'rgba(255,140,120,0.9)';
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.ellipse(px, py - 1, 8, 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, py - 1, sprH * 0.34, sprH * 0.12, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
-      /* 이름 */
+      /* 이름 라벨 */
       if (p.side === 'home') {
-        ctx.font = 'bold 7px "DungGeunMo", sans-serif';
+        ctx.font = '600 8px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(20,32,10,0.55)';
-        ctx.fillRect(px - 11, py + 2, 22, 8);
-        ctx.fillStyle = '#f6f2e2';
-        ctx.fillText(short(p.name), px, py + 9);
+        var label = short(p.name);
+        var tw = ctx.measureText(label).width + 8;
+        ctx.fillStyle = 'rgba(8,32,27,0.78)';
+        roundRect(px - tw / 2, py + 1, tw, 11, 5.5);
+        ctx.fill();
+        ctx.fillStyle = '#eaffd0';
+        ctx.fillText(label, px, py + 9);
       }
     }
 
     var bx = sx(ball.x), by = sy(ball.y);
-    var ballY = by - Math.min(6, Math.abs(ball.vy) * 0.03) - 3;
-    DS.Art.drawBall(ctx, bx, ballY, Math.max(3.2, W / 110));
+    var ballY = by - Math.min(7, Math.abs(ball.vy) * 0.03) - 3;
+    DS.Art.drawBall(ctx, bx, ballY, Math.max(3.4, W / 105));
 
     /* 시간 오버레이 */
-    ctx.fillStyle = 'rgba(26,38,16,0.72)';
-    ctx.fillRect(W - 54, H - 22, 48, 16);
-    ctx.strokeStyle = 'rgba(240,225,190,0.4)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(W - 54.5, H - 22.5, 49, 17);
-    ctx.fillStyle = '#ffe9a8';
-    ctx.font = 'bold 10px "DungGeunMo", sans-serif';
+    ctx.fillStyle = 'rgba(6,26,22,0.78)';
+    roundRect(W - 56, H - 24, 50, 18, 9); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,241,105,0.5)';
+    ctx.lineWidth = 1; roundRect(W - 56, H - 24, 50, 18, 9); ctx.stroke();
+    ctx.fillStyle = '#d6ff8a';
+    ctx.font = '700 10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText((minute() < 10 ? '0' : '') + minute() + "'", W - 30, H - 13);
+    ctx.fillText((minute() < 10 ? '0' : '') + minute() + "'", W - 31, H - 14);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
 
     if (M.paused && M.running) {
-      ctx.fillStyle = 'rgba(14,24,8,0.45)';
-      ctx.fillRect(0, H / 2 - 18, W, 36);
-      ctx.fillStyle = '#ffe9a8';
-      ctx.font = 'bold 16px "DungGeunMo", sans-serif';
+      ctx.fillStyle = 'rgba(4,20,16,0.55)';
+      ctx.fillRect(0, H / 2 - 20, W, 40);
+      ctx.fillStyle = '#d6ff8a';
+      ctx.font = '800 15px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('HALF TIME', W / 2, H / 2 + 6);
+      ctx.fillText('HALF TIME', W / 2, H / 2 + 5);
       ctx.textAlign = 'left';
     }
   }
 
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
   void looseBallPublic;
   void carrierOf;
+  void bannerQueue;
 
   DS.Match = M;
 

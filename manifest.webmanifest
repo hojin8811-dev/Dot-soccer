@@ -1,19 +1,19 @@
 {
-  "name": "도트싸커 × 포켓리그 — 도트 축구 구단주 시뮬레이션",
+  "name": "도트싸커 v3 — 우리만의 현대 전술 축구 RPG",
   "short_name": "도트싸커",
-  "description": "양피지 카드와 올리브 잔디, 2.5등신 캐리커처 도트 선수로 즐기는 축구 구단주 시뮬레이션 v2",
+  "description": "2.5등신 일러스트 선수, 현대 전술 13 포지션·8 포메이션, 실시간 모멘텀 전술 카드로 경기를 뒤집는 오리지널 축구 구단 RPG",
   "lang": "ko",
   "dir": "ltr",
-  "start_url": "./index.html?v=2&source=pwa",
+  "start_url": "./index.html?v=3&source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#26481d",
-  "theme_color": "#26481d",
+  "background_color": "#08231e",
+  "theme_color": "#0b332c",
   "categories": ["games", "sports"],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

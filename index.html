@@ -3,47 +3,57 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 × 포켓리그 — 도트 축구 구단주 시뮬레이션</title>
-<meta name="description" content="100% 한국어 도트 축구 구단주 시뮬레이션. 양피지 카드 UI, 2.5등신 캐리커처 도트 선수, 전술·육성·구단 경영까지.">
-<meta name="theme-color" content="#26481d">
+<title>도트싸커 v3 — 우리만의 현대 전술 축구 RPG</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. 2.5등신 일러스트 선수, 현대 전술 13 포지션·8 포메이션, 실시간 모멘텀 전술 카드로 경기를 뒤집는다.">
+<meta name="theme-color" content="#0b332c">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest?v=3">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
 <div id="app">
   <header id="topbar" class="topbar"></header>
   <main id="main">
-    <section class="screen on" id="screen-official"></section>
+    <section class="screen on" id="screen-home"></section>
     <section class="screen" id="screen-smatch"></section>
-    <section class="screen" id="screen-myteam"></section>
+    <section class="screen" id="screen-squad"></section>
     <section class="screen" id="screen-club"></section>
     <section class="screen" id="screen-shop"></section>
     <section class="screen" id="screen-match"></section>
   </main>
   <nav class="tabbar" id="tabbar">
-    <button data-act="tab" data-tab="official" class="on"><span class="ico">🏆</span><span class="lb">공식전</span></button>
-    <button data-act="tab" data-tab="smatch"><span class="ico">👑</span><span class="lb">S매치</span></button>
-    <button data-act="tab" data-tab="myteam"><span class="ico">👕</span><span class="lb">마이팀</span></button>
-    <button data-act="tab" data-tab="club"><span class="ico">🏗️</span><span class="lb">클럽경영</span></button>
-    <button data-act="tab" data-tab="shop"><span class="ico">🛒</span><span class="lb">상점</span></button>
+    <button data-act="tab" data-tab="home" class="on">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a4 4 0 0 1-3 3.8M7 5H4v2a4 4 0 0 0 3 3.8"/></svg>
+      <span>공식전</span></button>
+    <button data-act="tab" data-tab="smatch">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.4 5.5.7-4 4.1 1 5.8L12 16.2 7 19l1-5.8-4-4.1 5.5-.7L12 3Z"/></svg>
+      <span>S매치</span></button>
+    <button data-act="tab" data-tab="squad">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 2 4-2 4 3-2 4-2-1v10H8V9L6 10 4 6l4-3Z"/></svg>
+      <span>마이팀</span></button>
+    <button data-act="tab" data-tab="club">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M9 20v-6h6v6"/></svg>
+      <span>클럽</span></button>
+    <button data-act="tab" data-tab="shop">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l1 12H5L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+      <span>상점</span></button>
   </nav>
   <div id="modal"></div>
   <div id="toast" class="toast"></div>
 </div>
-<script src="js/data.js?v=2"></script>
-<script src="js/match.js?v=2"></script>
-<script src="js/game.js?v=2"></script>
+<script src="js/data.js?v=3"></script>
+<script src="js/match.js?v=3"></script>
+<script src="js/game.js?v=3"></script>
 <script>
-/* 서비스워커 등록 (PWA) */
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=3').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

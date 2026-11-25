@@ -48,110 +48,296 @@
   DS.RARITY = RARITY;
   DS.RARITY_ORDER = RARITY_ORDER;
 
-  /* ─────────────────────────  포지션  ───────────────────────── */
+  /* ─────────────────────────  포지션 (현대 13종)  ───────────────────────── */
+  /* group: GK / DF / MF / FW, line: 0(골키퍼)~3(최전방), w: 평가 가중치 */
   var POS = {
-    GK: { key: 'GK', name: '골키퍼',   short: 'GK', color: '#2f6f9e', w: { s: 0.22, t: 0.20, p: 0.58 } },
-    DF: { key: 'DF', name: '수비수',   short: 'DF', color: '#2f6fbf', w: { s: 0.28, t: 0.28, p: 0.44 } },
-    MF: { key: 'MF', name: '미드필더', short: 'MF', color: '#2f8f4a', w: { s: 0.30, t: 0.46, p: 0.24 } },
-    FW: { key: 'FW', name: '공격수',   short: 'FW', color: '#b93c2c', w: { s: 0.32, t: 0.50, p: 0.18 } }
+    GK:  { key: 'GK',  name: '골키퍼',        short: 'GK',  group: 'GK', line: 0, color: '#2f6f9e', w: { s: 0.20, t: 0.22, p: 0.58 } },
+    CB:  { key: 'CB',  name: '센터백',        short: 'CB',  group: 'DF', line: 1, color: '#2f6fbf', w: { s: 0.26, t: 0.26, p: 0.48 } },
+    LB:  { key: 'LB',  name: '레프트백',      short: 'LB',  group: 'DF', line: 1, color: '#3a7ac8', w: { s: 0.40, t: 0.30, p: 0.30 } },
+    RB:  { key: 'RB',  name: '라이트백',      short: 'RB',  group: 'DF', line: 1, color: '#3a7ac8', w: { s: 0.40, t: 0.30, p: 0.30 } },
+    LWB: { key: 'LWB', name: '레프트 윙백',   short: 'LWB', group: 'DF', line: 1, color: '#4a86d4', w: { s: 0.46, t: 0.32, p: 0.22 } },
+    RWB: { key: 'RWB', name: '라이트 윙백',   short: 'RWB', group: 'DF', line: 1, color: '#4a86d4', w: { s: 0.46, t: 0.32, p: 0.22 } },
+    DM:  { key: 'DM',  name: '수비형 미드필더', short: 'DM', group: 'MF', line: 2, color: '#2f8f62', w: { s: 0.26, t: 0.36, p: 0.38 } },
+    CM:  { key: 'CM',  name: '중앙 미드필더',  short: 'CM',  group: 'MF', line: 2, color: '#2f8f4a', w: { s: 0.30, t: 0.46, p: 0.24 } },
+    AM:  { key: 'AM',  name: '공격형 미드필더', short: 'AM', group: 'MF', line: 2, color: '#43a34f', w: { s: 0.30, t: 0.56, p: 0.14 } },
+    LWF: { key: 'LWF', name: '레프트 윙포워드', short: 'LWF', group: 'FW', line: 3, color: '#b93c2c', w: { s: 0.44, t: 0.40, p: 0.16 } },
+    RWF: { key: 'RWF', name: '라이트 윙포워드', short: 'RWF', group: 'FW', line: 3, color: '#b93c2c', w: { s: 0.44, t: 0.40, p: 0.16 } },
+    CF:  { key: 'CF',  name: '센터포워드',    short: 'CF',  group: 'FW', line: 3, color: '#d1482f', w: { s: 0.28, t: 0.52, p: 0.20 } },
+    ST:  { key: 'ST',  name: '스트라이커',    short: 'ST',  group: 'FW', line: 3, color: '#c23428', w: { s: 0.34, t: 0.42, p: 0.24 } }
   };
-  var POS_ORDER = ['GK', 'DF', 'MF', 'FW'];
+  var POS_ORDER = ['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'DM', 'CM', 'AM', 'LWF', 'RWF', 'CF', 'ST'];
+  var POS_LIST = POS_ORDER;
   DS.POS = POS;
   DS.POS_ORDER = POS_ORDER;
+  DS.POS_LIST = POS_LIST;
+  function posGroup(code) { return (POS[code] || POS.CM).group; }
+  DS.posGroup = posGroup;
+  DS.posName = function (code) { return POS[code] ? POS[code].name : code; };
 
-  /* 포지션 적성 3열 × 4행 (위 = 공격) */
-  var APT_GRID = [
-    ['LW', 'ST', 'RW'],
-    ['LM', 'CM', 'RM'],
-    ['LB', 'CB', 'RB'],
-    ['GK']
-  ];
-  DS.APT_GRID = APT_GRID;
-  var APT_LIST = ['LW', 'ST', 'RW', 'LM', 'CM', 'RM', 'LB', 'CB', 'RB', 'GK'];
-  var APT_FAMILY = {
-    LW: 'FW', ST: 'FW', RW: 'FW',
-    LM: 'MF', CM: 'MF', RM: 'MF',
-    LB: 'DF', CB: 'DF', RB: 'DF',
-    GK: 'GK'
+  /* 포지션 적성 배치 (미니 피치 위 좌표 %, 위 = 상대 골대) */
+  var APT_LAYOUT = {
+    LWF: { x: 16, y: 14 }, CF: { x: 50, y: 9 },  ST: { x: 78, y: 15 },
+    AM:  { x: 30, y: 32 }, CM: { x: 62, y: 33 },
+    DM:  { x: 50, y: 52 },
+    LWB: { x: 9,  y: 62 }, LB: { x: 30, y: 70 }, CB: { x: 56, y: 68 }, RB: { x: 82, y: 70 }, RWB: { x: 93, y: 60 },
+    GK:  { x: 62, y: 90 }
   };
+  DS.APT_LAYOUT = APT_LAYOUT;
+  var APT_LIST = POS_ORDER.slice();
   var APT_NEAR = {
-    LW: ['LM', 'ST', 'RW'], ST: ['LW', 'RW', 'CM'], RW: ['RM', 'ST', 'LW'],
-    LM: ['LW', 'CM', 'LB'], CM: ['LM', 'RM', 'ST'], RM: ['RW', 'CM', 'RB'],
-    LB: ['LM', 'CB', 'LW'], CB: ['LB', 'RB', 'CM'], RB: ['RM', 'CB', 'RW'],
-    GK: ['CB']
+    GK:  ['CB'],
+    CB:  ['DM', 'LB', 'RB'],
+    LB:  ['LWB', 'CB', 'CM'],
+    RB:  ['RWB', 'CB', 'CM'],
+    LWB: ['LB', 'LWF', 'CM'],
+    RWB: ['RB', 'RWF', 'CM'],
+    DM:  ['CM', 'CB'],
+    CM:  ['DM', 'AM', 'LB'],
+    AM:  ['CM', 'CF', 'LWF', 'RWF'],
+    LWF: ['LWB', 'AM', 'CF', 'RWF'],
+    RWF: ['RWB', 'AM', 'CF', 'LWF'],
+    CF:  ['ST', 'AM', 'LWF', 'RWF'],
+    ST:  ['CF', 'LWF', 'RWF']
   };
-  DS.APT_FAMILY = APT_FAMILY;
+  DS.APT_LIST = APT_LIST;
+  DS.APT_NEAR = APT_NEAR;
 
-  /* ─────────────────────────  포메이션  ───────────────────────── */
+  /* ─────────────────────────  포메이션 (현대 8종)  ───────────────────────── */
   /* x: 0(왼쪽)~100(오른쪽), y: 0(상대 골대)~100(우리 골대) / k: ☆ 핵심 자리 */
+  /* press: 압박 강도, line: 수비 라인 높이, width: 공격 폭, tempo: 템포 */
   var FORMATIONS = {
-    '4-3-3': {
-      name: '4-3-3', desc: '측면 공격 · 균형', key: 3,
+    '4-2-3-1': {
+      name: '4-2-3-1', tag: '게겐프레싱', desc: '두 줄 압박 · 즉시 탈취', key: 4,
+      metrics: { press: 88, line: 78, width: 62, tempo: 84 },
       slots: [
-        { role: 'GK', pos: 'GK', x: 50, y: 92 },
-        { role: 'LB', pos: 'DF', x: 13, y: 74 },
-        { role: 'CB', pos: 'DF', x: 37, y: 78, k: true },
-        { role: 'CB', pos: 'DF', x: 63, y: 78 },
-        { role: 'RB', pos: 'DF', x: 87, y: 74 },
-        { role: 'CM', pos: 'MF', x: 27, y: 54 },
-        { role: 'CM', pos: 'MF', x: 50, y: 58, k: true },
-        { role: 'CM', pos: 'MF', x: 73, y: 54 },
-        { role: 'LW', pos: 'FW', x: 18, y: 27 },
-        { role: 'ST', pos: 'FW', x: 50, y: 20, k: true },
-        { role: 'RW', pos: 'FW', x: 82, y: 27 }
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LB',  role: 'LB',  x: 12, y: 76 },
+        { pos: 'CB',  role: 'CB',  x: 36, y: 80, k: true },
+        { pos: 'CB',  role: 'CB',  x: 64, y: 80 },
+        { pos: 'RB',  role: 'RB',  x: 88, y: 76 },
+        { pos: 'DM',  role: 'DM',  x: 34, y: 60, k: true },
+        { pos: 'DM',  role: 'DM',  x: 66, y: 60 },
+        { pos: 'LWF', role: 'LWF', x: 16, y: 38 },
+        { pos: 'AM',  role: 'AM',  x: 50, y: 36, k: true },
+        { pos: 'RWF', role: 'RWF', x: 84, y: 38 },
+        { pos: 'ST',  role: 'ST',  x: 50, y: 17, k: true }
+      ]
+    },
+    '3-4-2-1': {
+      name: '3-4-2-1', tag: '윙백 오버래핑', desc: '스리백 · 측면 수적 우위', key: 3,
+      metrics: { press: 74, line: 68, width: 90, tempo: 78 },
+      slots: [
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'CB',  role: 'CB',  x: 26, y: 80 },
+        { pos: 'CB',  role: 'CB',  x: 50, y: 82, k: true },
+        { pos: 'CB',  role: 'CB',  x: 74, y: 80 },
+        { pos: 'LWB', role: 'LWB', x: 7,  y: 56, k: true },
+        { pos: 'CM',  role: 'CM',  x: 34, y: 58 },
+        { pos: 'CM',  role: 'CM',  x: 66, y: 58 },
+        { pos: 'RWB', role: 'RWB', x: 93, y: 56, k: true },
+        { pos: 'AM',  role: 'AM',  x: 33, y: 34 },
+        { pos: 'AM',  role: 'AM',  x: 67, y: 34 },
+        { pos: 'ST',  role: 'ST',  x: 50, y: 17, k: true }
+      ]
+    },
+    '4-3-3': {
+      name: '4-3-3', tag: '폴스 나인', desc: '최전방 내려오며 중원 창출', key: 3,
+      metrics: { press: 70, line: 66, width: 78, tempo: 76 },
+      slots: [
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LB',  role: 'LB',  x: 12, y: 75 },
+        { pos: 'CB',  role: 'CB',  x: 36, y: 79 },
+        { pos: 'CB',  role: 'CB',  x: 64, y: 79, k: true },
+        { pos: 'RB',  role: 'RB',  x: 88, y: 75 },
+        { pos: 'DM',  role: 'DM',  x: 50, y: 62, k: true },
+        { pos: 'CM',  role: 'CM',  x: 28, y: 52 },
+        { pos: 'CM',  role: 'CM',  x: 72, y: 52 },
+        { pos: 'LWF', role: 'LWF', x: 18, y: 28 },
+        { pos: 'CF',  role: 'CF',  x: 50, y: 24, k: true },
+        { pos: 'RWF', role: 'RWF', x: 82, y: 28 }
+      ]
+    },
+    '4-1-4-1': {
+      name: '4-1-4-1', tag: '원볼란치', desc: '홀딩 미드필더가 전방 보호', key: 3,
+      metrics: { press: 62, line: 58, width: 74, tempo: 64 },
+      slots: [
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LB',  role: 'LB',  x: 12, y: 76 },
+        { pos: 'CB',  role: 'CB',  x: 36, y: 80 },
+        { pos: 'CB',  role: 'CB',  x: 64, y: 80 },
+        { pos: 'RB',  role: 'RB',  x: 88, y: 76 },
+        { pos: 'DM',  role: 'DM',  x: 50, y: 64, k: true },
+        { pos: 'LWF', role: 'LWF', x: 14, y: 44 },
+        { pos: 'AM',  role: 'AM',  x: 38, y: 42 },
+        { pos: 'CM',  role: 'CM',  x: 62, y: 44 },
+        { pos: 'RWF', role: 'RWF', x: 86, y: 44 },
+        { pos: 'ST',  role: 'ST',  x: 50, y: 19, k: true }
       ]
     },
     '4-4-2': {
-      name: '4-4-2', desc: '수비 안정 · 역습', key: 3,
+      name: '4-4-2', tag: '다이아몬드', desc: '중앙 다이아몬드 · 정면 돌파', key: 4,
+      metrics: { press: 66, line: 62, width: 46, tempo: 70 },
       slots: [
-        { role: 'GK', pos: 'GK', x: 50, y: 92 },
-        { role: 'LB', pos: 'DF', x: 12, y: 74 },
-        { role: 'CB', pos: 'DF', x: 37, y: 78, k: true },
-        { role: 'CB', pos: 'DF', x: 63, y: 78, k: true },
-        { role: 'RB', pos: 'DF', x: 88, y: 74 },
-        { role: 'LM', pos: 'MF', x: 13, y: 51 },
-        { role: 'CM', pos: 'MF', x: 38, y: 55 },
-        { role: 'CM', pos: 'MF', x: 62, y: 55 },
-        { role: 'RM', pos: 'MF', x: 87, y: 51 },
-        { role: 'ST', pos: 'FW', x: 37, y: 23, k: true },
-        { role: 'ST', pos: 'FW', x: 63, y: 23 }
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LB',  role: 'LB',  x: 12, y: 76 },
+        { pos: 'CB',  role: 'CB',  x: 36, y: 80 },
+        { pos: 'CB',  role: 'CB',  x: 64, y: 80, k: true },
+        { pos: 'RB',  role: 'RB',  x: 88, y: 76 },
+        { pos: 'DM',  role: 'DM',  x: 50, y: 64 },
+        { pos: 'CM',  role: 'CM',  x: 26, y: 50 },
+        { pos: 'CM',  role: 'CM',  x: 74, y: 50 },
+        { pos: 'AM',  role: 'AM',  x: 50, y: 36, k: true },
+        { pos: 'ST',  role: 'ST',  x: 38, y: 18 },
+        { pos: 'ST',  role: 'ST',  x: 62, y: 18, k: true }
       ]
     },
     '3-5-2': {
-      name: '3-5-2', desc: '중원 장악 · 윙백', key: 3,
+      name: '3-5-2', tag: '투톱 압박', desc: '투톱이 수비수를 물고 늘어짐', key: 3,
+      metrics: { press: 84, line: 70, width: 66, tempo: 80 },
       slots: [
-        { role: 'GK', pos: 'GK', x: 50, y: 92 },
-        { role: 'CB', pos: 'DF', x: 27, y: 78 },
-        { role: 'CB', pos: 'DF', x: 50, y: 80, k: true },
-        { role: 'CB', pos: 'DF', x: 73, y: 78 },
-        { role: 'LWB', pos: 'MF', x: 8, y: 57 },
-        { role: 'CM', pos: 'MF', x: 31, y: 56, k: true },
-        { role: 'CM', pos: 'MF', x: 50, y: 60 },
-        { role: 'CM', pos: 'MF', x: 69, y: 56 },
-        { role: 'RWB', pos: 'MF', x: 92, y: 57 },
-        { role: 'ST', pos: 'FW', x: 37, y: 23, k: true },
-        { role: 'ST', pos: 'FW', x: 63, y: 23 }
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'CB',  role: 'CB',  x: 26, y: 80 },
+        { pos: 'CB',  role: 'CB',  x: 50, y: 82, k: true },
+        { pos: 'CB',  role: 'CB',  x: 74, y: 80 },
+        { pos: 'LWB', role: 'LWB', x: 8,  y: 58 },
+        { pos: 'DM',  role: 'DM',  x: 38, y: 60 },
+        { pos: 'CM',  role: 'CM',  x: 50, y: 52 },
+        { pos: 'DM',  role: 'DM',  x: 62, y: 60 },
+        { pos: 'RWB', role: 'RWB', x: 92, y: 58 },
+        { pos: 'ST',  role: 'ST',  x: 38, y: 20, k: true },
+        { pos: 'ST',  role: 'ST',  x: 62, y: 20 }
       ]
     },
-    '4-2-3-1': {
-      name: '4-2-3-1', desc: '두 줄 수비 · 한 명의 창', key: 4,
+    '5-3-2': {
+      name: '5-3-2', tag: '카운터', desc: '다섯 수비 → 한 번의 역습', key: 5,
+      metrics: { press: 44, line: 40, width: 60, tempo: 58 },
       slots: [
-        { role: 'GK', pos: 'GK', x: 50, y: 92 },
-        { role: 'LB', pos: 'DF', x: 12, y: 76 },
-        { role: 'CB', pos: 'DF', x: 37, y: 79 },
-        { role: 'CB', pos: 'DF', x: 63, y: 79 },
-        { role: 'RB', pos: 'DF', x: 88, y: 76 },
-        { role: 'DM', pos: 'MF', x: 36, y: 59, k: true },
-        { role: 'DM', pos: 'MF', x: 64, y: 59 },
-        { role: 'LAM', pos: 'MF', x: 17, y: 39 },
-        { role: 'CAM', pos: 'MF', x: 50, y: 35, k: true },
-        { role: 'RAM', pos: 'MF', x: 83, y: 39 },
-        { role: 'ST', pos: 'FW', x: 50, y: 18, k: true }
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LWB', role: 'LWB', x: 8,  y: 72 },
+        { pos: 'CB',  role: 'CB',  x: 28, y: 84 },
+        { pos: 'CB',  role: 'CB',  x: 50, y: 86, k: true },
+        { pos: 'CB',  role: 'CB',  x: 72, y: 84 },
+        { pos: 'RWB', role: 'RWB', x: 92, y: 72 },
+        { pos: 'CM',  role: 'CM',  x: 28, y: 56 },
+        { pos: 'DM',  role: 'DM',  x: 50, y: 58, k: true },
+        { pos: 'CM',  role: 'CM',  x: 72, y: 56 },
+        { pos: 'ST',  role: 'ST',  x: 38, y: 24, k: true },
+        { pos: 'ST',  role: 'ST',  x: 62, y: 24 }
+      ]
+    },
+    '4-2-2-2': {
+      name: '4-2-2-2', tag: '하프스페이스', desc: '두 개의 하프스페이스 침투', key: 4,
+      metrics: { press: 76, line: 72, width: 58, tempo: 82 },
+      slots: [
+        { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+        { pos: 'LB',  role: 'LB',  x: 12, y: 76 },
+        { pos: 'CB',  role: 'CB',  x: 36, y: 80 },
+        { pos: 'CB',  role: 'CB',  x: 64, y: 80 },
+        { pos: 'RB',  role: 'RB',  x: 88, y: 76 },
+        { pos: 'DM',  role: 'DM',  x: 36, y: 60 },
+        { pos: 'DM',  role: 'DM',  x: 64, y: 60, k: true },
+        { pos: 'AM',  role: 'AM',  x: 30, y: 38 },
+        { pos: 'AM',  role: 'AM',  x: 70, y: 38, k: true },
+        { pos: 'ST',  role: 'ST',  x: 38, y: 18 },
+        { pos: 'ST',  role: 'ST',  x: 62, y: 18, k: true }
       ]
     }
   };
   DS.FORMATIONS = FORMATIONS;
-  DS.FORMATION_KEYS = ['4-3-3', '4-4-2', '3-5-2', '4-2-3-1'];
+  DS.FORMATION_KEYS = ['4-2-3-1', '3-4-2-1', '4-3-3', '4-1-4-1', '4-4-2', '3-5-2', '5-3-2', '4-2-2-2'];
+
+  /* ─────────────────────────  현대 롤  ───────────────────────── */
+  var ROLES = [
+    { key: 'poacher',   name: '포처',            en: 'Poacher',        pos: ['ST', 'CF'],          need: 3, desc: '골문 앞에서만 산다. 슈팅·결정력 급상승.', gain: { atk: 7, s: 1 } },
+    { key: 'false9',    name: '폴스 나인',        en: 'False 9',        pos: ['CF', 'ST', 'AM'],    need: 3, desc: '내려와서 중원을 만들고 다시 침투한다.', gain: { t: 1, atk: 4, pass: 8 } },
+    { key: 'target',    name: '타겟맨',           en: 'Target Man',     pos: ['ST', 'CF'],          need: 3, desc: '공중볼과 등지는 플레이의 정점.', gain: { p: 1, atk: 5, hold: 8 } },
+    { key: 'inverted',  name: '인버티드 윙어',    en: 'Inverted Winger', pos: ['LWF', 'RWF'],       need: 3, desc: '측면에서 안쪽으로 접어 들어와 슛을 노린다.', gain: { t: 1, atk: 6 } },
+    { key: 'b2b',       name: '박스 투 박스',     en: 'Box to Box',     pos: ['CM', 'DM', 'AM'],    need: 3, desc: '양쪽 박스를 오가는 엔진.', gain: { p: 1, s: 1, atk: 2, def: 3 } },
+    { key: 'regista',   name: '레지스타',         en: 'Regista',        pos: ['DM', 'CM'],          need: 3, desc: '경기의 템포를 혼자서 지휘한다.', gain: { t: 1, pass: 10 } },
+    { key: 'mezzala',   name: '메짤라',           en: 'Mezzala',        pos: ['CM', 'AM'],          need: 4, desc: '하프스페이스로 흘러들어 수적 우위를 만든다.', gain: { t: 1, s: 1, atk: 3 } },
+    { key: 'bpd',       name: '볼플레잉 수비수',  en: 'Ball-Playing CB', pos: ['CB'],               need: 3, desc: '후방에서 빌드업을 시작하는 수비수.', gain: { t: 1, pass: 8, def: 3 } },
+    { key: 'ifb',       name: '인버티드 풀백',    en: 'Inverted Full-back', pos: ['LB', 'RB', 'LWB', 'RWB'], need: 4, desc: '중원으로 접혀 들어와 수적 우위를 만든다.', gain: { t: 1, def: 3, pass: 5 } },
+    { key: 'wingback',  name: '공격형 윙백',      en: 'Attacking Wing-back', pos: ['LWB', 'RWB', 'LB', 'RB'], need: 3, desc: '터치라인을 따라 끝까지 올라간다.', gain: { s: 1, atk: 4, pass: 4 } },
+    { key: 'sweeper',   name: '스위퍼 키퍼',      en: 'Sweeper Keeper', pos: ['GK'],                need: 3, desc: '수비 라인 뒤를 쓸어담고 발밑으로도 시작한다.', gain: { s: 2, pass: 8, def: 4 } }
+  ];
+  DS.ROLES = ROLES;
+  DS.roleOf = function (key) {
+    var i;
+    for (i = 0; i < ROLES.length; i++) { if (ROLES[i].key === key) { return ROLES[i]; } }
+    return null;
+  };
+  DS.rolesFor = function (pos) {
+    var out = [], i;
+    for (i = 0; i < ROLES.length; i++) { if (ROLES[i].pos.indexOf(pos) >= 0) { out.push(ROLES[i]); } }
+    return out;
+  };
+
+  /* ─────────────────────────  라커룸 성향  ───────────────────────── */
+  var LOCKER = [
+    { key: 'fight', name: '승부욕', color: '#e2553f', desc: '지는 순간을 견디지 못한다. 추격·결승 골 확률 상승.' },
+    { key: 'crea',  name: '창의',   color: '#8a5cd6', desc: '예측 불가한 발상. 패스·찬스 창출 상승.' },
+    { key: 'dev',   name: '헌신',   color: '#2f8f62', desc: '몸을 아끼지 않는다. 압박·태클·체력 유지 상승.' },
+    { key: 'calm',  name: '냉정',   color: '#3f7fb8', desc: '흔들리지 않는다. 실점 후 집중력·수비 안정 상승.' }
+  ];
+  DS.LOCKER = LOCKER;
+  DS.lockOf = function (key) {
+    var i;
+    for (i = 0; i < LOCKER.length; i++) { if (LOCKER[i].key === key) { return LOCKER[i]; } }
+    return LOCKER[0];
+  };
+  /* 성향 시너지: 같은 성향 3명 이상이면 발동 */
+  DS.lockSynergy = function (list) {
+    var cnt = {}, i, k, out = [];
+    for (i = 0; i < LOCKER.length; i++) { cnt[LOCKER[i].key] = 0; }
+    for (i = 0; i < list.length; i++) { if (list[i] && list[i].lock) { cnt[list[i].lock] = (cnt[list[i].lock] || 0) + 1; } }
+    for (i = 0; i < LOCKER.length; i++) {
+      k = LOCKER[i].key;
+      if (cnt[k] >= 3) {
+        out.push({
+          key: k, name: LOCKER[i].name, count: cnt[k],
+          tier: cnt[k] >= 5 ? 2 : 1,
+          value: cnt[k] >= 5 ? 6 : 3
+        });
+      }
+    }
+    return out;
+  };
+
+  /* ─────────────────────────  전술 카드  ───────────────────────── */
+  /* cost: 모멘텀 소모, dur: 지속 초(경기 내부 시간) */
+  var CARDS = [
+    { key: 'gegen',    name: '게겐프레싱',      en: 'GEGENPRESS',  tag: '압박', icon: 'press',
+      cost: 34, dur: 22, color: '#e2553f',
+      desc: '전원이 앞으로 나가 6초 안에 공을 되찾는다. 태클 성공률 · 상대 패스 실패율 급증.', fx: 'press' },
+    { key: 'halfspace', name: '하프스페이스 침투', en: 'HALF-SPACE', tag: '공격', icon: 'run',
+      cost: 30, dur: 20, color: '#8a5cd6',
+      desc: '윙어가 안쪽으로 접어 들어가 수비 라인 사이로 침투한다. 슈팅 정확도 상승.', fx: 'atk' },
+    { key: 'isolate',  name: '원톱 고립 차단',   en: 'ISOLATE',     tag: '수비', icon: 'shield',
+      cost: 28, dur: 24, color: '#3f7fb8',
+      desc: '상대 최전방을 고립시켜 지원을 끊는다. 상대 공격 전개력 하락.', fx: 'def' },
+    { key: 'build',    name: '골키퍼 빌드업',    en: 'BUILD-UP',    tag: '전개', icon: 'boot',
+      cost: 22, dur: 26, color: '#2f8f62',
+      desc: '골키퍼가 짧게 시작해 수적 우위를 만든다. 점유율 · 패스 성공률 상승.', fx: 'build' },
+    { key: 'joker',    name: '조커 타임',        en: 'JOKER TIME',  tag: '템포', icon: 'zap',
+      cost: 26, dur: 18, color: '#e8a33a',
+      desc: '교체 선수와 함께 템포를 끌어올린다. 전 선수 이동 속도 상승.', fx: 'tempo' },
+    { key: 'setpiece', name: '세트피스 트릭',    en: 'SET PIECE',   tag: '세트피스', icon: 'flag',
+      cost: 32, dur: 8,  color: '#b662c9',
+      desc: '연습한 세트피스 패턴으로 결정적 한 번을 만든다. 즉시 고확률 슈팅.', fx: 'setpiece' },
+    { key: 'linebreak', name: '라인 브레이크',   en: 'LINE BREAK',  tag: '공격', icon: 'arrow',
+      cost: 30, dur: 20, color: '#4aa8e0',
+      desc: '수비 라인 뒤 공간으로 스루패스를 찔러 넣는다. 결정적 패스 확률 상승.', fx: 'through' },
+    { key: 'trigger',  name: '압박 트리거',      en: 'PRESS TRIGGER', tag: '압박', icon: 'target',
+      cost: 24, dur: 16, color: '#c8c23a',
+      desc: '백패스 순간을 신호로 전방 압박을 시작한다. 즉시 태클 2회 보장.', fx: 'trigger' }
+  ];
+  DS.CARDS = CARDS;
+  DS.cardOf = function (key) {
+    var i;
+    for (i = 0; i < CARDS.length; i++) { if (CARDS[i].key === key) { return CARDS[i]; } }
+    return null;
+  };
+  DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'joker', 'setpiece'];
 
   /* ─────────────────────────  이름 · 얼굴  ───────────────────────── */
   var SURNAME = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍', '유', '고', '문', '양', '손', '배', '백', '허', '남', '심', '노', '하', '곽', '성', '차', '주', '우', '구', '민', '류'];
@@ -253,20 +439,66 @@
 
   function makeAptitude(pos) {
     var apt = {};
-    var i, code, fam, base;
+    var i, code, base, gp = posGroup(pos);
     for (i = 0; i < APT_LIST.length; i++) {
       code = APT_LIST[i];
-      fam = APT_FAMILY[code];
       if (code === pos) { apt[code] = irange(8, 9); continue; }
-      if (fam === pos) { base = irange(5, 8); }
+      if (posGroup(code) === gp) { base = irange(5, 8); }
       else if (APT_NEAR[pos] && APT_NEAR[pos].indexOf(code) >= 0) { base = irange(4, 7); }
       else { base = irange(1, 4); }
-      if (pos === 'GK' && code !== 'GK') { base = irange(1, 3); }
-      if (code === 'GK' && pos !== 'GK') { base = irange(1, 2); }
+      if (gp === 'GK' && code !== 'GK') { base = irange(1, 3); }
+      if (code === 'GK' && gp !== 'GK') { base = irange(1, 2); }
       apt[code] = clamp(base, 1, 9);
     }
     return apt;
   }
+
+  /* 일러스트(1~32)별 헤어 · 피부 · 유니폼 특징 — SD 스프라이트와 매칭 */
+  var PIC_META = [
+    null,
+    { hair: 'spiky',    color: '#6b4423', skin: '#f3cba4' },
+    { hair: 'spiky',    color: '#23262e', skin: '#f2c9a2' },
+    { hair: 'undercut', color: '#e6cf8a', skin: '#f6d5ae' },
+    { hair: 'ponytail', color: '#c4435c', skin: '#f6d2ad' },
+    { hair: 'wavy',     color: '#7a4a24', skin: '#f0c49a' },
+    { hair: 'mohawk',   color: '#1e2027', skin: '#eec49c' },
+    { hair: 'swoop',    color: '#e3c169', skin: '#f7d7b2' },
+    { hair: 'spiky',    color: '#24301f', skin: '#c9905f' },
+    { hair: 'spiky',    color: '#9ec9e0', skin: '#f7d5b0' },
+    { hair: 'spiky',    color: '#4a2a18', skin: '#eabf94' },
+    { hair: 'silver',   color: '#cfd3d6', skin: '#f4d3ae' },
+    { hair: 'ponytail', color: '#d9b06a', skin: '#f3cba2' },
+    { hair: 'ponytail', color: '#5a3620', skin: '#f0c49a' },
+    { hair: 'spiky',    color: '#e6e0e6', skin: '#f6d4ae' },
+    { hair: 'buzz',     color: '#6a4526', skin: '#eec49c' },
+    { hair: 'spiky',    color: '#2b3a63', skin: '#f1c8a0' },
+    { hair: 'silver',   color: '#d5d8dc', skin: '#f5d4ae' },
+    { hair: 'spiky',    color: '#2aa2a0', skin: '#f2c9a2' },
+    { hair: 'spiky',    color: '#e8722a', skin: '#f0c096' },
+    { hair: 'buzz',     color: '#22252b', skin: '#e8bd93' },
+    { hair: 'swoop',    color: '#e2c375', skin: '#f7d7b2' },
+    { hair: 'afro',     color: '#241f1c', skin: '#9c6238' },
+    { hair: 'undercut', color: '#1d1f26', skin: '#eec49c' },
+    { hair: 'braids',   color: '#d9b471', skin: '#f5d3ac' },
+    { hair: 'spiky',    color: '#26334e', skin: '#f1c8a0' },
+    { hair: 'spiky',    color: '#c2477a', skin: '#f6d2ad' },
+    { hair: 'spiky',    color: '#6a4f9e', skin: '#f4d0aa' },
+    { hair: 'spiky',    color: '#23262b', skin: '#eec49c' },
+    { hair: 'wavy',     color: '#ded3b4', skin: '#f7d7b2' },
+    { hair: 'spiky',    color: '#2f6bad', skin: '#f2c9a2' },
+    { hair: 'spiky',    color: '#e0c377', skin: '#f5d3ac' },
+    { hair: 'ponytail', color: '#cfd2d6', skin: '#f6d4ae' }
+  ];
+  DS.PIC_META = PIC_META;
+  DS.PIC_COUNT = 32;
+  function pickPic() {
+    var t = irange(1, DS.PIC_COUNT);
+    return t;
+  }
+  DS.picMeta = function (p) {
+    var i = p && p.pic ? p.pic : 1;
+    return PIC_META[i] || PIC_META[1];
+  };
 
   function makeTend() {
     return {
@@ -334,7 +566,7 @@
 
   function makePlayer(opts) {
     opts = opts || {};
-    var pos = opts.pos || pick(['GK', 'DF', 'DF', 'DF', 'MF', 'MF', 'MF', 'FW', 'FW', 'FW']);
+    var pos = opts.pos || pick(['CB', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'DM', 'CM', 'CM', 'AM', 'AM', 'LWF', 'RWF', 'CF', 'ST', 'GK']);
     var rarity = opts.rarity || pickRarity('normal');
     var base = RARITY[rarity].base;
     var tr = opts.trait ? traitOf(opts.trait) : pick(TRAITS);
@@ -361,6 +593,9 @@
       rarity: rarity,
       s: s, t: t, p: pw,
       level: opts.level || 0,
+      pic: opts.pic || pickPic(),
+      lock: opts.lock || pick(LOCKER).key,
+      role: opts.role || null,
       trait: tr.key,
       tenure: opts.tenure || irange(1, 6),
       age: opts.age || irange(19, 34),
@@ -403,7 +638,7 @@
   function playTypeFor(p) {
     var a = p.apt;
     var best = 'CM';
-    var keys = APT_LIST.slice(0, 9);
+    var keys = APT_LIST.slice();
     var i, top = -1;
     for (i = 0; i < keys.length; i++) {
       if (a[keys[i]] > top) { top = a[keys[i]]; best = keys[i]; }
@@ -414,7 +649,7 @@
 
   function makeInitialSquad() {
     var squad = [];
-    var roles = ['GK', 'DF', 'DF', 'DF', 'DF', 'MF', 'MF', 'MF', 'MF', 'FW', 'FW', 'DF', 'MF', 'FW', 'GK', 'MF'];
+    var roles = ['GK', 'CB', 'CB', 'LB', 'RB', 'DM', 'CM', 'AM', 'LWF', 'ST', 'RWF', 'CB', 'DM', 'CM', 'GK', 'ST'];
     var i;
     for (i = 0; i < roles.length; i++) {
       var r;
@@ -1113,91 +1348,104 @@
     g.fillRect(x + r * 0.42, y + r * 0.18, Math.ceil(r * 0.3), Math.ceil(r * 0.3));
   };
 
-  /* ── 잔디 경기장 ── */
-  Art.pitchMargin = function (W, H) {
-    return Math.max(12, Math.round(Math.min(W, H) * 0.035));
-  };
-
+  /* ── 현대 잔디 경기장 ── */
   Art.drawPitch = function (g, W, H, opt) {
     opt = opt || {};
-    var g1 = '#2c5220', g2 = '#335c26';
-    var rows = 12, i;
-    fill(g, 0, 0, W, H, g1);
-    for (i = 0; i < rows; i++) {
-      if (i % 2 === 1) { fill(g, 0, Math.floor(H / rows) * i, W, Math.ceil(H / rows) + 1, g2); }
+    var deep = '#0e3b32', mid = '#12493c', light = '#16564276';
+    var i, cols = 9;
+    var bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0b332c');
+    bg.addColorStop(0.5, '#11503f');
+    bg.addColorStop(1, '#0a2d27');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+    /* 잔디 줄무늬 */
+    var cw = W / cols;
+    for (i = 0; i < cols; i++) {
+      if (i % 2 === 0) {
+        g.fillStyle = 'rgba(255,255,255,0.035)';
+        g.fillRect(i * cw, 0, cw, H);
+      }
     }
     /* 잔디 결 */
-    g.fillStyle = 'rgba(255,255,255,0.028)';
-    for (i = 0; i < 30; i++) { g.fillRect((i * 41) % W, 0, 2, H); }
+    g.fillStyle = 'rgba(255,255,255,0.02)';
+    for (i = 0; i < 26; i++) { g.fillRect((i * 53) % W, 0, 1.5, H); }
     /* 비네트 */
-    var vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.18, W / 2, H / 2, Math.max(W, H) * 0.78);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(8,26,6,0.34)');
+    var vg = g.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.15, W / 2, H * 0.5, Math.max(W, H) * 0.8);
+    vg.addColorStop(0, 'rgba(255,255,255,0.05)');
+    vg.addColorStop(0.55, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(2,16,13,0.55)');
     g.fillStyle = vg;
     g.fillRect(0, 0, W, H);
 
     var m = opt.margin || Art.pitchMargin(W, H);
     var fx = m, fy = m, fw = W - m * 2, fh = H - m * 2;
-    g.strokeStyle = 'rgba(247,244,226,0.80)';
-    g.lineWidth = 1.6;
+    var lw = Math.max(1, Math.round(W / 240));
+    g.strokeStyle = 'rgba(228,255,240,0.55)';
+    g.lineWidth = lw;
     g.strokeRect(fx, fy, fw, fh);
+    /* 하프라인 · 센터서클 */
     g.beginPath();
     g.moveTo(fx, fy + fh / 2); g.lineTo(fx + fw, fy + fh / 2); g.stroke();
-    g.beginPath(); g.arc(W / 2, fy + fh / 2, fh * 0.125, 0, Math.PI * 2); g.stroke();
-    fill(g, W / 2 - 1.2, fy + fh / 2 - 1.2, 2.4, 2.4, 'rgba(247,244,226,0.85)');
+    g.beginPath(); g.arc(W / 2, fy + fh / 2, Math.min(fw, fh) * 0.13, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(228,255,240,0.7)';
+    g.beginPath(); g.arc(W / 2, fy + fh / 2, Math.max(1.4, lw), 0, Math.PI * 2); g.fill();
 
-    var boxW = fw * 0.56, boxH = fh * 0.15;
+    var boxW = fw * 0.58, boxH = fh * 0.155;
     g.strokeRect(W / 2 - boxW / 2, fy, boxW, boxH);
     g.strokeRect(W / 2 - boxW / 2, fy + fh - boxH, boxW, boxH);
-    var sw = fw * 0.28, sh = fh * 0.065;
+    var sw = fw * 0.3, sh = fh * 0.062;
     g.strokeRect(W / 2 - sw / 2, fy, sw, sh);
     g.strokeRect(W / 2 - sw / 2, fy + fh - sh, sw, sh);
-    g.beginPath(); g.arc(W / 2, fy + fh * 0.1, 2, 0, Math.PI * 2); g.fillStyle = 'rgba(247,244,226,0.85)'; g.fill();
-    g.beginPath(); g.arc(W / 2, fy + fh - fh * 0.1, 2, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(W / 2, fy + fh * 0.105, Math.max(1.4, lw), 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(W / 2, fy + fh - fh * 0.105, Math.max(1.4, lw), 0, Math.PI * 2); g.fill();
+    /* 코너 아크 */
+    [[fx, fy, 0], [fx + fw, fy, Math.PI / 2], [fx, fy + fh, -Math.PI / 2], [fx + fw, fy + fh, Math.PI]].forEach(function (c) {
+      g.beginPath();
+      g.arc(c[0], c[1], Math.min(fw, fh) * 0.035, c[2], c[2] + Math.PI / 2);
+      g.stroke();
+    });
 
     /* 골대 */
-    var goalW = fw * 0.24, goalD = Math.max(8, Math.min(16, fh * 0.045));
+    var goalW = fw * 0.26, goalD = Math.max(7, Math.min(15, fh * 0.042));
     var gx = W / 2 - goalW / 2;
-    g.strokeStyle = 'rgba(247,244,226,0.55)';
-    g.lineWidth = 1;
-    g.fillStyle = 'rgba(255,255,255,0.10)';
-    g.fillRect(gx, fy, goalW, goalD);
-    for (i = 0; i <= 7; i++) {
-      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy); g.lineTo(gx + (goalW / 7) * i, fy + goalD); g.stroke();
-    }
-    g.lineWidth = 2; g.strokeStyle = '#f7f4e2';
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(232,255,246,0.85)';
     g.beginPath();
     g.moveTo(gx, fy + goalD); g.lineTo(gx + goalW, fy + goalD);
-    g.moveTo(gx, fy); g.lineTo(gx, fy + goalD);
-    g.moveTo(gx + goalW, fy); g.lineTo(gx + goalW, fy + goalD);
-    g.stroke();
-    g.lineWidth = 1; g.strokeStyle = 'rgba(247,244,226,0.55)';
-    g.fillStyle = 'rgba(255,255,255,0.10)';
-    g.fillRect(gx, fy + fh - goalD, goalW, goalD);
-    for (i = 0; i <= 7; i++) {
-      g.beginPath(); g.moveTo(gx + (goalW / 7) * i, fy + fh - goalD); g.lineTo(gx + (goalW / 7) * i, fy + fh); g.stroke();
-    }
-    g.lineWidth = 2; g.strokeStyle = '#f7f4e2';
-    g.beginPath();
+    g.moveTo(gx, fy + goalD); g.lineTo(gx, fy);
+    g.moveTo(gx + goalW, fy + goalD); g.lineTo(gx + goalW, fy);
     g.moveTo(gx, fy + fh - goalD); g.lineTo(gx + goalW, fy + fh - goalD);
     g.moveTo(gx, fy + fh - goalD); g.lineTo(gx, fy + fh);
     g.moveTo(gx + goalW, fy + fh - goalD); g.lineTo(gx + goalW, fy + fh);
     g.stroke();
+    g.strokeStyle = 'rgba(232,255,246,0.28)';
+    g.lineWidth = 1;
+    for (i = 0; i <= 8; i++) {
+      g.beginPath(); g.moveTo(gx + (goalW / 8) * i, fy); g.lineTo(gx + (goalW / 8) * i, fy + goalD); g.stroke();
+      g.beginPath(); g.moveTo(gx + (goalW / 8) * i, fy + fh - goalD); g.lineTo(gx + (goalW / 8) * i, fy + fh); g.stroke();
+    }
 
-    /* 관중석 띠 (위/아래) */
-    if (opt.crowd !== false) {
-      var ch = Math.max(5, Math.round(H * 0.014));
-      var colors = ['#8a5a3a', '#a8763c', '#6e7c48', '#5a4634', '#c9b894', '#7a6440'];
-      fill(g, 0, 0, W, ch * 2, 'rgba(24,40,18,0.55)');
-      fill(g, 0, H - ch * 2, W, ch * 2, 'rgba(24,40,18,0.55)');
-      for (i = 0; i < Math.floor(W / 3); i++) {
-        fill(g, i * 3, ch * 0.15, 2, ch, colors[(i * 7 + 3) % colors.length]);
-        fill(g, i * 3 + 1, ch, 2, ch, colors[(i * 5 + 1) % colors.length]);
-        fill(g, i * 3, H - ch * 1.9, 2, ch, colors[(i * 3 + 2) % colors.length]);
-        fill(g, i * 3 + 1, H - ch * 0.9, 2, ch, colors[(i * 5 + 4) % colors.length]);
+    /* 관중석 (위/아래 띠) */
+    if (opt.crowd) {
+      var ch = Math.max(6, Math.round(H * 0.022));
+      var top = g.createLinearGradient(0, 0, 0, ch * 2.6);
+      top.addColorStop(0, 'rgba(4,18,16,0.95)');
+      top.addColorStop(1, 'rgba(6,26,22,0)');
+      g.fillStyle = top; g.fillRect(0, 0, W, ch * 2.6);
+      var bot = g.createLinearGradient(0, H, 0, H - ch * 2.6);
+      bot.addColorStop(0, 'rgba(4,18,16,0.95)');
+      bot.addColorStop(1, 'rgba(6,26,22,0)');
+      g.fillStyle = bot; g.fillRect(0, H - ch * 2.6, W, ch * 2.6);
+      var colors = ['#7fe3b0', '#f2d06b', '#5fa8e8', '#ef7f6b', '#c9a6f0'];
+      for (i = 0; i < 90; i++) {
+        var cx2 = (i * 37 + 11) % W;
+        g.fillStyle = colors[i % colors.length];
+        g.globalAlpha = 0.18 + ((i * 13) % 7) / 26;
+        g.fillRect(cx2, ch * 0.5 + ((i * 7) % 3) * 2.2, 1.7, 1.7);
+        g.fillRect(cx2 + 3, H - ch * 1.4 - ((i * 5) % 3) * 2.2, 1.7, 1.7);
       }
-      fill(g, 0, 0, W, 1, 'rgba(20,34,16,0.6)');
-      fill(g, 0, H - 1, W, 1, 'rgba(20,34,16,0.6)');
+      g.globalAlpha = 1;
     }
   };
 
@@ -1525,6 +1773,251 @@
   Art.gaugeHTML = function (v, cls) {
     var pct = clamp(v, 0, 10) * 10;
     return '<span class="gauge ' + (cls || '') + '"><i style="width:' + pct + '%"></i></span>';
+  };
+
+  /* ───────── 일러스트 · SD 스프라이트 ───────── */
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  Art.portraitSrc = function (p) {
+    var n = (p && p.pic) ? p.pic : 1;
+    return 'assets/portraits/p' + pad2(n) + '.png';
+  };
+  Art.headSrc = function (p) {
+    var n = (p && p.pic) ? p.pic : 1;
+    return 'assets/portraits/head/p' + pad2(n) + '.png';
+  };
+  /* 카드 · 전술판용 일러스트 태그 */
+  Art.portraitTag = function (p, cls, kind) {
+    var src = kind === 'head' ? Art.headSrc(p) : Art.portraitSrc(p);
+    return '<img class="' + (cls || '') + '" src="' + src + '" alt="" draggable="false" loading="lazy">';
+  };
+
+  var CHIBI_W = 44, CHIBI_H = 62, CHIBI_S = 3;
+  var chibiCache = {};
+
+  /* 2.5등신 SD 스프라이트 (일러스트의 헤어·피부·유니폼 색 매칭) */
+  Art.chibi = function (p, kit, frame, face) {
+    frame = ((frame || 0) % 4 + 4) % 4;
+    face = face >= 0 ? 1 : -1;
+    var key = p.id + '|' + (kit.shirt) + '|' + (kit.shorts) + '|' + frame + '|' + face + '|' + (p.pic || 0) + '|' + (p.number || 0);
+    if (chibiCache[key]) { return chibiCache[key]; }
+    var meta = DS.picMeta(p);
+    var cv = makeCanvas(CHIBI_W * CHIBI_S, CHIBI_H * CHIBI_S);
+    var g = cv.getContext('2d');
+    g.setTransform(CHIBI_S, 0, 0, CHIBI_S, 0, 0);
+    g.lineJoin = 'round'; g.lineCap = 'round';
+
+    var shirt = kit.shirt || '#c8432f';
+    var shorts = kit.shorts || '#1c2a25';
+    var trim = kit.trim || '#f1e7cf';
+    var skin = meta.skin || '#f2c9a2';
+    var skinD = shade(skin, -26);
+    var hair = meta.color || '#3a2a1a';
+    var hairD = shade(hair, -34);
+    var ink = '#141d1a';
+    var out = function (w) { g.lineWidth = w || 1.05; g.strokeStyle = ink; };
+
+    var swing = [1, 0, -1, 0][frame];
+    var lift = frame === 1 ? 1 : (frame === 3 ? 0.4 : 0);
+    var bob = frame % 2 === 0 ? 0 : 0.5;
+    g.translate(0, bob);
+
+    function boot(x, y, dir) {
+      g.save();
+      g.translate(x, y);
+      if (dir < 0) { g.scale(-1, 1); }
+      g.fillStyle = '#20262a';
+      g.beginPath();
+      g.moveTo(-3.2, 0);
+      g.lineTo(2.2, 0);
+      g.quadraticCurveTo(4.6, 0.4, 4.4, 2.1);
+      g.lineTo(-3.4, 2.1);
+      g.closePath(); g.fill();
+      out(0.9); g.stroke();
+      g.fillStyle = trim;
+      g.fillRect(-3.2, 0.5, 6.6, 0.9);
+      g.restore();
+    }
+    function leg(hipX, dir, phase) {
+      var footX = hipX + dir * (2.4 + phase * 2.6);
+      var footY = 57.2 - (phase > 0 ? 3.2 : 0);
+      var kneeX = hipX + dir * (1.2 + phase * 1.4);
+      var kneeY = (48 + footY) / 2 - 0.6;
+      g.strokeStyle = skin; g.lineWidth = 3.5;
+      g.beginPath(); g.moveTo(hipX, 45.4); g.lineTo(kneeX, kneeY); g.lineTo(footX, footY - 1.5); g.stroke();
+      /* 스타킹 */
+      g.strokeStyle = trim; g.lineWidth = 3.6;
+      g.beginPath(); g.moveTo(kneeX, kneeY); g.lineTo(footX, footY - 1.6); g.stroke();
+      g.strokeStyle = shirt;
+      g.beginPath(); g.moveTo(kneeX, kneeY + 0.4); g.lineTo(footX - (footX - kneeX) * 0.35, footY - 1.9); g.stroke();
+      boot(footX, footY - 1.6, dir);
+      return { x: footX, y: footY };
+    }
+    function arm(shX, shY, dir, phase, back) {
+      var handX = shX + dir * (2.2 + phase * 2.2);
+      var handY = shY + 8.4 - phase * 2.4;
+      g.strokeStyle = back ? shade(skin, -18) : skin;
+      g.lineWidth = 3.2;
+      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.6, shY + 4.4); g.lineTo(handX, handY); g.stroke();
+      /* 소매 */
+      g.strokeStyle = shirt; g.lineWidth = 3.6;
+      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.7, shY + 3.6); g.stroke();
+      g.fillStyle = back ? shade(skin, -18) : skin;
+      g.beginPath(); g.arc(handX, handY, 1.7, 0, Math.PI * 2); g.fill();
+    }
+
+    /* 뒤쪽 팔 · 다리 */
+    arm(12.6, 31.4, -1, -swing, true);
+    leg(19.2, -1, -swing * 0.9 + (frame === 1 ? 0.6 : 0));
+
+    /* 몸통 (유니폼) */
+    var bodyG = g.createLinearGradient(13, 27, 31, 43);
+    bodyG.addColorStop(0, shade(shirt, 16));
+    bodyG.addColorStop(0.55, shirt);
+    bodyG.addColorStop(1, shade(shirt, -26));
+    g.fillStyle = bodyG;
+    g.beginPath();
+    g.moveTo(14.6, 27.6);
+    g.quadraticCurveTo(22, 25.4, 29.4, 27.6);
+    g.quadraticCurveTo(32.4, 33, 31.4, 42.6);
+    g.quadraticCurveTo(22, 44.8, 12.6, 42.6);
+    g.quadraticCurveTo(11.6, 33, 14.6, 27.6);
+    g.closePath(); g.fill();
+    out(1.1); g.stroke();
+    /* 어깨 트림 · 칼라 */
+    g.fillStyle = trim;
+    g.beginPath();
+    g.moveTo(14.8, 27.4); g.quadraticCurveTo(12.4, 29.6, 12.8, 32.2);
+    g.lineTo(16.4, 31.6); g.quadraticCurveTo(16.6, 29.2, 17.8, 27.4);
+    g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(29.2, 27.4); g.quadraticCurveTo(31.6, 29.6, 31.2, 32.2);
+    g.lineTo(27.6, 31.6); g.quadraticCurveTo(27.4, 29.2, 26.2, 27.4);
+    g.closePath(); g.fill();
+    g.strokeStyle = trim; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(19.4, 26.6); g.quadraticCurveTo(22, 29.2, 24.6, 26.6); g.stroke();
+    /* 등번호 */
+    if (p.number) {
+      g.fillStyle = 'rgba(255,255,255,0.9)';
+      g.font = 'bold 6px system-ui, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(String(p.number), 22, 36.4);
+    }
+    /* 반바지 */
+    g.fillStyle = shorts;
+    g.beginPath();
+    g.moveTo(13.4, 42.2); g.quadraticCurveTo(22, 44.4, 30.6, 42.2);
+    g.lineTo(30, 47.6); g.quadraticCurveTo(26, 48.8, 22.6, 47.4);
+    g.quadraticCurveTo(18, 48.8, 14, 47.6);
+    g.closePath(); g.fill();
+    out(1); g.stroke();
+    g.strokeStyle = trim; g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(14, 44.4); g.lineTo(30, 44.4); g.stroke();
+
+    /* 앞쪽 다리 · 팔 */
+    leg(24.8, 1, swing);
+    arm(31.4, 31.4, 1, swing, false);
+
+    /* 목 */
+    g.fillStyle = skinD;
+    g.fillRect(20, 24.6, 4, 3.6);
+
+    /* 머리 */
+    g.save();
+    var hx = 22, hy = 14.6;
+    /* 헤어 뒷면 */
+    g.fillStyle = hairD;
+    if (meta.hair === 'afro') {
+      g.beginPath(); g.arc(hx, hy - 1.5, 13.4, 0, Math.PI * 2); g.fill();
+    } else if (meta.hair === 'ponytail' || meta.hair === 'braids') {
+      g.beginPath();
+      g.ellipse(hx + 9.6, hy + 2.2, 4.6, 8.2, -0.35, 0, Math.PI * 2);
+      g.fill();
+      out(1); g.stroke();
+    }
+    g.fillStyle = skin;
+    g.beginPath();
+    g.ellipse(hx, hy, 10.4, 10.9, 0, 0, Math.PI * 2);
+    g.fill();
+    out(1); g.stroke();
+
+    /* 헤어 앞면 */
+    g.fillStyle = hair;
+    var style = meta.hair || 'spiky';
+    g.beginPath();
+    if (style === 'spiky') {
+      g.moveTo(hx - 10.4, hy + 1.6);
+      g.quadraticCurveTo(hx - 12.4, hy - 8, hx - 6.2, hy - 10.4);
+      g.lineTo(hx - 7.4, hy - 14.2);
+      g.lineTo(hx - 2.2, hy - 11.2);
+      g.lineTo(hx - 0.4, hy - 15.6);
+      g.lineTo(hx + 3.4, hy - 11.4);
+      g.lineTo(hx + 6.6, hy - 14.6);
+      g.lineTo(hx + 7.2, hy - 9.8);
+      g.quadraticCurveTo(hx + 12.6, hy - 7, hx + 10.4, hy + 1.4);
+      g.quadraticCurveTo(hx + 8.2, hy - 5.4, hx + 4.2, hy - 6.4);
+      g.quadraticCurveTo(hx - 2.4, hy - 3.4, hx - 5.2, hy - 5.2);
+      g.quadraticCurveTo(hx - 8.2, hy - 4.4, hx - 10.4, hy + 1.6);
+    } else if (style === 'undercut' || style === 'swoop' || style === 'silver') {
+      g.moveTo(hx - 10.6, hy + 1.2);
+      g.quadraticCurveTo(hx - 12.6, hy - 8.6, hx - 5.4, hy - 10.8);
+      g.quadraticCurveTo(hx + 2.6, hy - 13.4, hx + 8.6, hy - 9.4);
+      g.lineTo(hx + 11.4, hy - 6.2);
+      g.quadraticCurveTo(hx + 4.4, hy - 8.2, hx + 1.4, hy - 5.6);
+      g.quadraticCurveTo(hx - 3.4, hy - 3.2, hx - 10.6, hy + 1.2);
+    } else if (style === 'mohawk') {
+      g.moveTo(hx - 10.2, hy + 0.8);
+      g.quadraticCurveTo(hx - 8.6, hy - 7.6, hx - 3.2, hy - 9.6);
+      g.lineTo(hx - 1.6, hy - 14.6);
+      g.lineTo(hx + 2.4, hy - 10.2);
+      g.lineTo(hx + 5.4, hy - 14.2);
+      g.lineTo(hx + 6.2, hy - 9.2);
+      g.quadraticCurveTo(hx + 10.4, hy - 6.4, hx + 10.2, hy + 0.8);
+      g.quadraticCurveTo(hx + 5.4, hy - 4.6, hx, hy - 5.4);
+      g.quadraticCurveTo(hx - 5.6, hy - 4.4, hx - 10.2, hy + 0.8);
+    } else if (style === 'buzz') {
+      g.moveTo(hx - 10.2, hy - 1.4);
+      g.quadraticCurveTo(hx - 8.4, hy - 10.4, hx, hy - 11.2);
+      g.quadraticCurveTo(hx + 8.4, hy - 10.4, hx + 10.2, hy - 1.4);
+      g.quadraticCurveTo(hx + 4, hy - 6.6, hx, hy - 6.6);
+      g.quadraticCurveTo(hx - 4, hy - 6.6, hx - 10.2, hy - 1.4);
+    } else if (style === 'afro') {
+      g.moveTo(hx - 11.4, hy - 0.6);
+      g.arc(hx, hy - 1.8, 12.6, Math.PI * 0.95, Math.PI * 2.1);
+      g.quadraticCurveTo(hx + 4.6, hy - 8.4, hx, hy - 6.4);
+      g.quadraticCurveTo(hx - 5.2, hy - 8.2, hx - 11.4, hy - 0.6);
+    } else if (style === 'braids') {
+      g.moveTo(hx - 10.4, hy - 0.4);
+      g.quadraticCurveTo(hx - 9.6, hy - 10.6, hx, hy - 11.4);
+      g.quadraticCurveTo(hx + 9.6, hy - 10.6, hx + 10.4, hy - 0.4);
+      g.quadraticCurveTo(hx + 4.8, hy - 6.6, hx, hy - 6.6);
+      g.quadraticCurveTo(hx - 4.8, hy - 6.6, hx - 10.4, hy - 0.4);
+    } else {
+      g.moveTo(hx - 10.4, hy + 0.6);
+      g.quadraticCurveTo(hx - 10.6, hy - 9.6, hx, hy - 10.6);
+      g.quadraticCurveTo(hx + 10.6, hy - 9.6, hx + 10.4, hy + 0.6);
+      g.quadraticCurveTo(hx + 5, hy - 5.6, hx, hy - 5.6);
+      g.quadraticCurveTo(hx - 5, hy - 5.6, hx - 10.4, hy + 0.6);
+    }
+    g.closePath(); g.fill();
+    out(0.9); g.stroke();
+
+    /* 눈 · 눈썹 · 입 */
+    g.fillStyle = '#20262c';
+    g.beginPath(); g.ellipse(hx - 4.2, hy + 2.2, 1.85, 2.7, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(hx + 4.2, hy + 2.2, 1.85, 2.7, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.arc(hx - 4.9, hy + 1.1, 0.75, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(hx + 3.5, hy + 1.1, 0.75, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = hairD; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(hx - 6.4, hy - 1.4); g.lineTo(hx - 2.6, hy - 2.2); g.stroke();
+    g.beginPath(); g.moveTo(hx + 6.4, hy - 1.4); g.lineTo(hx + 2.6, hy - 2.2); g.stroke();
+    g.strokeStyle = '#8a4a3c'; g.lineWidth = 0.8;
+    g.beginPath(); g.arc(hx, hy + 5.2, 1.6, 0.25, Math.PI - 0.25); g.stroke();
+    g.restore();
+
+    chibiCache[key] = cv;
+    return cv;
   };
 
   DS.Art = Art;
