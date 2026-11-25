@@ -1409,7 +1409,7 @@
       '<div id="m-overlay"></div></div>' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b>' +
-      '<span class="uses" id="m-uses">개입 3/3</span>' +
+      '<span class="uses" id="m-uses">개입 6/6</span>' +
       '<span class="val"><span id="m-mom-val">0</span><small>/100</small></span></div>' +
       '<div class="mom-bar"><i id="m-mom-fill"></i></div>' +
       '<div class="mom-buffs" id="m-buffs"></div>' +
@@ -1450,7 +1450,7 @@
     }
     var usesEl = document.getElementById('m-uses');
     if (usesEl) {
-      usesEl.textContent = '개입 ' + (st.usesLeft === undefined ? 3 : st.usesLeft) + '/' + (st.limit || 3);
+      usesEl.textContent = '개입 ' + (st.usesLeft === undefined ? 6 : st.usesLeft) + '/' + (st.limit || 6);
       usesEl.classList.toggle('out', st.usesLeft === 0);
     }
     var hand = document.getElementById('m-hand');
@@ -1835,7 +1835,7 @@
       var ok = DS.Match ? DS.Match.playCard(ck) : false;
       if (!ok) {
         var hs = DS.Match && DS.Match.handState ? DS.Match.handState() : null;
-        toast(hs && hs.usesLeft === 0 ? '이번 경기는 개입 3회를 모두 사용했습니다.' : '모멘텀이 부족합니다.');
+        toast(hs && hs.usesLeft === 0 ? '이번 경기는 개입 ' + (hs.limit || 6) + '회를 모두 사용했습니다.' : '모멘텀이 부족합니다.');
       }
       return;
     }

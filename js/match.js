@@ -11,7 +11,7 @@
   var MATCH_SECONDS = 96;      /* ×1 배속에서 96초에 90분 경기 */
   var MAX_SUBS = 5;
   var HAND_SIZE = 3;
-  var CARD_LIMIT = 3;      /* 경기당 전술 카드 개입 최대 횟수 */
+  var CARD_LIMIT = 6;      /* 경기당 전술 카드 개입 최대 횟수 (전·후반 합산) */
 
   var M = {
     running: false,
