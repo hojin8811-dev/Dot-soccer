@@ -43,6 +43,7 @@
   var spriteCache = {};
   var lastTouchName = '';
   var lastScorerSide = 'home';
+  var looseTimer = 0;
 
   /* ─────────────────────────  좌표  ───────────────────────── */
   function sx(x) { return field.x + (x / WORLD_W) * field.w; }
@@ -318,6 +319,14 @@
   function updateTargets() {
     var i, p, shift, target, near, carrier = ball.carrier;
     var chase = [];
+    var looseChase = [];
+    if (!carrier) {
+      /* 루즈볼: 양 팀 가장 가까운 선수가 공으로 달려간다 */
+      var hq = nearestToBall('home', 999);
+      var aq = nearestToBall('away', 999);
+      if (hq) { looseChase.push(hq); }
+      if (aq) { looseChase.push(aq); }
+    }
     if (carrier) {
       /* 수비 측에서 가장 가까운 2명이 압박 */
       var defSide = carrier.side === 'home' ? 'away' : 'home';
@@ -347,6 +356,12 @@
         if (Math.abs(p.y - gy) < 16) {
           p.tx = 50 + (p.x - 50) * 0.5;
         }
+        continue;
+      }
+
+      if (looseChase.indexOf(p) >= 0) {
+        p.tx = ball.x;
+        p.ty = ball.y;
         continue;
       }
 
@@ -419,6 +434,8 @@
     ball.shotBy = null;
     ball.target = null;
     ball.vx = 0; ball.vy = 0;
+    ball.flight = 0;
+    looseTimer = 0;
     lastTouchName = p.name;
     actionTimer = 0.25 + Math.random() * 0.3;
   }
@@ -769,6 +786,30 @@
       ball.y += ball.vy * dt;
       ball.vx *= (1 - 1.0 * dt);
       ball.vy *= (1 - 1.0 * dt);
+      ball.flight = (ball.flight || 0) + dt;
+
+      /* 공이 떠돌면(패스/슈트 실패) 시간 초과로 정리 — 무한 정지 방지 */
+      if (ball.flight > 2.8) {
+        if (M.phase === 'shot') {
+          ball.flight = 0;
+          resolveShot();
+          return;
+        }
+        M.phase = 'play';
+        var c1 = nearestToBall('home', 999);
+        var c2 = nearestToBall('away', 999);
+        var loser = c1;
+        if (!c1) { loser = c2; }
+        else if (c2) {
+          var d1 = Math.hypot(c1.x - ball.x, c1.y - ball.y);
+          var d2 = Math.hypot(c2.x - ball.x, c2.y - ball.y);
+          loser = d1 <= d2 ? c1 : c2;
+        }
+        ball.flight = 0;
+        if (loser) { giveBall(loser); } else { looseTimer += dt; }
+        return;
+      }
+      if (!ball.target) { looseTimer += dt; } else { looseTimer = 0; }
 
       if (M.phase === 'shot') {
         var gkSide = ball.shotBy ? (ball.shotBy.side === 'home' ? 'away' : 'home') : 'home';

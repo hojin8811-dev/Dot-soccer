@@ -404,7 +404,7 @@
 
   /* 경기장 */
   Art.pitchMargin = function (W, H) {
-    return Math.max(10, Math.round(Math.min(W, H) * 0.028));
+    return Math.max(14, Math.round(Math.min(W, H) * 0.04));
   };
 
   Art.drawPitch = function (ctx, W, H, opt) {
@@ -459,7 +459,7 @@
 
     /* 골대 + 그물 */
     var goalW = fw * 0.22;
-    var goalD = Math.max(6, Math.round(m * 0.72));
+    var goalD = Math.max(10, m - 3);
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.lineWidth = 1;
