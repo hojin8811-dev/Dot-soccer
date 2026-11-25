@@ -519,44 +519,49 @@ main {
 .cutin {
   position: absolute; inset: 0;
   background:
-    radial-gradient(62% 52% at 76% 62%, rgba(200, 241, 105, .14), transparent 72%),
-    linear-gradient(100deg, rgba(4, 18, 15, .985) 0%, rgba(4, 18, 15, .955) 46%, rgba(5, 22, 18, .90) 100%);
+    radial-gradient(58% 48% at 76% 66%, rgba(255, 255, 255, .10), transparent 66%),
+    linear-gradient(100deg, rgba(3, 16, 13, .99) 0%, rgba(4, 18, 15, .965) 52%, rgba(5, 24, 20, .94) 100%);
   display: flex; align-items: center; overflow: hidden;
   animation: cutinIn .34s cubic-bezier(.2, .8, .3, 1);
 }
-@keyframes cutinIn { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: none; } }
+@keyframes cutinIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
 .cutin-lines {
   position: absolute; inset: -20%;
-  background: repeating-conic-gradient(from 0deg at 74% 50%, rgba(255,255,255,.10) 0deg 2deg, transparent 2deg 7deg);
-  opacity: .5; animation: spin 6s linear infinite;
+  background: repeating-conic-gradient(from 0deg at 74% 62%, rgba(255,255,255,.09) 0deg 2deg, transparent 2deg 8deg);
+  opacity: .45; animation: spin 9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .cutin::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 92px; transform: translateY(-52%) skewY(-6deg);
-  background: linear-gradient(90deg, transparent, var(--cc, #c8f169) 18%, var(--cc, #c8f169) 92%, transparent);
-  opacity: .92;
+  content: ""; position: absolute; left: 0; top: 50%; width: 66%; height: 156px;
+  transform: translateY(-52%) skewY(-7deg);
+  background: linear-gradient(90deg, var(--cc, #c8f169) 0%, rgba(0, 0, 0, 0) 92%);
+  opacity: .32;
 }
 .cutin-art {
-  position: absolute; right: 4px; bottom: 12px; width: 232px; height: 232px;
+  position: absolute; right: -2px; bottom: 0; width: 268px; height: 268px;
   display: flex; align-items: flex-end; justify-content: center;
   z-index: 2;
+  filter: drop-shadow(0 16px 26px rgba(0, 0, 0, .65));
 }
 .cutin-art img {
   width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain;
-  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, .6));
-  animation: cutPop .45s cubic-bezier(.2,1.4,.4,1);
+  animation: cutPop .5s cubic-bezier(.2,1.45,.4,1);
 }
-@keyframes cutPop { from { transform: translateX(30px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes cutPop { from { transform: translateX(26px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
 .cutin-body {
-  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-  z-index: 3; padding: 0 0 0 16px; width: 56%;
-  color: #0c241d;
+  position: absolute; left: 0; top: 48%; transform: translateY(-50%);
+  z-index: 3; padding: 0 0 0 18px; width: 64%;
+  color: #f2f8ea;
 }
-.cutin-tag { font-size: 7.5px; font-weight: 900; letter-spacing: 1.2px; opacity: .62; }
-.cutin-name { font-size: 22px; font-weight: 900; letter-spacing: -.8px; line-height: 1.05; margin-top: 2px; }
-.cutin-en { font-size: 9px; font-weight: 900; letter-spacing: 1.2px; opacity: .55; }
-.cutin-ace { margin-top: 5px; font-size: 10px; font-weight: 900; background: rgba(8, 30, 24, .85); color: var(--lime); display: inline-block; padding: 2px 7px; border-radius: 7px; }
-.cutin-desc { margin-top: 6px; font-size: 9px; font-weight: 700; line-height: 1.45; opacity: .8; }
+.cutin-tag { font-size: 8px; font-weight: 900; letter-spacing: 1.4px; color: var(--cc, #c8f169); filter: brightness(1.5); }
+.cutin-name { font-size: 28px; font-weight: 900; letter-spacing: -1px; line-height: 1.06; margin-top: 3px; color: #ffffff; text-shadow: 0 2px 14px rgba(0,0,0,.7); }
+.cutin-en { font-size: 9px; font-weight: 900; letter-spacing: 1.4px; color: rgba(255,255,255,.55); margin-top: 2px; }
+.cutin-ace {
+  margin-top: 7px; font-size: 10.5px; font-weight: 900;
+  background: var(--cc, #c8f169); color: #08160f;
+  display: inline-block; padding: 3px 8px; border-radius: 7px;
+}
+.cutin-desc { margin-top: 7px; font-size: 9.5px; font-weight: 600; line-height: 1.5; color: rgba(238,248,228,.8); max-width: 92%; }
 
 /* 교체 패널 */
 #m-overlay { position: absolute; inset: 0; z-index: 55; display: none; background: rgba(3, 16, 13, .74); backdrop-filter: blur(3px); }
@@ -784,15 +789,13 @@ main {
 .minihead img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; }
 
 /* 골 컷인 */
-.gcutin { background: radial-gradient(75% 85% at 76% 50%, rgba(255,255,255,.06), rgba(3,16,13,.95)); }
-.gcutin::before { background: linear-gradient(90deg, transparent, var(--cc, #c8f169) 14%, #f6ffd9 55%, var(--cc, #c8f169) 92%, transparent); }
-.gcutin .cutin-body { width: 60%; }
+.gcutin::before { background: linear-gradient(90deg, #f6ffd9 0%, var(--cc, #c8f169) 40%, rgba(0,0,0,0) 92%); opacity: .38; }
+.gcutin .cutin-body { width: 62%; }
 .gword {
-  font-size: 34px; font-weight: 900; font-style: italic; letter-spacing: -2px;
-  line-height: 1; color: #0c241d; margin: 2px 0 4px;
-  text-shadow: 0 2px 0 rgba(255,255,255,.35);
+  font-size: 40px; font-weight: 900; font-style: italic; letter-spacing: -2px;
+  line-height: 1; color: #f6ffd9; margin: 2px 0 5px;
+  text-shadow: 0 0 18px rgba(200,241,105,.7), 0 4px 14px rgba(0,0,0,.6);
 }
-.gcutin .cutin-art img { height: 100%; }
 .mom-top b { letter-spacing: .3px; }
 .mom-top .val { white-space: nowrap; }
 
