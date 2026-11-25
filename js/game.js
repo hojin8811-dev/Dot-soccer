@@ -144,7 +144,7 @@
     DS.resetNames();
     var squad = DS.makeInitialSquad();
     var st = {
-      v: 3,
+      v: 4,
       club: { name: '도트 유나이티드', emblem: 'bolt', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
       money: 7200,
       fans: 1280,
@@ -201,7 +201,7 @@
       var raw = localStorage.getItem(SAVE_KEY);
       if (!raw) { return null; }
       var d = JSON.parse(raw);
-      if (!d || d.v !== 3 || !d.squad || !d.lineup || !d.club) { return null; }
+      if (!d || (d.v !== 3 && d.v !== 4) || !d.squad || !d.lineup || !d.club) { return null; }
       if (!d.table || !d.table.length) { d.table = makeTable(); }
       if (!d.fixtures || !d.fixtures.length) { d.fixtures = makeFixtures(); }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
@@ -230,11 +230,29 @@
         if (!p.pic) { p.pic = (i % 32) + 1; }
         if (!p.lock) { p.lock = DS.LOCKER[i % 4].key; }
       }
+      /* v4: 선발 11 + 벤치 5 = 16명의 일러스트(p01~p32) 중복 제거 */
+      DS.assignUniquePics(d.squad);
+      if (d.scoutCandidates && d.scoutCandidates.length) { DS.assignUniquePics(d.scoutCandidates); }
+      if (!d.homeFormation) { d.homeFormation = d.formation; }
+      d.v = 4;
       return d;
     } catch (e) { return null; }
   }
 
   /* ═════════════════  조회 ═════════════════ */
+  /* 영입·후보가 기존 선수와 같은 얼굴을 쓰지 않도록 */
+  function ensureUniquePic(p) {
+    if (!p) { return; }
+    var used = {}, dup = !p.pic || !DS.picAllowed(p.pos, p.pic), i, q;
+    for (i = 0; i < S.squad.length; i++) {
+      q = S.squad[i];
+      if (q.id === p.id) { continue; }
+      if (q.pic === p.pic) { dup = true; }
+      used[q.pic] = 1;
+    }
+    if (dup) { p.pic = DS.nextFreePic(S.squad, p.pos); }
+  }
+
   function byId(id) {
     var i;
     if (!id) { return null; }
@@ -815,8 +833,11 @@
   function rollScout() {
     S.scoutCandidates = [];
     var i;
+    var taken = S.squad.slice();
     for (i = 0; i < 4; i++) {
       var p = DS.makePlayer({ rarity: DS.pickRarity('special') });
+      p.pic = DS.nextFreePic(taken, p.pos);
+      taken.push(p);
       S.scoutCandidates.push(p);
       EXTRA[p.id] = p;
     }
@@ -1166,6 +1187,7 @@
       p.stats = DS.statSheet(p);
       out.push(p);
     }
+    DS.assignUniquePics(out);
     return out;
   }
 
@@ -1218,6 +1240,7 @@
       awayEmblem: oppTeam.emblem,
       lineup: lineup,
       bench: benchList,
+      homeFormation: S.formation,
       awayPlayers: buildAwaySquad(oppTeam, awayFormation),
       awayFormation: awayFormation,
       tactics: S.tactics,
@@ -1407,7 +1430,9 @@
       '<div style="text-align:center"><div class="sb-score"><b id="m-gf">0</b><i>:</i><b id="m-ga">0</b></div><span class="sb-clock" id="m-clock">00\'</span></div>' +
       '<div class="sb-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="22" height="26"></canvas><span class="sb-name">' + esc(oppTeam.short) + '</span></div>' +
       '</div>' +
-      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas><div id="m-banner" class="goal-banner"></div></div>' +
+      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas>' +
+      '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
+      '<div id="m-banner" class="goal-banner"></div></div>' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b>' +
       '<span class="uses" id="m-uses">개입 6/6</span>' +
@@ -1442,7 +1467,11 @@
     if (fill) { fill.style.width = st.momentum + '%'; }
     var buffs = document.getElementById('m-buffs');
     if (buffs) {
-      var names = { press: '압박', atk: '침투', def: '차단', build: '빌드업', tempo: '템포', setpiece: '세트피스', through: '스루패스', trigger: '트리거' };
+      var names = {
+        press: '압박', atk: '침투', def: '차단', build: '빌드업', tempo: '템포',
+        setpiece: '세트피스', through: '스루패스', trigger: '트리거',
+        tiki: '티키타카', offside: '오프사이드', longshot: '중거리', roar: '일갈'
+      };
       var html = '', i;
       for (i = 0; i < st.buffs.length; i++) {
         html += '<span class="buffchip">' + (names[st.buffs[i].key] || st.buffs[i].key) + ' <em>' + st.buffs[i].left + 's</em></span>';
@@ -1651,6 +1680,7 @@
     if (S.squad.length >= MAX_SQUAD) { toast('선수단이 가득 찼습니다. IN/OUT으로 교환하세요.'); return; }
     S.money -= 600;
     var p = DS.makePlayer({ rarity: DS.pickRarity('normal') });
+    p.pic = DS.nextFreePic(S.squad, p.pos);
     S.squad.push(p);
     EXTRA[p.id] = p;
     S.dex.players[p.name] = 1;
@@ -1670,6 +1700,7 @@
     if (li >= 0) { S.lineup[li] = cand.id; }
     if (bi >= 0) { S.bench[bi] = cand.id; }
     S.squad = S.squad.filter(function (x) { return x.id !== outP.id; });
+    ensureUniquePic(cand);
     S.squad.push(cand);
     delete EXTRA[cand.id];
     S.dex.players[cand.name] = 1;

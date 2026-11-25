@@ -342,6 +342,7 @@ main {
   background: none; border: none; padding: 0;
   display: flex; flex-direction: column; align-items: center;
   cursor: pointer;
+  overflow: visible;
 }
 .tok .ring {
   width: 37px; height: 37px; border-radius: 50%;
@@ -350,6 +351,7 @@ main {
   box-shadow: 0 3px 8px rgba(0, 0, 0, .38);
   overflow: hidden;
   position: relative;
+  z-index: 1;
 }
 .tok .ring img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; }
 .tok.r-dong .ring { border-color: #b8792f; }
@@ -450,6 +452,46 @@ main {
   font-style: italic;
 }
 .gb-sub { margin-top: 2px; padding: 3px 10px; border-radius: 10px; background: rgba(6,26,22,.8); color: #eaffd0; font-size: 10px; font-weight: 800; }
+
+/* 경기장 상단 전술 상황 배너 */
+.sit {
+  position: absolute; left: 8px; top: 8px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 5px;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px 4px 7px; border-radius: 10px;
+  background: rgba(5, 24, 20, .84);
+  border: 1px solid rgba(200, 241, 105, .42);
+  color: #eaffd0; pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .38);
+}
+.sit i {
+  width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--lime); box-shadow: 0 0 8px var(--lime);
+  animation: sitPulse 1.2s ease-in-out infinite;
+}
+.sit b { font-size: 9px; font-weight: 900; letter-spacing: .2px; white-space: nowrap; }
+.sit span {
+  font-size: 8px; font-weight: 700; color: rgba(233, 244, 221, .66);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sit.tone-hot { border-color: rgba(255, 217, 138, .72); }
+.sit.tone-hot i { background: #ffd98a; box-shadow: 0 0 10px #ffd98a; }
+.sit.tone-hot b { color: #ffedb8; }
+.sit.tone-danger { border-color: rgba(255, 140, 120, .8); background: rgba(58, 14, 10, .88); }
+.sit.tone-danger i { background: #ff8c78; box-shadow: 0 0 10px #ff8c78; }
+.sit.tone-danger b { color: #ffc4b4; }
+.sit.tone-set { border-color: rgba(195, 166, 255, .7); }
+.sit.tone-set i { background: #c3a6ff; box-shadow: 0 0 10px #c3a6ff; }
+.sit.tone-set b { color: #e2d2ff; }
+.sit.tone-wide { border-color: rgba(159, 216, 255, .7); }
+.sit.tone-wide i { background: #9fd8ff; box-shadow: 0 0 10px #9fd8ff; }
+.sit.tone-press { border-color: rgba(255, 159, 138, .7); }
+.sit.tone-press i { background: #ff9f8a; box-shadow: 0 0 10px #ff9f8a; }
+.sit.tone-save i { background: #9fe8ff; box-shadow: 0 0 10px #9fe8ff; }
+@keyframes sitPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .45; transform: scale(.75); }
+}
 
 .mom {
   background: linear-gradient(160deg, #143a31, #0b2721);
@@ -671,15 +713,15 @@ main {
 .band::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line); }
 .band span { letter-spacing: 0; font-weight: 700; color: var(--ink3); opacity: .8; }
 
-.aptmap { position: relative; height: 196px; border-radius: 12px; background: linear-gradient(180deg, #10473a, #0a2f27); overflow: hidden; margin-bottom: 8px; }
+.aptmap { position: relative; height: 250px; border-radius: 12px; background: linear-gradient(180deg, #10473a, #0a2f27); overflow: hidden; margin-bottom: 8px; }
 .aptmap::before { content: ""; position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 3px; }
 .aptmap::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: 1px; background: rgba(255,255,255,.15); }
 .aptcell {
   position: absolute; transform: translate(-50%, -50%);
   width: 38px; text-align: center;
 }
-.aptcell .v { display: block; width: 30px; height: 30px; margin: 0 auto; border-radius: 50%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); font-size: 12px; font-weight: 900; color: #eaf6dd; line-height: 30px; }
-.aptcell .c { display: block; font-size: 7.5px; font-weight: 800; color: rgba(233,244,221,.55); margin-top: 1px; letter-spacing: .2px; }
+.aptcell .v { display: block; width: 27px; height: 27px; margin: 0 auto; border-radius: 50%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); font-size: 11px; font-weight: 900; color: #eaf6dd; line-height: 27px; }
+.aptcell .c { display: block; font-size: 7px; font-weight: 800; color: rgba(233,244,221,.55); margin-top: 0; line-height: 1.1; letter-spacing: .2px; }
 .aptcell.hi .v { background: linear-gradient(160deg, #d6fb8a, #a8da4e); color: #1d3b07; border-color: #a8da4e; }
 .aptcell.mid .v { background: rgba(200,241,105,.22); color: #dcf9a6; }
 
@@ -805,11 +847,15 @@ main {
 .seg.mode button { min-width: 46px; height: 24px; font-size: 10px; }
 .modehint { font-size: 8.5px; font-weight: 700; color: rgba(233,244,221,.45); letter-spacing: .2px; }
 .tok .rl {
-  position: absolute; top: -3px; right: -2px;
-  padding: 0 4px; border-radius: 5px;
-  background: rgba(6, 26, 22, .88);
-  border: 1px solid rgba(255,255,255,.22);
-  color: #dff2cb; font-size: 6.5px; font-weight: 900; letter-spacing: .2px;
+  position: absolute; top: -7px; right: -9px;
+  z-index: 7;
+  min-width: 17px; padding: 1px 4px 1px;
+  border-radius: 6px;
+  background: rgba(6, 26, 22, .94);
+  border: 1px solid rgba(255,255,255,.30);
+  color: #eaffd2; font-size: 7px; font-weight: 900; letter-spacing: .1px;
+  line-height: 1.15; text-align: center; white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,.45);
 }
 .tok .rl.role { background: var(--lime); border-color: var(--lime2); color: #1d3b07; }
 .mom-top .uses {
@@ -839,4 +885,4 @@ main {
 
 main::-webkit-scrollbar { width: 0; height: 0; }
 .seg button { white-space: nowrap; }
-.aptmap { height: 204px; }
+.aptmap { height: 250px; }

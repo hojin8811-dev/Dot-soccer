@@ -75,12 +75,14 @@
   DS.posName = function (code) { return POS[code] ? POS[code].name : code; };
 
   /* 포지션 적성 배치 (미니 피치 위 좌표 %, 위 = 상대 골대) */
+  /* 적성 피치맵: 13 포지션 전부, 좌우 완전 대칭 (위 = 상대 골대) */
   var APT_LAYOUT = {
-    LWF: { x: 16, y: 14 }, CF: { x: 50, y: 9 },  ST: { x: 78, y: 15 },
-    AM:  { x: 30, y: 32 }, CM: { x: 62, y: 33 },
-    DM:  { x: 50, y: 52 },
-    LWB: { x: 9,  y: 62 }, LB: { x: 30, y: 70 }, CB: { x: 56, y: 68 }, RB: { x: 82, y: 70 }, RWB: { x: 93, y: 60 },
-    GK:  { x: 62, y: 88 }
+    LWF: { x: 12, y: 20 }, ST: { x: 41, y: 8 },  CF: { x: 59, y: 8 },  RWF: { x: 88, y: 20 },
+    AM:  { x: 50, y: 34 },
+    LWB: { x: 7,  y: 40 }, RWB: { x: 93, y: 40 },
+    CM:  { x: 37, y: 54 }, DM: { x: 63, y: 54 },
+    LB:  { x: 24, y: 70 }, CB: { x: 50, y: 77 }, RB: { x: 76, y: 70 },
+    GK:  { x: 50, y: 92 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
   var APT_LIST = POS_ORDER.slice();
@@ -329,7 +331,19 @@
       desc: '수비 라인 뒤 공간으로 스루패스를 찔러 넣는다. 결정적 패스 확률 상승.', fx: 'through' },
     { key: 'trigger',  name: '압박 트리거',      en: 'PRESS TRIGGER', tag: '압박', icon: 'target',
       cost: 24, dur: 16, color: '#c8c23a',
-      desc: '백패스 순간을 신호로 전방 압박을 시작한다. 즉시 태클 2회 보장.', fx: 'trigger' }
+      desc: '백패스 순간을 신호로 전방 압박을 시작한다. 즉시 태클 2회 보장.', fx: 'trigger' },
+    { key: 'tikitaka', name: '티키타카 원투패스', en: 'TIKI-TAKA',    tag: '전개', icon: 'pass',
+      cost: 24, dur: 20, color: '#38a86b',
+      desc: '짧은 원투패스로 상대를 벗겨낸다. 패스 속도·성공률 상승, 모멘텀 회복 증가.', fx: 'tiki' },
+    { key: 'offside',  name: '오프사이드 트랩',  en: 'OFFSIDE TRAP', tag: '수비', icon: 'flag',
+      cost: 26, dur: 16, color: '#2f7fb8',
+      desc: '수비 라인이 동시에 전진해 상대 침투를 오프사이드로 잡아낸다.', fx: 'offside' },
+    { key: 'longshot', name: '중거리 대포알 슛', en: 'LONG RANGE',  tag: '공격', icon: 'bolt',
+      cost: 30, dur: 18, color: '#d2691e',
+      desc: '박스 밖에서도 과감하게 때린다. 슈팅 사거리·정확도가 크게 올라간다.', fx: 'longshot' },
+    { key: 'roar',     name: '라커룸 일갈',      en: 'TEAM TALK',   tag: '템포', icon: 'shout',
+      cost: 20, dur: 12, color: '#c8a83a',
+      desc: '벤치의 일갈로 전 선수가 달아오른다. 즉시 모멘텀 회복 + 전원 스피드 상승.', fx: 'roar' }
   ];
   DS.CARDS = CARDS;
   DS.cardOf = function (key) {
@@ -337,7 +351,7 @@
     for (i = 0; i < CARDS.length; i++) { if (CARDS[i].key === key) { return CARDS[i]; } }
     return null;
   };
-  DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'joker', 'setpiece'];
+  DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'tikitaka', 'longshot'];
 
   /* ─────────────────────────  이름 · 얼굴  ───────────────────────── */
   var SURNAME = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '전', '홍', '유', '고', '문', '양', '손', '배', '백', '허', '남', '심', '노', '하', '곽', '성', '차', '주', '우', '구', '민', '류'];
@@ -487,14 +501,69 @@
     { hair: 'wavy',     color: '#ded3b4', skin: '#f7d7b2' },
     { hair: 'spiky',    color: '#2f6bad', skin: '#f2c9a2' },
     { hair: 'spiky',    color: '#e0c377', skin: '#f5d3ac' },
-    { hair: 'ponytail', color: '#cfd2d6', skin: '#f6d4ae' }
+    { hair: 'ponytail', color: '#cfd2d6', skin: '#f6d4ae' },
+    /* p33~p36: 골키퍼 전용 일러스트(장갑) */
+    { hair: 'spiky',    color: '#6b4423', skin: '#f3cba4' },
+    { hair: 'buzz',     color: '#1e2028', skin: '#f2c9a2' },
+    { hair: 'spiky',    color: '#e3c169', skin: '#f7d7b2' },
+    { hair: 'ponytail', color: '#d5d8dc', skin: '#f6d4ae' }
   ];
   DS.PIC_META = PIC_META;
-  DS.PIC_COUNT = 32;
+  DS.PIC_COUNT = 36;
+  /* 골키퍼 장갑을 낀 일러스트는 GK 전용 — 필드 선수와 절대 섞이지 않는다 */
+  var GK_PORTRAITS = [6, 15, 20, 33, 34, 35, 36];
+  var FIELD_PORTRAITS = [];
+  (function () {
+    var n;
+    for (n = 1; n <= DS.PIC_COUNT; n++) {
+      if (GK_PORTRAITS.indexOf(n) < 0) { FIELD_PORTRAITS.push(n); }
+    }
+  })();
+  DS.GK_PORTRAITS = GK_PORTRAITS;
+  DS.FIELD_PORTRAITS = FIELD_PORTRAITS;
+  DS.picPoolFor = function (pos) { return pos === 'GK' ? GK_PORTRAITS : FIELD_PORTRAITS; };
+  DS.picAllowed = function (pos, pic) { return DS.picPoolFor(pos).indexOf(pic) >= 0; };
+  function pickPicFor(pos) {
+    return pick(DS.picPoolFor(pos));
+  }
   function pickPic() {
     var t = irange(1, DS.PIC_COUNT);
     return t;
   }
+  /* 16명 스쿼드 · 영입 후보가 같은 얼굴을 쓰지 않도록 pic을 고유 배정 (GK/필드 풀 분리) */
+  DS.assignUniquePics = function (list) {
+    if (!list) { return list; }
+    var used = {}, i, n, fi = 0, p, pic, pool, free;
+    for (i = 0; i < list.length; i++) {
+      p = list[i];
+      if (!p) { continue; }
+      pic = p.pic;
+      if (typeof pic === 'number' && DS.picAllowed(p.pos, pic) && !used[pic]) { used[pic] = 1; }
+      else { p.pic = 0; }
+    }
+    for (i = 0; i < list.length; i++) {
+      p = list[i];
+      if (!p || p.pic) { continue; }
+      pool = DS.picPoolFor(p.pos);
+      free = [];
+      for (n = 0; n < pool.length; n++) { if (!used[pool[n]]) { free.push(pool[n]); } }
+      if (!free.length) { free = pool.slice(); }
+      free = shuffle(free);
+      p.pic = free[0];
+      used[p.pic] = 1;
+      fi++;
+    }
+    void fi;
+    return list;
+  };
+  DS.nextFreePic = function (list, pos) {
+    var pool = DS.picPoolFor(pos), used = {}, free = [], i, n;
+    for (i = 0; i < (list || []).length; i++) {
+      if (list[i] && list[i].pic) { used[list[i].pic] = 1; }
+    }
+    for (n = 0; n < pool.length; n++) { if (!used[pool[n]]) { free.push(pool[n]); } }
+    return free.length ? pick(free) : pick(pool);
+  };
   DS.picMeta = function (p) {
     var i = p && p.pic ? p.pic : 1;
     return PIC_META[i] || PIC_META[1];
@@ -585,6 +654,7 @@
     pw = clamp(pw + (tr.mod.p || 0), 1, 10);
 
     var name = opts.name || randName();
+    var pic = (typeof opts.pic === 'number' && DS.picAllowed(pos, opts.pic)) ? opts.pic : pickPicFor(pos);
     var p = {
       id: opts.id || newId(),
       name: name,
@@ -593,7 +663,7 @@
       rarity: rarity,
       s: s, t: t, p: pw,
       level: opts.level || 0,
-      pic: opts.pic || pickPic(),
+      pic: pic,
       lock: opts.lock || pick(LOCKER).key,
       role: opts.role || null,
       trait: tr.key,
@@ -667,6 +737,7 @@
       }
       squad.push(p);
     }
+    DS.assignUniquePics(squad);
     return squad;
   }
 
@@ -2023,6 +2094,201 @@
     chibiCache[key] = cv;
     return cv;
   };
+
+  /* ───────── 피치용 2.5등신 SD — 일러스트 얼굴 + 벡터 유니폼 바디 ───────── */
+  var SD_W = 44, SD_H = 62, SD_S = 3;
+  var sdCache = {};
+  var headImgCache = {};
+
+  /* 일러스트 얼굴(head/*.png) 이미지 로더 — 한 번만 생성 */
+  Art.headImage = function (p) {
+    var n = (p && p.pic) ? p.pic : 1;
+    if (headImgCache[n]) { return headImgCache[n]; }
+    if (typeof Image === 'undefined') { return null; }
+    var img = new Image();
+    img.src = 'assets/portraits/head/p' + pad2(n) + '.png';
+    headImgCache[n] = img;
+    return img;
+  };
+  Art.headReady = function (p) {
+    var img = Art.headImage(p);
+    return !!(img && img.complete && (img.naturalWidth || img.width) > 0);
+  };
+
+  Art.sdSprite = function (p, kit, frame, facing) {
+    frame = ((frame || 0) % 4 + 4) % 4;
+    facing = facing >= 0 ? 1 : -1;
+    var pic = p.pic || 0;
+    var ready = Art.headReady(p);
+    var key = p.id + '|' + kit.shirt + '|' + kit.shorts + '|' + kit.trim + '|' + frame + '|' + facing + '|' + pic + '|' + (p.number || 0) + '|' + (ready ? 1 : 0);
+    if (sdCache[key]) { return sdCache[key]; }
+    var meta = DS.picMeta(p);
+    var cv = makeCanvas(SD_W * SD_S, SD_H * SD_S);
+    var g = cv.getContext('2d');
+    g.setTransform(SD_S, 0, 0, SD_S, 0, 0);
+    g.lineJoin = 'round'; g.lineCap = 'round';
+
+    var shirt = kit.shirt || '#c8432f';
+    var shorts = kit.shorts || '#16241f';
+    var trim = kit.trim || '#f1e7cf';
+    var skin = meta.skin || '#f2c9a2';
+    var skinD = shade(skin, -30);
+    var hair = meta.color || '#3a2a1a';
+    var ink = '#111c17';
+    var s = facing;                      /* 달리는 방향 */
+    var swing = [1, 0.15, -1, -0.15][frame];
+    var lift = frame % 2 === 1 ? 1.1 : 0;
+    var bob = frame % 2 === 1 ? 0.6 : 0;
+    g.translate(0, bob);
+    var OL = function (w) { g.lineWidth = w || 1.1; g.strokeStyle = ink; };
+
+    function boot(x, y, dir) {
+      g.save();
+      g.translate(x, y);
+      if (dir < 0) { g.scale(-1, 1); }
+      g.fillStyle = '#1b2327';
+      g.beginPath();
+      g.moveTo(-2.6, 0);
+      g.lineTo(1.9, -0.4);
+      g.quadraticCurveTo(4.4, 0.2, 4.2, 2.0);
+      g.lineTo(-2.8, 2.0);
+      g.closePath(); g.fill();
+      OL(0.85); g.stroke();
+      g.fillStyle = trim;
+      g.fillRect(-2.4, 0.5, 5.6, 0.9);
+      g.restore();
+    }
+
+    function leg(hipX, dir, phase, back) {
+      var footX = hipX + dir * (1.4 + phase * 2.9);
+      var footY = 59.4 - (phase > 0 ? 3.0 : 0) - lift * 0.4;
+      var kneeX = hipX + dir * (0.8 + phase * 1.5);
+      var kneeY = (44 + footY) / 2 + 0.4;
+      g.strokeStyle = back ? shade(skin, -16) : skin;
+      g.lineWidth = 3.4;
+      g.beginPath(); g.moveTo(hipX, 43.4); g.lineTo(kneeX, kneeY); g.lineTo(footX, footY - 1.4); g.stroke();
+      /* 스타킹 */
+      g.strokeStyle = back ? shade(trim, -14) : trim;
+      g.lineWidth = 3.5;
+      g.beginPath(); g.moveTo(kneeX, kneeY); g.lineTo(footX, footY - 1.5); g.stroke();
+      g.strokeStyle = back ? shade(shirt, -20) : shirt;
+      g.lineWidth = 3.5;
+      g.beginPath();
+      g.moveTo(kneeX + (footX - kneeX) * 0.30, kneeY + (footY - 1.5 - kneeY) * 0.30);
+      g.lineTo(footX - (footX - kneeX) * 0.18, footY - 1.8);
+      g.stroke();
+      boot(footX, footY - 1.5, dir);
+    }
+
+    function arm(shX, shY, dir, phase, back) {
+      var handX = shX + dir * (1.4 + phase * 1.9);
+      var handY = shY + 8.2 - phase * 2.0;
+      g.strokeStyle = back ? shade(skin, -18) : skin;
+      g.lineWidth = 2.9;
+      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.2, shY + 4.2); g.lineTo(handX, handY); g.stroke();
+      g.strokeStyle = back ? shade(shirt, -20) : shirt;
+      g.lineWidth = 3.3;
+      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.4, shY + 3.4); g.stroke();
+      g.fillStyle = back ? shade(skin, -18) : skin;
+      g.beginPath(); g.arc(handX, handY, 1.5, 0, Math.PI * 2); g.fill();
+    }
+
+    /* 뒤쪽 팔 · 다리 */
+    arm(15.6, 29.4, -s, -swing, true);
+    leg(19.2, -s, -swing * 0.85, true);
+
+    /* 몸통 (유니폼) */
+    var bodyG = g.createLinearGradient(13, 25, 31, 43);
+    bodyG.addColorStop(0, shade(shirt, 20));
+    bodyG.addColorStop(0.5, shirt);
+    bodyG.addColorStop(1, shade(shirt, -28));
+    g.fillStyle = bodyG;
+    g.beginPath();
+    g.moveTo(14.4, 26.6);
+    g.quadraticCurveTo(22, 24.6, 29.6, 26.6);
+    g.quadraticCurveTo(32.2, 32, 31.0, 42.2);
+    g.quadraticCurveTo(22, 44.4, 13.0, 42.2);
+    g.quadraticCurveTo(11.8, 32, 14.4, 26.6);
+    g.closePath(); g.fill();
+    OL(1.05); g.stroke();
+    /* 어깨 · 소매 트림 */
+    g.fillStyle = trim;
+    g.beginPath();
+    g.moveTo(14.7, 26.4); g.quadraticCurveTo(12.0, 28.8, 12.6, 31.6);
+    g.lineTo(16.2, 31.0); g.quadraticCurveTo(16.4, 28.4, 17.4, 26.2);
+    g.closePath(); g.fill();
+    g.beginPath();
+    g.moveTo(29.3, 26.4); g.quadraticCurveTo(32.0, 28.8, 31.4, 31.6);
+    g.lineTo(27.8, 31.0); g.quadraticCurveTo(27.6, 28.4, 26.6, 26.2);
+    g.closePath(); g.fill();
+    /* 칼라 */
+    g.strokeStyle = trim; g.lineWidth = 1.15;
+    g.beginPath(); g.moveTo(19.2, 25.8); g.quadraticCurveTo(22, 28.6, 24.8, 25.8); g.stroke();
+    /* 사이드 라인 */
+    g.strokeStyle = hexAlpha('#ffffff', 0.22); g.lineWidth = 0.7;
+    g.beginPath(); g.moveTo(15.6, 30); g.quadraticCurveTo(14.6, 36, 14.6, 41.4); g.stroke();
+    g.beginPath(); g.moveTo(28.4, 30); g.quadraticCurveTo(29.4, 36, 29.4, 41.4); g.stroke();
+    /* 등번호(가슴) */
+    if (p.number) {
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      g.font = '800 5.6px system-ui, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(String(p.number), 22, 34.6);
+    }
+    /* 반바지 */
+    g.fillStyle = shorts;
+    g.beginPath();
+    g.moveTo(13.4, 41.6); g.quadraticCurveTo(22, 43.8, 30.6, 41.6);
+    g.lineTo(30.0, 46.8); g.quadraticCurveTo(26, 48.0, 22.6, 46.6);
+    g.quadraticCurveTo(18, 48.0, 14.0, 46.8);
+    g.closePath(); g.fill();
+    OL(0.95); g.stroke();
+    g.strokeStyle = trim; g.lineWidth = 0.85;
+    g.beginPath(); g.moveTo(14.4, 43.2); g.lineTo(29.6, 43.2); g.stroke();
+
+    /* 앞쪽 다리 · 팔 */
+    leg(24.8, s, swing, false);
+    arm(28.4, 29.4, s, swing, false);
+
+    /* 목 */
+    g.fillStyle = skinD;
+    g.fillRect(19.6, 22.4, 4.8, 4.2);
+    OL(0.8); g.strokeRect(19.6, 22.4, 4.8, 4.2);
+
+    /* 머리 — 일러스트 얼굴 이미지 */
+    var img = Art.headImage(p);
+    /* 뒤 실루엣 (배경 분리) */
+    g.fillStyle = hexAlpha(hair, 0.35);
+    g.beginPath(); g.ellipse(22, 11.6, 12.6, 12.4, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = skin; g.globalAlpha = 0.5;
+    g.beginPath(); g.ellipse(22, 13.2, 8.4, 8.8, 0, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 1;
+    if (img && img.complete && (img.naturalWidth || img.width) > 0) {
+      g.save();
+      g.beginPath();
+      g.ellipse(22, 11.4, 13.0, 12.8, 0, 0, Math.PI * 2);
+      g.clip();
+      g.drawImage(img, 8.4, -1.8, 27.2, 27.2);
+      g.restore();
+    } else {
+      /* 이미지 로딩 전 임시 얼굴 */
+      g.fillStyle = skin;
+      g.beginPath(); g.ellipse(22, 11.6, 10.2, 10.6, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = hair;
+      g.beginPath(); g.ellipse(22, 6.6, 10.6, 7.0, 0, Math.PI, Math.PI * 2); g.fill();
+      g.fillStyle = '#20262c';
+      g.beginPath(); g.arc(18, 12.4, 1.6, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(26, 12.4, 1.6, 0, Math.PI * 2); g.fill();
+    }
+    /* 턱 밑 그림자 */
+    g.strokeStyle = hexAlpha('#000000', 0.18); g.lineWidth = 1.4;
+    g.beginPath(); g.ellipse(22, 23.4, 7.2, 2.2, 0, 0.15, Math.PI - 0.15); g.stroke();
+
+    sdCache[key] = cv;
+    return cv;
+  };
+  Art.SD_SIZE = { w: SD_W, h: SD_H };
+  Art.clearSdCache = function () { sdCache = {}; };
 
   DS.Art = Art;
 
