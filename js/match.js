@@ -221,6 +221,28 @@
     }, 1700);
   }
 
+  /* 골 컷인 — 득점자 일러스트 */
+  function goalCutin(scorer) {
+    var host = document.getElementById('m-cutin');
+    if (!host) { return; }
+    var meta = DS.picMeta(scorer.player);
+    host.innerHTML =
+      '<div class="cutin gcutin" style="--cc:' + meta.color + '">' +
+      '<div class="cutin-lines"></div>' +
+      '<div class="cutin-art">' + DS.Art.portraitTag(scorer.player, '', 'full') + '</div>' +
+      '<div class="cutin-body">' +
+      '<div class="cutin-tag">GOAL · ' + minute() + "'</div>" +
+      '<div class="gword">GOAL!</div>' +
+      '<div class="cutin-ace">' + scorer.name + '</div>' +
+      '<div class="cutin-desc">' + M.homeScore + ' : ' + M.awayScore + ' · ' + cfg.homeName + '</div>' +
+      '</div></div>';
+    host.classList.add('on');
+    cutinHold = 1.25;
+    global.setTimeout(function () {
+      if (host) { host.classList.remove('on'); host.innerHTML = ''; }
+    }, 1600);
+  }
+
   M.playCard = function (key) {
     if (!M.running) { return false; }
     var idx = -1, i;
@@ -753,6 +775,7 @@
     updateScoreboard();
     var isHome = side === 'home';
     banner('GOAL!', short(scorer.name) + (isHome ? ' · ' + cfg.homeName : ' · ' + cfg.awayName));
+    if (isHome) { goalCutin(scorer); }
     say((isHome ? '⚽ GOAL!! ' : '😱 실점... ') + U.josa(short(scorer.name), '이/가') + ' 골망을 흔듭니다! ' + pick([
       '관중석이 들썩입니다!', '완벽한 마무리였습니다!', '골키퍼가 손을 쓸 수 없었습니다!', '중계석도 목이 쉬겠습니다!'
     ]), 'goal');

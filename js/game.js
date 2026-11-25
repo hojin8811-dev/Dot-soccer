@@ -450,7 +450,7 @@
     var dcs = deckCards();
     deckHTML = '<div class="card tight">' +
       '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '장 편성 · 경기 중 손패 3장</span></div>' +
-      '<div class="hcards">' + dcs.map(function (d) {
+      '<div class="deckgrid">' + dcs.map(function (d) {
         return '<div class="deckcard" style="--cc:' + d.color + '">' +
           '<div class="tg">' + d.tag + '</div>' +
           '<div class="nm">' + d.name + '</div>' +

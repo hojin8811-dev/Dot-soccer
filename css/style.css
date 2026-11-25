@@ -232,8 +232,9 @@ main {
   padding: 12px 13px;
 }
 .hero-kicker {
-  font-size: 8px; font-weight: 800; letter-spacing: 1.5px; line-height: 1.6;
-  color: var(--lime); margin-bottom: 5px; opacity: .95;
+  font-size: 7.5px; font-weight: 800; letter-spacing: 1.4px; line-height: 1.2;
+  color: var(--lime); margin-bottom: 7px; opacity: .95;
+  text-shadow: 0 1px 6px rgba(0,0,0,.8);
 }
 .hero-title {
   margin: 0 0 4px;
@@ -391,8 +392,9 @@ main {
 .pcard .mini { height: 3px; border-radius: 2px; background: rgba(20,33,28,.12); margin-top: 3px; overflow: hidden; }
 .pcard .mini i { display: block; height: 100%; background: var(--lime2); }
 
+.deckgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .deckcard {
-  flex: 0 0 auto; width: 86px; height: 74px;
+  width: auto; height: 68px;
   padding: 6px; border-radius: 11px;
   background: linear-gradient(165deg, #1b463b, #0e2b25);
   border: 1px solid rgba(255, 255, 255, .13);
@@ -400,7 +402,7 @@ main {
 }
 .deckcard::after { content: ""; position: absolute; right: -16px; top: -16px; width: 40px; height: 40px; border-radius: 50%; background: var(--cc, #c8f169); opacity: .22; }
 .deckcard .tg { font-size: 6.5px; font-weight: 900; letter-spacing: .4px; color: var(--cc, var(--lime)); white-space: nowrap; }
-.deckcard .nm { font-size: 8.5px; font-weight: 900; letter-spacing: -.4px; line-height: 1.15; margin-top: 2px; height: 21px; overflow: hidden; }
+.deckcard .nm { display: block; font-size: 9px; font-weight: 900; letter-spacing: -.5px; line-height: 1.2; margin-top: 3px; height: 22px; overflow: hidden; color: #eef8e2; }
 .deckcard .mt { position: absolute; left: 6px; bottom: 6px; font-size: 7px; font-weight: 800; color: rgba(233,244,221,.5); letter-spacing: .3px; }
 .deckcard .mt em { font-style: normal; color: var(--lime); font-size: 8.5px; }
 
@@ -536,7 +538,7 @@ main {
   display: flex; align-items: flex-end;
   filter: drop-shadow(0 10px 24px rgba(0,0,0,.6));
 }
-.cutin-art img { height: 96%; width: auto; max-width: 62%; object-fit: contain; animation: cutPop .45s cubic-bezier(.2,1.4,.4,1); }
+.cutin-art img { height: 96%; width: auto; max-width: 100%; object-fit: contain; animation: cutPop .45s cubic-bezier(.2,1.4,.4,1); }
 @keyframes cutPop { from { transform: translateX(30px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
 .cutin-body {
   position: relative; z-index: 3;
@@ -773,3 +775,14 @@ main {
 
 .minihead { display: block; border-radius: 50%; overflow: hidden; background: #e6e1d1; flex: 0 0 auto; }
 .minihead img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: block; }
+
+/* 골 컷인 */
+.gcutin { background: radial-gradient(75% 85% at 76% 50%, rgba(255,255,255,.06), rgba(3,16,13,.95)); }
+.gcutin::before { background: linear-gradient(90deg, transparent, var(--cc, #c8f169) 14%, #f6ffd9 55%, var(--cc, #c8f169) 92%, transparent); }
+.gcutin .cutin-body { width: 60%; }
+.gword {
+  font-size: 40px; font-weight: 900; font-style: italic; letter-spacing: -2.5px;
+  line-height: 1; color: #0c241d; margin: 2px 0 4px;
+  text-shadow: 0 2px 0 rgba(255,255,255,.35);
+}
+.gcutin .cutin-art img { height: 100%; }
