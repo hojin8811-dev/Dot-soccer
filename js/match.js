@@ -203,7 +203,7 @@
   }
 
   function playCutin(def, ace) {
-    cutinHold = 1.55;
+    cutinHold = 1.7;
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
     var img = ace ? DS.Art.portraitSrc(ace.player) : '';
@@ -222,7 +222,7 @@
     host.classList.add('on');
     global.setTimeout(function () {
       if (host) { host.classList.remove('on'); host.innerHTML = ''; }
-    }, 2000);
+    }, 2400);
   }
 
   /* 골 컷인 — 득점자 일러스트 */
