@@ -449,12 +449,12 @@
     var deckHTML = '';
     var dcs = deckCards();
     deckHTML = '<div class="card tight">' +
-      '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '/6 · 모멘텀 ' + momentumHint() + '</span></div>' +
+      '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '장 편성 · 경기 중 손패 3장</span></div>' +
       '<div class="hcards">' + dcs.map(function (d) {
-        return '<div class="pcard" style="width:72px;background:linear-gradient(165deg,#1b463b,#0e2b25);border-color:rgba(255,255,255,.14);color:#e9f4dd;padding:6px 5px">' +
-          '<div style="font-size:7px;font-weight:900;color:' + d.color + ';letter-spacing:.5px">' + d.tag + '</div>' +
-          '<div style="font-size:9.5px;font-weight:900;letter-spacing:-.3px;margin-top:2px;line-height:1.15;min-height:22px">' + d.name + '</div>' +
-          '<div style="font-size:8px;font-weight:800;color:var(--lime);margin-top:2px">MOMENTUM ' + d.cost + '</div></div>';
+        return '<div class="deckcard" style="--cc:' + d.color + '">' +
+          '<div class="tg">' + d.tag + '</div>' +
+          '<div class="nm">' + d.name + '</div>' +
+          '<div class="mt">MOM <em>' + d.cost + '</em></div></div>';
       }).join('') + '</div>' +
       '<button class="btn ghost sm wide" style="margin-top:5px" data-act="deck">덱 편성 · 6장 선택</button></div>';
 
@@ -698,8 +698,9 @@
       fac = DS.FACILITIES[i];
       lv = S.facilities[fac.key] || 0;
       cost = DS.facilityCost(fac, lv);
+      var ficon = { training: '🏋️', medical: '🚑', shop: '🛍️', fanclub: '📣', cafe: '☕' }[fac.key] || '🏟️';
       facHTML += '<div class="fac">' +
-        '<div class="row between"><div class="fac-name">' + fac.name + '</div><span class="fac-lv">Lv.' + lv + '/5</span></div>' +
+        '<div class="row between"><div class="row" style="gap:5px;min-width:0"><span class="ico">' + ficon + '</span><span class="fac-name">' + fac.name + '</span></div><span class="fac-lv">Lv.' + lv + '/5</span></div>' +
         '<div class="bar" style="margin:4px 0 3px"><i style="width:' + (lv / 5 * 100) + '%"></i></div>' +
         '<div class="eff">' + fac.target + ' ' + (lv > 0 ? '+' + facEffect(fac, lv) + fac.unit : '—') + '</div>' +
         '<button class="btn sm wide" data-act="facility" data-k="' + fac.key + '" ' + (lv >= 5 || S.money < cost ? 'disabled' : '') + '>' +

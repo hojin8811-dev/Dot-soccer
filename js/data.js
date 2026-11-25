@@ -1348,6 +1348,10 @@
     g.fillRect(x + r * 0.42, y + r * 0.18, Math.ceil(r * 0.3), Math.ceil(r * 0.3));
   };
 
+  Art.pitchMargin = function (W, H) {
+    return Math.max(9, Math.round(Math.min(W, H) * 0.032));
+  };
+
   /* ── 현대 잔디 경기장 ── */
   Art.drawPitch = function (g, W, H, opt) {
     opt = opt || {};
