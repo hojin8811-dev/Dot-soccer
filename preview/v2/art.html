@@ -6,7 +6,7 @@
 <style>
   html, body { margin: 0; background: #26481d; color: #f5efdd; font-family: "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
   h2 { font-size: 13px; margin: 10px 8px 4px; color: #ffe9a8; letter-spacing: .5px; }
-  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 0 8px 8px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 8px 8px; }
   .cell { background: linear-gradient(#79a458, #3f6a2a); border: 1px solid #1b3413; border-radius: 4px; text-align: center; padding: 3px 0 2px; }
   .cell canvas { width: 100%; height: auto; display: block; image-rendering: pixelated; }
   .cell span { font-size: 9px; font-weight: 800; color: #f7f2e2; }
@@ -26,7 +26,7 @@
 <div class="row" id="sprites"></div>
 <h2>스태프</h2>
 <div class="row" id="staff"></div>
-<script src="../../js/data.js?v=2"></script>
+<script src="../../js/data.js?v=2b2"></script>
 <script>
 (function () {
   var DS = window.DS;
@@ -51,7 +51,7 @@
     p.face.collar = ['v', 'round', 'polo'][i % 3];
     p.number = 7 + i;
     var c = document.createElement('canvas');
-    DS.Art.paint(c, p, kit, { k: 4, number: true });
+    DS.Art.paint(c, p, kit, { k: 8, number: true });
     var cell = document.createElement('div');
     cell.className = 'cell';
     cell.appendChild(c);

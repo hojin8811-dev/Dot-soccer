@@ -933,7 +933,7 @@
     }
 
     /* 등번호 */
-    if (opt.number) { drawNumber(g, 10, 14, opt.number, 'rgba(255,251,238,0.92)'); }
+    if (opt.number) { drawNumber(g, 10, 14, opt.number, '#fff6e4'); }
     /* 주장 완장 */
     if (opt.captain) {
       fill(g, 2, 15, 2, 1, '#e8b62c');
