@@ -891,11 +891,14 @@
   function closeModal() {
     var m = document.getElementById('modal');
     if (!m) { return; }
+    var wasReport = m.getAttribute('data-report') === '1';
     m.className = '';
     m.innerHTML = '';
+    m.removeAttribute('data-report');
     rolePick = null;
     ioState = { candId: null, outId: null };
     deckDraft = null;
+    if (wasReport && currentTab === 'match') { setTab('home'); }
   }
   function setSheet(title, body, cls) {
     var m = document.getElementById('modal');
@@ -1141,6 +1144,7 @@
   function showReport(r) {
     var m = document.getElementById('modal');
     m.className = 'on';
+    m.setAttribute('data-report', '1');
     m.innerHTML = '<div class="sheet"><div class="sheet-head"><b>RESULTS</b>' +
       '<span class="tiny muted">' + r.season + ' 시즌 · ' + r.roundLabel + '</span>' +
       '<button class="x" data-act="closemodal">닫기 ✕</button></div>' +
@@ -1245,7 +1249,7 @@
     if (win) { fanGain = Math.round(fanGain * (1 + facValue('fanclub') / 100)); }
     S.fans = Math.max(120, S.fans + fanGain);
     S.morale = clamp(S.morale + (win ? 6 : (draw ? 0 : -5)), 0, 100);
-    S.condition = clamp(S.condition - U.irange(10, 16) + facValue('medical'), 5, 100);
+    S.condition = clamp(S.condition - U.irange(6, 10) + facValue('medical'), 12, 100);
     S.money += reward;
     S.totals.matches++;
     S.totals.goals += gf;
@@ -1403,9 +1407,7 @@
       '<div style="text-align:center"><div class="sb-score"><b id="m-gf">0</b><i>:</i><b id="m-ga">0</b></div><span class="sb-clock" id="m-clock">00\'</span></div>' +
       '<div class="sb-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="22" height="26"></canvas><span class="sb-name">' + esc(oppTeam.short) + '</span></div>' +
       '</div>' +
-      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas><div id="m-banner" class="goal-banner"></div>' +
-      '<div id="m-cutin"></div>' +
-      '<div id="m-overlay"></div></div>' +
+      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas><div id="m-banner" class="goal-banner"></div></div>' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b>' +
       '<span class="uses" id="m-uses">개입 6/6</span>' +
