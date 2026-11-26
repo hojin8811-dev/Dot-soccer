@@ -2154,6 +2154,11 @@
     var tx = p.x + (50 - p.x) * 0.10 + avoid;
     var ty = p.y + dir * 9;
     if (Math.abs(p.y - gy) < 18) { tx = p.x + (54 - p.x) * 0.3 + avoid; }
+    /* v20 ② — 인버티드 윙어는 볼을 몰 때도 터치라인 대신 하프스페이스로 접어 들어온다 */
+    if (isInverted(p) && Math.abs(p.x - 50) > 24) {
+      tx = p.x + (50 - p.x) * 0.30 + avoid * 0.5;
+      ty = p.y + dir * 8;
+    }
     p.tx = clamp(tx, 6, 94);
     p.ty = clamp(ty, 4, 116);
   }
@@ -2431,6 +2436,12 @@
         ty = supportLineY(p.side) - z.dir * 1.2;
         v20t.stBehind[p.side] += 1;
       }
+    }
+    /* 공격형 윙백 롤: 터치라인을 타고 볼 높이까지 겹쳐 올라가 크로스 지점을 만든다 */
+    if (isWingbackPos(p) && mroleOf(p) === 'wingback' && st !== 'build') {
+      tx = sideX(p, p.pos === 'LWB' ? 3.4 : 96.6);
+      ty = clamp(ball.y + z.dir * 2, 6, 114);
+      v20t.wideHold[p.side] += 1;
     }
 
     /* ── v20 ① 공격 루트 지시: 고른 레인으로 목표를 당기고 그쪽에서 한 발 더 전진한다 ── */
@@ -5657,34 +5668,39 @@
   function drawTouchCallout() {
     if (touchFx.t <= 0 || !touchFx.label) { return; }
     var k = clamp(touchFx.t / touchFx.t0, 0, 1);
-    var w = Math.min(258, W * 0.44), h = 29;
-    var x = 8, y = H - h - 9;
+    var w = Math.min(262, W * 0.46), h = 30;
+    var x = 9, y = H - h - 13;
     var a = clamp(k / 0.22, 0, 1);
     v20t.calloutDraw = (v20t.calloutDraw || 0) + 1;
     v20t.calloutRect = [Math.round(x), Math.round(y), Math.round(w), Math.round(H), Math.round(a * 100)];
     ctx.save();
     ctx.globalAlpha = clamp(a, 0, 1);
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 9;
+    ctx.shadowOffsetY = 2;
     var g = ctx.createLinearGradient(x, y, x + w, y + h);
-    g.addColorStop(0, 'rgba(9,31,24,0.94)');
-    g.addColorStop(1, 'rgba(20,58,42,0.88)');
+    g.addColorStop(0, 'rgba(4,18,14,0.97)');
+    g.addColorStop(1, 'rgba(13,44,32,0.95)');
     ctx.fillStyle = g;
     roundRect(x, y, w, h, 8);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(200,241,105,0.6)';
-    ctx.lineWidth = 1;
-    roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 8);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.strokeStyle = 'rgba(200,241,105,0.92)';
+    ctx.lineWidth = 1.4;
+    roundRect(x + 0.7, y + 0.7, w - 1.4, h - 1.4, 8);
     ctx.stroke();
     ctx.fillStyle = 'rgba(200,241,105,0.9)';
     roundRect(x + 6, y + 7, 3, h - 14, 2);
     ctx.fill();
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(200,241,105,0.72)';
-    ctx.font = '900 7px system-ui, sans-serif';
-    ctx.fillText('TOUCHLINE', x + 15, y + 8.5);
-    ctx.fillStyle = '#f4fce6';
-    ctx.font = '900 12px system-ui, sans-serif';
-    ctx.fillText(touchFx.label, x + 15, y + 19.5);
+    ctx.fillStyle = 'rgba(200,241,105,0.85)';
+    ctx.font = '900 7.5px system-ui, sans-serif';
+    ctx.fillText('TOUCHLINE', x + 15, y + 9);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 12.5px system-ui, sans-serif';
+    ctx.fillText(touchFx.label, x + 15, y + 20.5);
     ctx.restore();
   }
 
