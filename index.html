@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v12 — 적성 피치맵 CM·CB 좌우 2자리 · DM 후방 배치 · 원형 초상화 토큰</title>
+<title>도트싸커 v13 — LWB·RWB 하프라인 정렬 · 주발(왼발/오른발/양발) 좌우 적성</title>
 <meta name="description" content="100% 오리지널 축구 구단 경영 RPG. 330명 고유 초상화가 원형 토큰이 되어 16:9 가로 스타디움에서 뛰고, 파랑/빨강 팀 링으로 편이 한눈에 갈리는 필드 플레이 · 포메이션대로 움직이는 진짜 축구 AI · 실시간 모멘텀 전술 카드.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=12">
+<link rel="manifest" href="manifest.webmanifest?v=13">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=12&b=38">
+<link rel="stylesheet" href="css/style.css?v=13&b=39">
 </head>
 <body>
 <div id="app">
@@ -51,21 +51,21 @@
     <div class="rot-in">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="4" width="14" height="26" rx="3"/><path d="M24 38a14 14 0 1 0-12-6.8"/><path d="M6 26l5 6 6-4"/></svg>
       <b>가로로 돌려 주세요</b>
-      <span>도트싸커 v12는 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
+      <span>도트싸커 v13은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
       <button class="btn primary" data-act="rotgo">가로 화면으로 보기</button>
       <button class="btn ghost sm" data-act="rotstay">세로로 계속 보기</button>
     </div>
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=12&b=38"></script>
-<script src="js/match.js?v=12&b=38"></script>
-<script src="js/game.js?v=12&b=38"></script>
+<script src="js/data.js?v=13&b=39"></script>
+<script src="js/match.js?v=13&b=39"></script>
+<script src="js/game.js?v=13&b=39"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=12').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=13').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

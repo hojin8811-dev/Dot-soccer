@@ -1,12 +1,12 @@
-/*! 도트싸커 v12 — 적성 피치맵 CM·CB 좌우 2자리 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v12a-20261126';
+/*! 도트싸커 v13 — 주발 좌우 적성 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v13a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=12&b=38', './js/data.js?v=12&b=38', './js/match.js?v=12&b=38', './js/game.js?v=12&b=38',
+        './css/style.css?v=13&b=39', './js/data.js?v=13&b=39', './js/match.js?v=13&b=39', './js/game.js?v=13&b=39',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

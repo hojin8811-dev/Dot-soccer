@@ -4,7 +4,7 @@
   "description": "330명 고유 초상화가 원형 토큰이 되어 16:9 가로 스타디움을 누비는 필드 플레이 — 원 바깥 파랑/빨강 팀 링, 골키퍼 GK 뱃지, 실시간 모멘텀 전술 카드 12종의 오리지널 축구 구단 RPG",
   "lang": "ko",
   "dir": "ltr",
-  "start_url": "./index.html?v=12&source=pwa",
+  "start_url": "./index.html?v=13&source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "landscape",
@@ -12,8 +12,8 @@
   "theme_color": "#0b332c",
   "categories": ["games", "sports"],
   "icons": [
-    { "src": "icons/icon-192.png?v=12", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png?v=12", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png?v=12", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192.png?v=13", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=13", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=13", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

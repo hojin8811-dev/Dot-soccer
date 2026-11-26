@@ -79,11 +79,12 @@
      중앙축 x=50 한 줄: AM → DM → GK (DM은 CM 두 자리 뒤쪽 정중앙)
      좌우 2자리: CM(좌 37 / 우 63), CB(좌 38 / 우 62) — 좌표는 왼쪽 자리 기준,
      오른쪽 자리는 슬롯 side:'R'로 x를 100 기준 뒤집어 그린다
-     좌우 날개: ST/CF · LWF/RWF · LWB/RWB · LB/RB 는 x=50 기준 정대칭 */
+     윙백(LWB/RWB)은 하프라인(y=50) 위 — CM(y=40)과 DM(y=56) 사이 중앙선에 걸친다
+     좌우 날개: ST/CF · LWF/RWF · LB/RB 는 x=50 기준 정대칭 */
   var APT_LAYOUT = {
     ST:  { x: 41, y: 11 }, CF: { x: 59, y: 11 },
     LWF: { x: 11, y: 25 }, AM: { x: 50, y: 25 }, RWF: { x: 89, y: 25 },
-    LWB: { x: 7,  y: 40 }, CM: { x: 37, y: 40 }, RWB: { x: 93, y: 40 },
+    LWB: { x: 7,  y: 50 }, CM: { x: 37, y: 40 }, RWB: { x: 93, y: 50 },
     DM:  { x: 50, y: 56 },
     LB:  { x: 17, y: 71 }, CB: { x: 38, y: 71 }, RB: { x: 83, y: 71 },
     GK:  { x: 50, y: 87 }
@@ -118,6 +119,64 @@
   };
   DS.APT_LIST = APT_LIST;
   DS.APT_NEAR = APT_NEAR;
+
+  /* ─────────────────────────  주발 (왼발 · 오른발 · 양발)  ───────────────────────── */
+  /* 왼쪽 측면(LB·LWB·LWF)은 왼발잡이, 오른쪽 측면(RB·RWB·RWF)은 오른발잡이에게
+     적성 보너스를 준다. 반대쪽은 감점하되 인버티드 윙어(RWF·LWF)만 -1로 살짝 허용. */
+  var FOOT_LIST = ['왼발', '오른발', '양발'];
+  var FOOT_COLOR = { '왼발': '#2f6fbf', '오른발': '#b93c2c', '양발': '#4d7a2a' };
+  var FOOT_SIDE = { LB: 'L', LWB: 'L', LWF: 'L', RB: 'R', RWB: 'R', RWF: 'R' };
+  DS.FOOT_LIST = FOOT_LIST;
+  DS.FOOT_COLOR = FOOT_COLOR;
+  DS.FOOT_SIDE = FOOT_SIDE;
+  DS.footColor = function (f) { return FOOT_COLOR[f] || '#4d7a2a'; };
+
+  function footAdjust(foot, code) {
+    var side = FOOT_SIDE[code];
+    if (!side) { return 0; }
+    if (foot === '양발') { return 1; }
+    if (foot === '왼발') { return side === 'L' ? 2 : (code === 'RWF' ? -1 : -2); }
+    if (foot === '오른발') { return side === 'R' ? 2 : (code === 'LWF' ? -1 : -2); }
+    return 0;
+  }
+  DS.footAdjust = footAdjust;
+
+  /* 새 선수 — 주 포지션에 맞춰 왼발/오른발을 뽑는다 (중앙·GK는 현실 비율 68/22/10) */
+  function pickFoot(pos) {
+    var r = Math.random();
+    if (FOOT_SIDE[pos] === 'L') { return r < 0.72 ? '왼발' : (r < 0.90 ? '양발' : '오른발'); }
+    if (FOOT_SIDE[pos] === 'R') { return r < 0.72 ? '오른발' : (r < 0.90 ? '양발' : '왼발'); }
+    return r < 0.68 ? '오른발' : (r < 0.90 ? '왼발' : '양발');
+  }
+  DS.pickFoot = pickFoot;
+
+  function footSeed(str) {
+    var h = 2166136261, i, s = String(str || '');
+    for (i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return (h >>> 0) / 4294967296;
+  }
+  /* 기존 세이브 마이그레이션 — id+이름 시드로 결정적 배정(새로고침해도 주발이 바뀌지 않는다).
+     측면 선수는 주 발/양발만 — 주 포지션 적성과 주발이 어긋나 보이지 않게 한다. */
+  DS.ensureFoot = function (p) {
+    if (!p) { return '오른발'; }
+    if (FOOT_LIST.indexOf(p.foot) >= 0) { return p.foot; }
+    var pos = POS[p.pos] ? p.pos : 'CM';
+    var r = footSeed((p.id || '') + '|' + (p.name || '') + '|foot');
+    var foot;
+    if (FOOT_SIDE[pos] === 'L') { foot = r < 0.82 ? '왼발' : '양발'; }
+    else if (FOOT_SIDE[pos] === 'R') { foot = r < 0.82 ? '오른발' : '양발'; }
+    else { foot = r < 0.68 ? '오른발' : (r < 0.90 ? '왼발' : '양발'); }
+    p.foot = foot;
+    if (p.apt) {
+      var i, code;
+      for (i = 0; i < APT_LIST.length; i++) {
+        code = APT_LIST[i];
+        if (!FOOT_SIDE[code]) { continue; }
+        p.apt[code] = clamp((p.apt[code] || 1) + footAdjust(foot, code), 1, 9);
+      }
+    }
+    return foot;
+  };
 
   /* ─────────────────────────  포메이션 (현대 8종)  ───────────────────────── */
   /* x: 0(왼쪽)~100(오른쪽), y: 0(상대 골대)~100(우리 골대) / k: ☆ 핵심 자리 */
@@ -640,18 +699,18 @@
     return 'dong';
   }
 
-  function makeAptitude(pos) {
+  function makeAptitude(pos, foot) {
     var apt = {};
     var i, code, base, gp = posGroup(pos);
     for (i = 0; i < APT_LIST.length; i++) {
       code = APT_LIST[i];
-      if (code === pos) { apt[code] = irange(8, 9); continue; }
+      if (code === pos) { apt[code] = clamp(Math.max(7, irange(8, 9) + footAdjust(foot, code)), 1, 9); continue; }
       if (posGroup(code) === gp) { base = irange(5, 8); }
       else if (APT_NEAR[pos] && APT_NEAR[pos].indexOf(code) >= 0) { base = irange(4, 7); }
       else { base = irange(1, 4); }
       if (gp === 'GK' && code !== 'GK') { base = irange(1, 3); }
       if (code === 'GK' && gp !== 'GK') { base = irange(1, 2); }
-      apt[code] = clamp(base, 1, 9);
+      apt[code] = clamp(base + footAdjust(foot, code), 1, 9);
     }
     return apt;
   }
@@ -863,9 +922,11 @@
 
     var name = opts.name || randName();
     var pic = (typeof opts.pic === 'number' && DS.picAllowed(pos, opts.pic)) ? opts.pic : pickPicFor(pos);
+    var foot = (opts.foot && FOOT_LIST.indexOf(opts.foot) >= 0) ? opts.foot : pickFoot(pos);
     var p = {
       id: opts.id || newId(),
       name: name,
+      foot: foot,
       number: opts.number || irange(1, 45),
       pos: pos,
       rarity: rarity,
@@ -892,7 +953,7 @@
         beard: pick(BEARD),
         collar: pick(COLLAR)
       },
-      apt: makeAptitude(pos),
+      apt: makeAptitude(pos, foot),
       tend: makeTend(),
       set: {
         pk: clamp(Math.round(t * 0.6 + pw * 0.3 + irange(-1, 1)), 1, 10),
@@ -941,7 +1002,7 @@
       }
       if (i === 0) {
         p.name = '한지호'; p.s = 6; p.t = 6; p.p = 8; p.pos = 'GK';
-        p.apt = makeAptitude('GK'); p.stats = statSheet(p);
+        p.apt = makeAptitude('GK', p.foot); p.stats = statSheet(p);
       }
       squad.push(p);
     }

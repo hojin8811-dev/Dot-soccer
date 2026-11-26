@@ -47,6 +47,12 @@
   function posBadge(code, extra) {
     return '<span class="pb ' + groupClass(code) + '">' + (extra || code) + '</span>';
   }
+  /* 주발 배지 — 왼쪽 파랑 · 오른쪽 빨강 · 양발 초록 */
+  function footChip(p) {
+    var f = (p && p.foot) ? p.foot : (DS.ensureFoot ? DS.ensureFoot(p) : '오른발');
+    var c = DS.footColor ? DS.footColor(f) : '#4d7a2a';
+    return '<span class="chip foot" style="background:' + c + '26;color:' + c + '">' + f + '</span>';
+  }
   function stars(v) {
     var s = '', i;
     for (i = 1; i <= 5; i++) { s += i <= v ? '★' : '<i>★</i>'; }
@@ -236,6 +242,11 @@
         else if (p.pos === 'FW') { p.pos = 'ST'; }
         if (!p.pic) { p.pic = 0; }
         if (!p.lock) { p.lock = DS.LOCKER[i % 4].key; }
+        /* v13: 주발 — 기존 선수는 id/이름 시드로 결정적 배정 + 좌우 적성 재보정 */
+        DS.ensureFoot(p);
+      }
+      if (d.scoutCandidates && d.scoutCandidates.length) {
+        for (i = 0; i < d.scoutCandidates.length; i++) { DS.ensureFoot(d.scoutCandidates[i]); }
       }
       /* v4: 선발 11 + 벤치 5 = 16명의 일러스트(p01~p32) 중복 제거 */
       DS.assignUniquePics(d.squad);
@@ -1113,11 +1124,12 @@
       '<div class="pd-nick">\'' + esc(p.nickname) + '\'</div>' +
       '<div class="pd-name">' + esc(p.name) + ' <small>' + p.age + '세</small></div>' +
       '<div class="pd-line">' + posBadge(p.pos, p.pos + ' · ' + DS.POS[p.pos].name) +
+      footChip(p) +
       '<span class="chip" style="background:' + L.color + '26;color:' + L.color + '">' + L.name + '</span>' +
       (role ? '<span class="chip lime">' + role.name + '</span>' : '') + '</div>' +
       '<div class="row" style="align-items:flex-end;gap:8px"><div class="pd-ov">' + rt + '<small>OVR</small></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.6);padding-bottom:2px">' + DS.RARITY[p.rarity].name + ' · ' + p.tenure + '기수 · Lv.' + (p.level || 0) + '</div></div>' +
-      '<div class="pd-rows"><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
+      '<div class="pd-rows"><div><span>주발</span>' + footChip(p) + '</div><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
       '</div></div>' +
 
       '<div class="band">STATUS<span>능력치 · 적성</span></div>' +
