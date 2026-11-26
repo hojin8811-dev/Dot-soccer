@@ -81,10 +81,10 @@
   var APT_LAYOUT = {
     ST:  { x: 41, y: 11 }, CF: { x: 59, y: 11 },
     LWF: { x: 11, y: 25 }, AM: { x: 50, y: 25 }, RWF: { x: 89, y: 25 },
-    LWB: { x: 7,  y: 41 }, CM: { x: 50, y: 41 }, RWB: { x: 93, y: 41 },
-    DM:  { x: 50, y: 57 },
-    LB:  { x: 23, y: 73 }, CB: { x: 50, y: 73 }, RB: { x: 77, y: 73 },
-    GK:  { x: 50, y: 89 }
+    LWB: { x: 7,  y: 40 }, CM: { x: 50, y: 40 }, RWB: { x: 93, y: 40 },
+    DM:  { x: 50, y: 56 },
+    LB:  { x: 23, y: 71 }, CB: { x: 50, y: 71 }, RB: { x: 77, y: 71 },
+    GK:  { x: 50, y: 87 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
   var APT_LIST = POS_ORDER.slice();
