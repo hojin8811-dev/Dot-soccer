@@ -35,6 +35,19 @@ iframe{width:844px;height:390px;border:0;background:#061a16;border-radius:10px;b
     var f = document.getElementById('pv');
     var d = f.contentDocument;
     d.open(); d.write(idx); d.close();
+    /* QA 세이브 격리 — 사용자의 저장 프로필을 건드리지 않도록 메모리 저장소를 씌운다 */
+    if (q.get('fresh') !== '0') {
+      var mem = {};
+      Object.defineProperty(f.contentWindow, 'localStorage', {
+        configurable: true,
+        value: {
+          getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+          setItem: function (k, v) { mem[k] = String(v); },
+          removeItem: function (k) { delete mem[k]; },
+          clear: function () { mem = {}; }
+        }
+      });
+    }
     var style = d.createElement('style');
     style.textContent = css;
     d.head.appendChild(style);
