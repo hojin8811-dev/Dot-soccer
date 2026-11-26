@@ -889,7 +889,80 @@
     { id: 'm32', name: '배영달',  age: 66, rarity: 'legend', formation: '4-4-2', alt: '4-1-4-1', tacticStyle: 'balanced',
       tacticLine: '무패 우승 두 번 — 화려함 없이 이기는 균형',
       style: '무패의 설계자', story: '한 시즌 무패 우승을 두 번 달성한 원로. 화려함 없이도 이기는 법을 안다.',
-      traits: [{ k: 'org', v: 8 }, { k: 'jump', v: 7 }] }
+      traits: [{ k: 'org', v: 8 }, { k: 'jump', v: 7 }] },
+    /* ── v21 — 50명으로 확장 (동 5 · 은 6 · 금 5 · 전설 2) ── */
+    { id: 'm33', name: '구본재',  age: 51, rarity: 'dong', formation: '4-4-2', alt: '4-2-3-1', tacticStyle: 'balanced',
+      tacticLine: '두 줄 간격만 지켜도 절반은 이긴다',
+      style: '간격의 신앙', story: '지방 구단에서 20년을 버틴 베테랑. 화려한 전술보다 줄 간격 하나를 끝까지 다듬는다.',
+      traits: [{ k: 'org', v: 3 }] },
+    { id: 'm34', name: '탁영수',  age: 46, rarity: 'dong', formation: '4-1-4-1', alt: '3-5-2', tacticStyle: 'counter',
+      tacticLine: '내려서 기다리다 한 번에 뒤집는다',
+      style: '한 방의 사냥꾼', story: '강팀 상대로 유독 강한 지도자. “먼저 넣지 말고 먼저 버텨라”가 지론이다.',
+      traits: [{ k: 'def', v: 3 }] },
+    { id: 'm35', name: '편다인',  age: 38, rarity: 'dong', formation: '3-5-2', alt: '3-3-1-3', tacticStyle: 'gegenpress',
+      tacticLine: '전방에서부터 세 명이 물고 늘어진다',
+      style: '물고 늘어지기', story: '선수 시절 압박 하나로 이름을 남긴 지도자. 후반 체력 관리가 숙제다.',
+      traits: [{ k: 'press', v: 3 }] },
+    { id: 'm36', name: '허문자',  age: 57, rarity: 'dong', formation: '4-3-3', alt: '4-1-3-2', tacticStyle: 'tikitaka',
+      tacticLine: '짧게 주고 짧게 받는다 — 점유가 곧 수비',
+      style: '점유의 장인', story: '패스 하나를 백 번 반복시키는 지도자. 선수들은 지루해도 결과는 따른다.',
+      traits: [{ k: 'pass', v: 3 }] },
+    { id: 'm37', name: '길상호',  age: 60, rarity: 'dong', formation: '5-3-2', alt: '5-2-2-1', tacticStyle: 'direct',
+      tacticLine: '크게 걷어내고 머리로 싸운다',
+      style: '공중볼 노장', story: '장신 자원을 모으는 재주가 있다. 세트피스 한 번에 경기를 가져간다.',
+      traits: [{ k: 'jump', v: 3 }] },
+    { id: 'm38', name: '채유진',  age: 42, rarity: 'eun', formation: '4-2-3-1', alt: '3-2-4-1', tacticStyle: 'hybrid3241',
+      tacticLine: '공격 시 3-2-4-1로 늘어나 중앙을 점령한다',
+      style: '가변의 설계자', story: '수비와 공격의 모양을 완전히 바꿔 쓰는 신세대 지도자. 판독이 어렵다.',
+      traits: [{ k: 'org', v: 4 }, { k: 'pass', v: 3 }] },
+    { id: 'm39', name: '오현우',  age: 49, rarity: 'eun', formation: '4-4-2', alt: '4-2-4', tacticStyle: 'wingplay',
+      tacticLine: '터치라인 끝까지 붙잡고 크로스를 올린다',
+      style: '측면 고집', story: '측면 한 줄만 파는 지도자. 상대가 알면서도 막기 어렵다는 평가를 받는다.',
+      traits: [{ k: 'speed', v: 4 }, { k: 'atk', v: 3 }] },
+    { id: 'm40', name: '진하람',  age: 36, rarity: 'eun', formation: '3-4-1-2', alt: '4-1-4-1', tacticStyle: 'tikitaka',
+      tacticLine: '더블 볼란테로 중원을 잠그고 짧게 돌린다',
+      style: '중원 잠금', story: '두 명의 6번으로 중원을 잠그는 축구를 한다. 경기 템포가 늘 같다.',
+      traits: [{ k: 'pass', v: 4 }, { k: 'def', v: 3 }] },
+    { id: 'm41', name: '표강일',  age: 53, rarity: 'eun', formation: '4-1-3-2', alt: '3-3-1-3', tacticStyle: 'direct',
+      tacticLine: '투톱에게 곧장 넣고 두 번째 공을 노린다',
+      style: '투톱 직선', story: '투톱의 몸싸움을 믿는 지도자. 두 번째 공을 잡는 자리가 곧 득점이다.',
+      traits: [{ k: 'jump', v: 4 }, { k: 'atk', v: 3 }] },
+    { id: 'm42', name: '남기범',  age: 44, rarity: 'eun', formation: '3-4-2-1', alt: '4-3-3', tacticStyle: 'counter',
+      tacticLine: '스리백 두 줄 뒤에서 역습 한 번',
+      style: '카운터 장인', story: '수비 숫자를 늘려 놓고 역습 타이밍만 노린다. 강팀일수록 잘 통한다.',
+      traits: [{ k: 'def', v: 4 }, { k: 'speed', v: 3 }] },
+    { id: 'm43', name: '서정후',  age: 47, rarity: 'eun', formation: '4-2-2-2', alt: '4-2-3-1', tacticStyle: 'gegenpress',
+      tacticLine: '하프스페이스에서 숫자로 눌러 탈취한다',
+      style: '하프스페이스 압박', story: '중앙 두 칸을 숫자로 채워 압박하는 지도자. 볼을 뺏는 위치가 늘 좋다.',
+      traits: [{ k: 'press', v: 4 }, { k: 'org', v: 3 }] },
+    { id: 'm44', name: '권태산',  age: 54, rarity: 'geum', formation: '4-3-3', alt: '4-2-3-1', tacticStyle: 'wingplay',
+      tacticLine: '윙어를 최전방에 붙이고 윙백이 그 뒤를 채운다',
+      style: '측면 수적 우위', story: '측면 두 줄로 수적 우위를 만드는 데 집착한다. 크로스 숫자가 리그 1위다.',
+      traits: [{ k: 'speed', v: 6 }, { k: 'atk', v: 5 }] },
+    { id: 'm45', name: '천지안',  age: 41, rarity: 'geum', formation: '3-2-4-1', alt: '3-4-1-2', tacticStyle: 'hybrid3241',
+      tacticLine: '박스 미드필더 4각 — 침투 경로를 미리 그려 둔다',
+      style: '경로 설계자', story: '박스로 들어가는 경로를 도면처럼 그려 훈련시키는 지도자. 상대는 늘 한 발 늦다.',
+      traits: [{ k: 'atk', v: 6 }, { k: 'org', v: 5 }] },
+    { id: 'm46', name: '하윤슬',  age: 39, rarity: 'geum', formation: '4-1-3-2', alt: '4-4-2', tacticStyle: 'tikitaka',
+      tacticLine: '전방 다이아로 라인 사이를 계속 흔든다',
+      style: '라인 사이의 마법사', story: '라인 사이 공간을 쓰는 법을 선수들에게 각인시키는 지도자. 패스 각이 남다르다.',
+      traits: [{ k: 'pass', v: 6 }, { k: 'atk', v: 5 }] },
+    { id: 'm47', name: '고강민',  age: 50, rarity: 'geum', formation: '5-2-2-1', alt: '5-3-2', tacticStyle: 'counter',
+      tacticLine: '다섯 수비로 잠그고 두 명의 10번으로 역습',
+      style: '철벽 역습', story: '실점을 극도로 싫어하는 지도자. 한 시즌 최소 실점 기록을 노린다.',
+      traits: [{ k: 'def', v: 6 }, { k: 'speed', v: 5 }] },
+    { id: 'm48', name: '유시온',  age: 43, rarity: 'geum', formation: '4-2-4', alt: '3-3-1-3', tacticStyle: 'direct',
+      tacticLine: '윙 2 + 투톱 — 골문을 향해 곧장 밀어붙인다',
+      style: '화력 집중', story: '공격 숫자를 최대로 올려 상대를 눌러 버린다. 수비 불안은 득점으로 메운다.',
+      traits: [{ k: 'shoot', v: 6 }, { k: 'atk', v: 5 }] },
+    { id: 'm49', name: '명재현',  age: 58, rarity: 'legend', formation: '4-3-3', alt: '3-2-4-1', tacticStyle: 'tikitaka',
+      tacticLine: '20년 동안 같은 축구 — 점유와 위치로 상대를 질식시킨다',
+      style: '점유의 거장', story: '한 시대를 지배한 점유 축구의 거장. 그의 팀은 공을 잃는 순간이 가장 위험하다.',
+      traits: [{ k: 'pass', v: 8 }, { k: 'org', v: 7 }] },
+    { id: 'm50', name: '백서진',  age: 62, rarity: 'legend', formation: '3-4-2-1', alt: '4-2-3-1', tacticStyle: 'gegenpress',
+      tacticLine: '잃으면 6초 안에 되찾는다 — 압박의 교과서',
+      style: '압박의 교과서', story: '압박 축구를 리그의 표준으로 만든 지도자. 그의 팀을 상대로는 빌드업이 곧 위험이다.',
+      traits: [{ k: 'press', v: 8 }, { k: 'speed', v: 7 }] }
   ];
 
   /* 감독이 보유한 변칙 포메이션 (고유 + 두 번째) — 마이팀에서 선택 가능 */
@@ -1005,7 +1078,20 @@
     { id: 'cheongchun', name: '청춘 FC',      short: '청춘', kit: { shirt: '#c85a1e', shorts: '#2b2622', trim: '#ffd8a8' }, emblem: 'flame', strength: 66 },
     { id: 'cheolma',  name: '철마 SC',        short: '철마', kit: { shirt: '#a82020', shorts: '#f2e8d2', trim: '#f0a8a8' }, emblem: 'claw', strength: 74 },
     { id: 'byeolbit', name: '별빛 레인저스',  short: '별빛', kit: { shirt: '#6a34c0', shorts: '#241634', trim: '#dcc8f8' }, emblem: 'star', strength: 71 },
-    { id: 'baekho',   name: '백호 유나이티드', short: '백호', kit: { shirt: '#1b7f88', shorts: '#f2e8d2', trim: '#b0eef2' }, emblem: 'moon', strength: 68 }
+    { id: 'baekho',   name: '백호 유나이티드', short: '백호', kit: { shirt: '#1b7f88', shorts: '#f2e8d2', trim: '#b0eef2' }, emblem: 'moon', strength: 68 },
+    /* ── v21 — 프리미어리그 20팀 (우리 구단 + 아래 19팀) ── */
+    { id: 'seorak',   name: '설악 FC',        short: '설악', kit: { shirt: '#2c6fa8', shorts: '#14202c', trim: '#bfe0ff' }, emblem: 'claw', strength: 70 },
+    { id: 'haeundae', name: '해운대 웨이브',  short: '해운대', kit: { shirt: '#197f8c', shorts: '#f2e8d2', trim: '#b6f0f4' }, emblem: 'wave', strength: 67 },
+    { id: 'mudeung',  name: '무등 산악',      short: '무등', kit: { shirt: '#b8461e', shorts: '#241a14', trim: '#ffcf9e' }, emblem: 'flame', strength: 65 },
+    { id: 'jeonju',   name: '전주 청솔',      short: '전주', kit: { shirt: '#2f7a55', shorts: '#1b2a20', trim: '#c9f0cf' }, emblem: 'moon', strength: 73 },
+    { id: 'ulsan',    name: '울산 강철',      short: '울산', kit: { shirt: '#34427e', shorts: '#1a1f30', trim: '#c8d0ff' }, emblem: 'bolt', strength: 77 },
+    { id: 'suwon',    name: '수원 성곽',      short: '수원', kit: { shirt: '#8a2f3f', shorts: '#f2e8d2', trim: '#ffc8cf' }, emblem: 'crown', strength: 75 },
+    { id: 'incheon',  name: '인천 항로',      short: '인천', kit: { shirt: '#1f6f9e', shorts: '#0e1e28', trim: '#a8e2ff' }, emblem: 'wave', strength: 72 },
+    { id: 'daegu',    name: '대구 열매',      short: '대구', kit: { shirt: '#c07a12', shorts: '#241a10', trim: '#ffe0a8' }, emblem: 'ball', strength: 70 },
+    { id: 'jeju',     name: '제주 바람',      short: '제주', kit: { shirt: '#3b8a3f', shorts: '#f2e8d2', trim: '#cff5c0' }, emblem: 'star', strength: 78 },
+    { id: 'busan',    name: '부산 갈매기',    short: '부산', kit: { shirt: '#2a5f9e', shorts: '#f2e8d2', trim: '#ffe9a8' }, emblem: 'wave', strength: 79 },
+    { id: 'taebaek',  name: '태백 정상',      short: '태백', kit: { shirt: '#5c6b3a', shorts: '#1d2418', trim: '#e6f0bc' }, emblem: 'claw', strength: 66 },
+    { id: 'hanseong', name: '한성 레전드',    short: '한성', kit: { shirt: '#1f2430', shorts: '#c8a83a', trim: '#ffd34d' }, emblem: 'crown', strength: 92 }
   ];
   DS.TEAMS = TEAMS;
 
@@ -1129,7 +1215,11 @@
     { hair: 'spiky',    color: '#e3c169', skin: '#f7d7b2' },
     { hair: 'ponytail', color: '#d5d8dc', skin: '#f6d4ae' }
   ];
-  DS.PIC_COUNT = 330;
+  /* v21 — p331~p500 신규 170종. 아트가 함께 배포될 때 PIC_MAX 를 500으로 올린다.
+     500일 때 gk = 6·15·20 · 294~330 · 471~500 = 70종 / field = 430종 (assets/portraits/pools.json 과 같다) */
+  var PIC_MAX = 330;
+  DS.PIC_COUNT = PIC_MAX;
+  DS.PIC_LEGACY = 330;
   /* p37~p330: 일러스트 시트에서 슬라이스된 나머지 선수 — 번호 기반으로 헤어·피부를 고정 배정 */
   (function () {
     var HAIRS = [
@@ -1155,7 +1245,8 @@
   var FIELD_PORTRAITS = [];
   (function () {
     var n;
-    for (n = 294; n <= DS.PIC_COUNT; n++) { GK_PORTRAITS.push(n); }
+    for (n = 294; n <= DS.PIC_LEGACY; n++) { GK_PORTRAITS.push(n); }
+    for (n = 471; n <= DS.PIC_COUNT; n++) { GK_PORTRAITS.push(n); }
     for (n = 1; n <= DS.PIC_COUNT; n++) {
       if (GK_PORTRAITS.indexOf(n) < 0) { FIELD_PORTRAITS.push(n); }
     }
@@ -1394,6 +1485,86 @@
   DS.randName = randName;
   DS.playTypeFor = playTypeFor;
   DS.resetNames = function () { USED = {}; };
+
+  /* ─────────────────────────  v21 — 경기 EXP · 이적시장 · 유소년 아카데미  ───────────────────────── */
+  /* 레벨업에 필요한 EXP. 레벨이 오를수록 선형으로 늘어나 성장이 느려진다. */
+  DS.expToNext = function (level) { return 520 + (level || 0) * 420; };
+
+  /* 이적료 — OVR·등급·나이·레벨. 20대 중반이 정점, 33세 이상은 급락. */
+  DS.marketValue = function (p) {
+    if (!p) { return 0; }
+    var ovr = Math.max(20, ratingOf(p));
+    var base = Math.pow(ovr / 55, 3.1) * 4200;
+    var age = p.age || 26;
+    var ageK = age <= 20 ? 1.4 : (age <= 23 ? 1.28 : (age <= 26 ? 1.14 : (age <= 29 ? 1 : (age <= 32 ? 0.74 : 0.46))));
+    var rarK = { dong: 0.85, eun: 1, geum: 1.22, legend: 1.55 }[p.rarity] || 1;
+    var fee = base * ageK * rarK * (1 + (p.level || 0) * 0.035);
+    return Math.max(260, Math.round(fee / 50) * 50);
+  };
+  /* 주급 — 이적료의 3.5% 수준(경기당이 아니라 시즌 주급 감각) */
+  DS.wageOf = function (p) {
+    if (!p) { return 0; }
+    return Math.max(40, Math.round(DS.marketValue(p) * 0.035 / 10) * 10);
+  };
+  /* 라운드마다 같은 목록이 보이도록 고정 시드 난수 */
+  function seedRnd(seed) {
+    var s = (seed | 0) % 2147483647;
+    if (s <= 0) { s += 2147483646; }
+    return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  }
+  DS.seedRnd = seedRnd;
+
+  /* 이적시장 매물 — 라운드·시즌 시드로 고정. 라운드가 바뀌면 새 매물이 올라온다. */
+  DS.makeMarketListings = function (count, seed, opts) {
+    opts = opts || {};
+    var R = seedRnd((seed || 1) * 7919 + 13);
+    var out = [], i, p, rarity, roll, age, fee, from;
+    var teams = DS.TEAMS.length ? DS.TEAMS : [{ name: '자유계약', short: 'FA' }];
+    for (i = 0; i < count; i++) {
+      roll = R();
+      rarity = roll < 0.30 ? 'dong' : (roll < 0.72 ? 'eun' : (roll < 0.96 ? 'geum' : 'legend'));
+      p = makePlayer({ rarity: rarity });
+      age = 18 + Math.floor(R() * 17);
+      p.age = age;
+      /* 어린 선수는 현재 능력치를 낮춰 잠재 성장 여지를 만든다 */
+      if (age <= 21) {
+        p.s = clamp(p.s - 1, 1, 10); p.t = clamp(p.t - 1, 1, 10); p.p = clamp(p.p - 1, 1, 10);
+        p.stats = statSheet(p);
+      }
+      fee = Math.round(DS.marketValue(p) * (0.92 + R() * 0.34) / 50) * 50;
+      from = teams[Math.floor(R() * teams.length)];
+      out.push({
+        id: p.id, player: p, fee: Math.max(300, fee),
+        wage: DS.wageOf(p), fromId: from.id || 'fa', fromName: from.short || from.name,
+        round: opts.round || 0, sold: false
+      });
+      DS.assignUniquePics([p]);
+    }
+    return out;
+  };
+
+  /* 유소년 후보 — 15~18세, 현재 능력치는 낮고 잠재력(pot)은 높다. */
+  DS.makeYouthProspect = function (opts) {
+    opts = opts || {};
+    var p = makePlayer({ rarity: opts.rarity || (Math.random() < 0.16 ? 'eun' : 'dong') });
+    p.age = opts.age || (15 + Math.floor(Math.random() * 4));
+    p.s = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
+    p.t = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
+    p.p = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
+    p.level = 0;
+    p.exp = 0;
+    p.pot = opts.pot || (58 + Math.floor(Math.random() * 38));       /* 58~95 */
+    p.youth = true;
+    p.stats = statSheet(p);
+    DS.assignUniquePics([p]);
+    return p;
+  };
+  /* 잠재력 대비 성장 여유 (0~1) */
+  DS.headroom = function (p) {
+    if (!p || !p.pot) { return 0; }
+    var cur = ratingOf(p);
+    return clamp((p.pot - cur) / 40, 0, 1);
+  };
 
   /* ─────────────────────────  구단 시설  ───────────────────────── */
   var FACILITIES = [

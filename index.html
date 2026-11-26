@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v20 — 라이브 터치라인 지시 · 롤·주발 플레이 · 상대 스카우팅 · SD 아트</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v20은 경기 중 터치라인 지시로 직접 개입하는 패치다 — 공격 성향·압박 강도·수비 라인·공격 루트를 바꾸면 라인 높이와 압박 인원, 패스 레인이 그 자리에서 달라지고, 인버티드 윙어는 안으로 접어 강한 발로 슈팅하며 전통 윙어는 폭을 지켜 크로스를 올린다. 레지스타는 빌드업 때 CB 사이로 내려오고, B2B는 늦게 박스로 쇄도하며, 폴스나인과 포처는 서로 다른 공간을 쓴다. 킥오프 전에는 실제 상대 스쿼드를 읽은 스카우팅 리포트가 위험 선수와 카운터 팁을 알려준다.">
+<title>도트싸커 v21 — 프리미어리그 20팀 · 이적시장 · 유소년 아카데미</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v21은 리그를 프리미어리그식 20팀 38라운드로 넓히고, 명확한 찬스를 앞에서 주저 없이 때리는 슈팅과 자기 진영 정체를 끊는 전진 압박을 넣었다. 상점은 이적시장으로 바뀌어 매물을 협상해 영입하고 내 선수를 내놓아 자금을 만들며, 클럽 하우스에는 U-18 유소년 아카데미가 들어섰다. 경기 후에는 출전 선수 전원이 EXP를 받아 자동으로 레벨업한다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=20">
-<link rel="icon" href="icons/icon-192.png?v=20">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
-<link rel="stylesheet" href="css/style.css?v=20&b=1">
+<link rel="manifest" href="manifest.webmanifest?v=21">
+<link rel="icon" href="icons/icon-192.png?v=21">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=21">
+<link rel="stylesheet" href="css/style.css?v=21&b=1">
 </head>
 <body>
 <div id="app">
@@ -40,8 +40,8 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9l8-5 8 5v11H4Z"/><path d="M9 20v-6h6v6"/></svg>
       <span>클럽</span></button>
     <button data-act="tab" data-tab="shop">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l1 12H5L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
-      <span>상점</span></button>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16l-1 12H5L4 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M9 13h6M9 16h6"/></svg>
+      <span>이적시장</span></button>
   </nav>
   <div id="m-overlay"></div>
   <div id="m-cutin"></div>
@@ -51,21 +51,21 @@
     <div class="rot-in">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="4" width="14" height="26" rx="3"/><path d="M24 38a14 14 0 1 0-12-6.8"/><path d="M6 26l5 6 6-4"/></svg>
       <b>가로로 돌려 주세요</b>
-      <span>도트싸커 v20은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
+      <span>도트싸커 v21은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
       <button class="btn primary" data-act="rotgo">가로 화면으로 보기</button>
       <button class="btn ghost sm" data-act="rotstay">세로로 계속 보기</button>
     </div>
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=20&b=1"></script>
-<script src="js/match.js?v=20&b=1"></script>
-<script src="js/game.js?v=20&b=1"></script>
+<script src="js/data.js?v=21&b=1"></script>
+<script src="js/match.js?v=21&b=1"></script>
+<script src="js/game.js?v=21&b=1"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=20').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=21').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

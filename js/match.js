@@ -177,7 +177,7 @@
 
   /* ── 볼 ── */
   var ball = {
-    x: 50, y: 60, vx: 0, vy: 0, z: 0, vz: 0,
+    x: 50, y: 60, vx: 0, vy: 0, z: 0, vz: 0, px: 50, py: 60, pz: 0,
     carrier: null, from: null, receiver: null,
     kind: 'idle', flight: 0, dur: 0,
     aim: null, shot: null, trail: [], assist: null,
@@ -262,6 +262,19 @@
     };
   }
   var v20t = blankV20();
+
+  /* ── v21 계측기 — 정체 탈출 · 명확한 찬스 슈팅 · 렌더 보간 ── */
+  var ownHalfT = 0;            /* 같은 팀이 자기 진영에서만 공을 돌린 시간(초) */
+  var ownHalfSide = null;
+  var renderAlpha = 1;         /* acc / stepDt — 60/120fps 서브프레임 보간 계수 */
+  function blankV21() {
+    return {
+      stallWarn: 0, stallBreak: 0, stallLong: 0, forwardPass: 0,
+      clearShots: 0, boxShots: 0, chancePass: 0, backPassBlocked: 0,
+      frames: 0, steps: 0
+    };
+  }
+  var v21t = blankV21();
 
   /* 전술 상황 배너 문구 */
   var SIT = {
@@ -1097,7 +1110,7 @@
     var by = side === 'home' ? y * 1.2 : WORLD_H - y * 1.2;
     return {
       side: side, player: player, kit: kit, role: role, pos: pos,
-      baseX: bx, baseY: by, x: bx, y: by, tx: bx, ty: by,
+      baseX: bx, baseY: by, x: bx, y: by, px: bx, py: by, tx: bx, ty: by,
       vx: 0, vy: 0, phase: Math.random() * 4, frame: 0,
       pose: null, poseT: 0, lean: 0, speed: 0,
       facing: side === 'home' ? 1 : -1, diveT: 0, diveDir: 1, stun: 0,
@@ -1192,6 +1205,21 @@
     out.score = [M.homeScore, M.awayScore];
     out.poss = [hPos, 100 - hPos];
     out.shots = [goalStats.homeShots, goalStats.awayShots];
+    /* v21 ④ — xG · 유효슈팅 · 라이브 평점 */
+    out.xg = [Math.round(homeXg * 10) / 10, Math.round(awayXg * 10) / 10];
+    var onT = [0, 0], sj;
+    for (sj = 0; sj < shotLog.length; sj++) {
+      if (shotLog[sj].onTarget) { onT[shotLog[sj].side === 'home' ? 0 : 1] += 1; }
+    }
+    out.onTarget = onT;
+    var rts = [], ri;
+    for (ri = 0; ri < ratings.length; ri++) {
+      var rr0 = ratings[ri];
+      if (rr0.subbedOut) { continue; }
+      rts.push({ name: short(rr0.name), pos: rr0.pos, rating: rr0.rating });
+    }
+    rts.sort(function (a, b) { return b.rating - a.rating; });
+    out.ratings = { top: rts.slice(0, 2), low: rts.slice(-2).reverse() };
     out.tired = [];
     var j, q;
     for (j = 0; j < players.length; j++) {
@@ -1445,6 +1473,11 @@
     touchFx = { t: 0, t0: 2.6, label: '', tone: '' };
     v20t = blankV20();
     touchCount = 0;
+    /* v21 — 정체 타이머·보간 계수·계측기 초기화 */
+    v21t = blankV21();
+    ownHalfT = 0;
+    ownHalfSide = null;
+    renderAlpha = 1;
     mgrFx = cfg.managerFx || {};
     buildHomeMetrics(cfg.homeFormation);
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
@@ -3127,6 +3160,12 @@
         score += (fdel < 14 ? 11 : (fdel < 28 ? 4 : -4));
       }
       score += Math.random() * 5;
+      /* v21 ② — 자기 진영 정체 중에는 무조건 앞으로: 백패스·CB 돌리기를 감점하고 전진 패스에 힘을 준다 */
+      if (ownHalfSide === p.side && ownHalfT > 2.4) {
+        score += Math.max(0, fwd) * 2.4;
+        if (isGK(q)) { score -= 30; }
+        if (fwd < 0) { score -= 14; }
+      }
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
     }
     if (!best) { return false; }
@@ -3294,6 +3333,9 @@
   /* 압박을 받을 때 안전한 백패스/원터치 옵션 */
   function backPass(p) {
     var dir = goalDir(p.side), best = null, bv = -1, i, q, d, back, open, v;
+    /* v21 ② — 자기 진영에 오래 묶여 있으면 백패스를 잠근다 (CB·DM·GK 사이 돌리기 방지) */
+    var stall = (ownHalfSide === p.side) ? ownHalfT : 0;
+    if (stall > 2.6) { v21t.backPassBlocked += 1; return false; }
     for (i = 0; i < players.length; i++) {
       q = players[i];
       if (q === p || q.side !== p.side || q.off) { continue; }
@@ -3302,6 +3344,8 @@
       back = (q.y - p.y) * dir;                 /* 뒤쪽 = 음수 */
       open = nearestOpponent(q, 22).dist;
       v = open * 1.4 - Math.abs(d - 12) * 0.5 + (back < 0 ? 8 : 0) - back * 0.2;
+      /* 정체 중에는 앞쪽 동료만 남긴다 */
+      if (stall > 1.6 && back > 0) { continue; }
       if (v > bv) { bv = v; best = q; }
     }
     if (!best || bv < 6) { return false; }
@@ -3333,8 +3377,25 @@
     }
     return best;
   }
-  function gkLongTarget(p) {
-    var best = null, bv = -1e9, i, q, prog, open, v;
+  /* v21 ② — 정체 탈출용 전진 타깃: 앞에 있고 마크가 덜 붙은 동료 */
+  function forwardTarget(p) {
+    var best = null, bv = -1e9, i, q, prog, open, d, ownProg = progressOf(p.side, p.y);
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q === p || q.side !== p.side || q.off || isGK(q)) { continue; }
+      d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < 7 || d > 46) { continue; }
+      prog = progressOf(p.side, q.y);
+      if (prog < ownProg + 0.06) { continue; }
+      if (isOffsidePos(q)) { continue; }
+      open = nearestOpponent(q, 24).dist;
+      var v = prog * 50 + open * 1.2 + (isFwdGroup(q) ? 12 : 0) - d * 0.25 + Math.random() * 4;
+      if (v > bv) { bv = v; best = q; }
+    }
+    return best;
+  }
+
+  function gkLongTarget(p) {    var best = null, bv = -1e9, i, q, prog, open, v;
     for (i = 0; i < players.length; i++) {
       q = players[i];
       if (q === p || q.side !== p.side || q.off || isGK(q)) { continue; }
@@ -3382,8 +3443,7 @@
 
   function decide() {
     var p = ball.carrier;
-    if (!p) { return; }
-    /* v18 ① — GK는 이 함수의 나머지 분기를 타지 않는다 (드리블 금지) */
+    if (!p) { return; }    /* v18 ① — GK는 이 함수의 나머지 분기를 타지 않는다 (드리블 금지) */
     if (isGK(p)) {
       v18t.gkDecision += 1;
       if (gkDistribute(p)) { actionTimer = 0.42 + Math.random() * 0.22; return; }
@@ -3399,25 +3459,37 @@
     /* v20 ② — 윙어의 롤·주발: 인버티드는 안으로 접어 슛, 전통 윙어는 폭을 지켜 크로스 */
     var invW = isInverted(p);
     var tradW = isTraditionalWinger(p);
+    /* v21 ② — 이 팀이 자기 진영에서 공을 돌린 시간 */
+    var stallNow = (ownHalfSide === p.side) ? ownHalfT : 0;
     var shootRange = 22 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
     if (p.side === 'home' && buffOf('atk') > 0) { shootRange += 2; }
     if (invW) { shootRange += 5; }                       /* 하프스페이스에서 바로 때릴 수 있다 */
 
     /* 1) 슛 */
     if (dist < shootRange) {
-      var pShot = dist < 12 ? 0.52 : (dist < 18 ? 0.36 : 0.22);
+      /* v21 ① — 박스 안·1:1·하프스페이스의 명확한 찬스는 주저 없이 때린다.
+         (예전에는 근접 압박(pressure<2.2)이면 0.45배로 깎여 찬스가 패스로 샜다) */
+      var inBox = dist < 11.5;
+      var pShot = inBox ? 0.72 : (dist < 18 ? 0.46 : 0.24);
       pShot *= sty.shootBias;
-      if (pressure < 2.2 && dist > 10) { pShot *= 0.45; }
+      if (pressure < 2.2 && !inBox && dist > 15) { pShot *= 0.7; }
+      if (inBox && pressure > 3) { pShot += 0.10; }        /* 골문 앞에서 마크가 비었을 때 */
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
       if (invW && dist < 21) { pShot += 0.10; }           /* 컷인 후 강한 발 슈팅 */
-      if (chance(pShot)) { shoot(p, dist); return; }
+      if (chance(pShot)) {
+        if (inBox) { v21t.boxShots += 1; }
+        if (inBox || pressure > 3.5) { v21t.clearShots += 1; }
+        shoot(p, dist);
+        return;
+      }
     }
     /* 1.2) v19 ① — 전환 창: 역습·직선 팀은 탈취 직후 한 번 더 세로로 찌른다 */
     if (trans.side === p.side && trans.kind === 'vertical' && progressOf(p.side, p.y) > 0.28 && chance(0.4)) {
       if (transitionThrough(p)) { actionTimer = 0.16; return; }
     }
-    /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다 */
-    if (pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
+    /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다
+       v21 ② — 자기 진영 정체 중에는 이 안전 패스도 막는다 */
+    if (stallNow < 2.4 && pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
       if (backPass(p)) { actionTimer = 0.14; return; }
     }
 
@@ -3436,6 +3508,24 @@
       }
       if (passBall(p)) { return; }
     }
+    /* 2.5) v21 ② — 정체 탈출: 오래 자기 진영에서만 돌았다면 앞으로 밀어붙인다 */
+    if (stallNow > 3.4) {
+      var ft = forwardTarget(p);
+      if (ft && kickPass(p, ft, 'longkick')) {
+        v21t.stallBreak += 1;
+        v21t.stallLong += 1;
+        v21t.forwardPass += 1;
+        bubble(p, '⚡ 전진!', '#ffd98a', 1.0);
+        return;
+      }
+      /* 받을 곳도 없으면 앞으로 직접 돌파한다 */
+      p.dribbleX = clamp(p.x + range(-4, 4), 6, WORLD_W - 6);
+      p.dribbleY = p.y - goalDir(p.side) * range(9, 14);
+      p.dribbleT = 0.55;
+      p.kind = 'dribble';
+      v21t.stallBreak += 1;
+      return;
+    }
     /* 3) 패스 */
     if (pressure < 6 || chance(0.72)) {
       if (passBall(p)) { return; }
@@ -3443,7 +3533,6 @@
     /* 4) 드리블 */
     dribble(p);
   }
-
   /* v19 ④ — 슛 카운트·xG 누적을 한 곳으로 (일반 슛·세트피스 헤더·PK 모두) */
   function countShot(side, xg) {
     if (side === 'home') { goalStats.homeShots++; homeXg += xg; }
@@ -4572,13 +4661,20 @@
         /* v17 — 리플레이는 실제 시간으로 3초 (0.5배속), 배속과 무관하게 흘러간다 */
         replayTick(realDt);
         crowdTick(realDt);
+        renderAlpha = 1;
       } else {
         var dt = realDt * M.speed;
         acc += dt;
         var stepDt = 1 / 60, guard = 0;
         while (acc >= stepDt && guard < 14) { step(stepDt); acc -= stepDt; guard++; }
+        /* v21 ③ — 다음 스텝까지 남은 시간 비율로 렌더 좌표를 보간한다.
+           60Hz 시뮬레이션을 120Hz 화면에 그려도 끊기지 않는다. */
+        renderAlpha = clamp(acc / stepDt, 0, 1);
       }
+    } else {
+      renderAlpha = 1;
     }
+    v21t.frames++;
     draw();
     if (M.running) { rafId = requestAnimationFrame(loop); }
   }
@@ -4586,6 +4682,11 @@
   function step(dt) {
     if (M.phase === 'ended') { return; }
     simFrame++;
+    v21t.steps++;
+    /* v21 ③ — 이번 스텝 전 좌표를 남겨 렌더에서 보간한다 */
+    var pi;
+    for (pi = 0; pi < players.length; pi++) { players[pi].px = players[pi].x; players[pi].py = players[pi].y; }
+    ball.px = ball.x; ball.py = ball.y; ball.pz = ball.z;
     if (cutinHold > 0) { cutinHold -= dt; return; }
 
     var i;
@@ -4814,6 +4915,22 @@
     else { st = 'final'; }
     if (st !== play.stage) { play.stage = st; play.stageT = 0; }
     play.stageT += dt;
+
+    /* v21 ② — 자기 진영 정체 타이머: 공을 가진 팀이 우리 진영(진행도 42% 미만)에서만
+       돌리면 시간이 쌓인다. 앞으로 나가면 빨리 줄어든다. */
+    if (play.phase === 'play' && c) {
+      if (prog < 0.42) {
+        if (ownHalfSide === c.side) { ownHalfT += dt; }
+        else { ownHalfSide = c.side; ownHalfT = dt; }
+        if (ownHalfT > 7 && Math.floor(ownHalfT) % 3 === 0) { v21t.stallWarn++; }
+      } else {
+        ownHalfT = Math.max(0, ownHalfT - dt * 1.8);
+        if (ownHalfT <= 0) { ownHalfSide = null; }
+      }
+    } else if (play.phase !== 'play') {
+      ownHalfT = Math.max(0, ownHalfT - dt * 3);
+      if (ownHalfT <= 0) { ownHalfSide = null; }
+    }
 
     if (play.phase !== 'play') { return; }
     if (play.counterT > 0) {
@@ -5813,6 +5930,23 @@
     /* v17 — 리플레이 재생 중에는 저장된 프레임을 그린다 */
     if (replay.on) { drawReplayFrame(); return; }
 
+    /* v21 ③ — 서브프레임 보간: 그리기 직전에만 좌표를 보간값으로 바꿓고 끝나면 되돌린다.
+       시뮬레이션 상태는 건드리지 않으므로 물리·판정에는 영향이 없다. */
+    var lerpK = (renderAlpha >= 0.999 || !(renderAlpha > 0)) ? 1 : renderAlpha;
+    var swap = lerpK < 1, si, sp;
+    if (swap) {
+      for (si = 0; si < players.length; si++) {
+        sp = players[si];
+        sp._x = sp.x; sp._y = sp.y;
+        sp.x = sp.px + (sp.x - sp.px) * lerpK;
+        sp.y = sp.py + (sp.y - sp.py) * lerpK;
+      }
+      ball._x = ball.x; ball._y = ball.y; ball._z = ball.z;
+      ball.x = ball.px + (ball.x - ball.px) * lerpK;
+      ball.y = ball.py + (ball.y - ball.py) * lerpK;
+      ball.z = ball.pz + (ball.z - ball.pz) * lerpK;
+    }
+
     /* 카메라 흔들림 — 슛·골·선방 순간 경기장이 짧게 울린다 */
     var shk = 0;
     if (shake.t > 0) {
@@ -5941,7 +6075,25 @@
       ctx.fillText('PAUSE', W / 2, H / 2 + 5);
       ctx.textAlign = 'left';
     }
+    if (swap) {
+      for (si = 0; si < players.length; si++) {
+        sp = players[si];
+        sp.x = sp._x; sp.y = sp._y;
+      }
+      ball.x = ball._x; ball.y = ball._y; ball.z = ball._z;
+    }
   }
+
+  M.v21 = function () {
+    return {
+      stall: { t: Math.round(ownHalfT * 100) / 100, side: ownHalfSide, warn: v21t.stallWarn, break: v21t.stallBreak, long: v21t.stallLong, backPassBlocked: v21t.backPassBlocked },
+      shots: { clear: v21t.clearShots, box: v21t.boxShots, forwardPass: v21t.forwardPass },
+      render: { alpha: Math.round(renderAlpha * 1000) / 1000, frames: v21t.frames, steps: v21t.steps, ratio: v21t.steps ? Math.round(v21t.frames / v21t.steps * 1000) / 1000 : null },
+      hud: (function () { var h = hudState(); return { poss: h.poss, xg: h.xg, shots: h.shots, onTarget: h.onTarget, top: h.ratings.top, low: h.ratings.low }; })()
+    };
+  };
+
+  /* ─────────────────────────  v21 계측  ───────────────────────── */
 
   /* v16 계측: 프레임 단위 선수 좌표·토큰 반지름 — 겹침·GK 밀집·블록 위치를 실측한다 */
   M.inspect = function () {
