@@ -118,9 +118,10 @@
   var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
   var pitchImg = null;
   /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링 */
-  var TOKEN_R = 0.50;             /* 토큰 원 반지름 / SPR_H (지름 ≈ SPR_H) */
+  var TOKEN_R = 0.58;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 1.16 × SPR_H) */
   var portraits = {};             /* pic 번호 → { img, ready } — 마이팀·카드용 전신(그대로 사용) */
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
+  var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
   var portraitLeft = 0;
   var portraitNeed = 0;
@@ -163,11 +164,13 @@
     if (rec) { return rec; }
     rec = { img: new global.Image(), ready: false, fx: 0.5 };
     heads[n] = rec;
+    headLeft++;
     rec.img.onload = function () {
       rec.ready = Math.max(rec.img.naturalWidth || 0, rec.img.width || 0) > 0;
       rec.fx = headFocusX(rec.img);
+      headLeft--;
     };
-    rec.img.onerror = function () { rec.ready = false; };
+    rec.img.onerror = function () { rec.ready = false; headLeft--; };
     rec.img.src = 'assets/portraits/head/p' + (n < 10 ? '0' + n : n) + '.png';
     return rec;
   }
@@ -716,7 +719,7 @@
     pushHud();
     /* 선수단 입장 연출 — 2.5등신 일러스트가 준비되면 킥오프 */
     portraitNeed = portraitLeft;
-    artGateOn = portraitNeed > 0;
+    artGateOn = portraitNeed > 0 || headLeft > 0;
     artGateT = 0;
     if (artGateOn) { M.paused = true; }
     cancelAnimationFrame(rafId);
@@ -2018,7 +2021,7 @@
     lastT = t;
     if (artGateOn) {
       artGateT += realDt;
-      if (portraitLeft <= 0 || artGateT > 9) {
+      if (portraitLeft <= 0 && headLeft <= 0 || artGateT > 9) {
         artGateOn = false;
         M.paused = false;
         acc = 0;
@@ -2655,10 +2658,12 @@
       ctx.beginPath(); ctx.arc(0, 0, r - 0.4, 0, PI2);
       ctx.clip();
       if (iw > 0 && ih > 0) {
-        var S = Math.min(iw, ih) * 0.99;                 /* 머리 영역 정사각 크롭 */
+        var base = Math.min(iw, ih);
+        var S = base * 0.94;                            /* 머리 영역 정사각 크롭 (살짝 당겨 얼굴을 크게) */
         var sx = clamp(iw * (headRec.fx || 0.5) - S / 2, 0, Math.max(0, iw - S));
+        var sy = clamp(base * 0.10, 0, Math.max(0, ih - S));   /* 정수리 끝만 살짝 자르고 얼굴을 가운데로 */
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(headRec.img, sx, 0, S, S, -r, -r, r * 2, r * 2);
+        ctx.drawImage(headRec.img, sx, sy, S, S, -r, -r, r * 2, r * 2);
       }
       /* 원 안쪽 입체 음영 */
       var sh = ctx.createLinearGradient(0, -r, 0, r);
@@ -2868,8 +2873,13 @@
     drawMatchBall(bp.x, bp.y - zpx - r * 0.35, r, bp.y);
 
     if (artGateOn) {
-      var ready = Math.max(0, portraitNeed - portraitLeft);
-      var pct = portraitNeed ? clamp(ready / portraitNeed, 0, 1) : 1;
+      var headTotal = 0, headOk = 0, kk2;
+      for (kk2 in heads) {
+        if (heads.hasOwnProperty(kk2)) { headTotal++; if (heads[kk2].ready) { headOk++; } }
+      }
+      var ready = headOk;
+      var total = headTotal || 1;
+      var pct = clamp(ready / total, 0, 1);
       ctx.fillStyle = 'rgba(3,16,13,0.82)';
       ctx.fillRect(0, 0, W, H);
       ctx.textAlign = 'center';
@@ -2879,7 +2889,7 @@
       ctx.fillText('선수단 입장 중', W / 2, H / 2 - 16);
       ctx.font = '700 11px system-ui, sans-serif';
       ctx.fillStyle = 'rgba(233,244,221,.72)';
-      ctx.fillText('원형 초상화 ' + ready + ' / ' + portraitNeed + '명 준비', W / 2, H / 2 + 6);
+      ctx.fillText('원형 초상화 ' + ready + ' / ' + total + '명 준비', W / 2, H / 2 + 6);
       var bw = Math.min(240, W * 0.46), bh = 6;
       ctx.fillStyle = 'rgba(255,255,255,.14)';
       roundRect(W / 2 - bw / 2, H / 2 + 18, bw, bh, 3); ctx.fill();
@@ -2914,6 +2924,8 @@
       p = players[i];
       var row = {
         pos: p.pos, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
+        pic: (p.player && p.player.pic) || null,
+        head: (function () { var hrec = heads[(p.player && p.player.pic) || 1]; return hrec && hrec.ready ? 'loaded' : 'pending'; })(),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
         pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
         stam: Math.round(p.stam), tokenR: Math.round(SPR_H * scr(p.x, p.y).s * TOKEN_R * 10) / 10,
