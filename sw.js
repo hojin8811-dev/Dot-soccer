@@ -1,13 +1,13 @@
-/*! 도트싸커 v6 — SD 필드 플레이 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v6a-20261126';
+/*! 도트싸커 v7 — 가로 16:9 스타디움 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v7a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=6&b=22', './js/data.js?v=6&b=22', './js/match.js?v=6&b=22', './js/game.js?v=6&b=22',
-        './assets/hero-banner.jpg'
+        './css/style.css?v=7&b=23', './js/data.js?v=7&b=23', './js/match.js?v=7&b=23', './js/game.js?v=7&b=23',
+        './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
   );

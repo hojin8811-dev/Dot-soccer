@@ -659,8 +659,9 @@
       slot = f.slots[i];
       p = byId(S.lineup[i]);
       var tokBadge = master ? slot.pos : DS.posGroup(slot.pos);
+      /* 가로 전술판: 길이(y) → 화면 x(왼→오른), 폭(x) → 화면 y(먼→가까운) */
       toks += '<button class="tok ' + (p ? 'r-' + p.rarity : 'empty') + (selId === (p && p.id) ? ' sel' : '') + '" ' +
-        'style="left:' + slot.x + '%;top:' + (slot.y * 1.0) + '%" data-act="starter" data-slot="' + i + '" data-id="' + (p ? p.id : '') + '">' +
+        'style="left:' + (100 - slot.y).toFixed(1) + '%;top:' + slot.x.toFixed(1) + '%" data-act="starter" data-slot="' + i + '" data-id="' + (p ? p.id : '') + '">' +
         (slot.k ? '<span class="key">☆</span>' : '') +
         '<span class="rl' + (master ? ' role' : '') + '">' + tokBadge + '</span>' +
         '<span class="ring">' + (p ? '<img src="' + DS.Art.headSrc(p) + '" alt="">' : '') + '</span>' +
@@ -687,50 +688,45 @@
     for (i = 0; i < st.length; i++) { if (st[i].lock) { counts[st[i].lock]++; } }
     for (i = 0; i < DS.LOCKER.length; i++) {
       var L = DS.LOCKER[i], on = counts[L.key] >= 3;
-      synHTML += '<div class="row between" style="padding:3px 0">' +
+      synHTML += '<div class="row between" style="padding:2px 0">' +
         '<span class="chip" style="background:' + L.color + '22;color:' + L.color + '">' + L.name + ' ' + counts[L.key] + '</span>' +
-        '<span class="tiny muted" style="flex:1 1 auto;padding-left:6px">' + (on ? '시너지 발동' : '3명 이상') + '</span>' +
-        '<b style="font-size:10px;color:' + (on ? '#3d6b12' : '#9aa196') + '">' + (on ? '+' + (counts[L.key] >= 5 ? 6 : 3) : '—') + '</b></div>';
+        '<b style="font-size:10px;color:' + (on ? '#3d6b12' : '#9aa196') + '">' + (on ? '시너지 +' + (counts[L.key] >= 5 ? 6 : 3) : '3명↑') + '</b></div>';
     }
+    void syn;
 
-    var kpiHTML = master
-      ? '<div class="kpis">' +
-        '<div class="kpi"><b class="lime">' + xgEstimate().toFixed(1) + '</b><span>기대 득점 xG</span></div>' +
-        '<div class="kpi"><b>' + pressLevel() + '</b><span>압박 강도</span></div>' +
-        '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력 소모</span></div></div>'
-      : '<div class="kpis">' +
-        '<div class="kpi"><b class="lime">' + teamPower() + '</b><span>전력</span></div>' +
-        '<div class="kpi"><b>' + chemistry() + '</b><span>조직력</span></div>' +
-        '<div class="kpi"><b>' + ourRank() + '위</b><span>리그 순위</span></div></div>';
+    var kpiHTML =
+      '<div class="kpis">' +
+      '<div class="kpi"><b class="lime">' + xgEstimate().toFixed(1) + '</b><span>기대득점 xG</span></div>' +
+      '<div class="kpi"><b>' + pressLevel() + '</b><span>압박</span></div>' +
+      '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력</span></div></div>';
 
     box.innerHTML =
-      '<div class="modebar">' +
+      '<div class="sq">' +
+      '<div class="sq-left">' +
+      '<div class="sq-mode">' +
       '<div class="seg mode" id="ui-mode">' +
       '<button data-act="uimode" data-v="basic" class="' + (master ? '' : 'on') + '">기본</button>' +
-      '<button data-act="uimode" data-v="master" class="' + (master ? 'on' : '') + '">마스터</button>' +
+      '<button data-act="uimode" data-v="master" class="' + (master ? 'on' : '') + '">마스터</button></div>' +
+      '<span class="modehint">' + (master ? '세부 포지션 · 롤 · xG' : '직관 포지션 · 핵심 전력') + '</span>' +
+      '<span class="sq-org">' + S.formation + ' · 조직력 <em>' + chemistry() + '</em> · 전력 <em>' + teamPower() + '</em></span>' +
       '</div>' +
-      '<span class="modehint">' + (master ? '세부 포지션 · 롤 · xG 지표' : '직관 포지션 · 핵심 전력만') + '</span>' +
+      '<div class="pitch sq-pitch" id="pitch-squad">' +
+      '<canvas id="pitch-bg"></canvas>' + toks + '</div>' +
+      '<div class="sq-bench"><span class="sqb-lbl">벤치</span>' + benchHTML + '</div>' +
       '</div>' +
-      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') +
-      '<span class="mgr-go">감독실 ›</span></div>' +
-      '<div class="fscroll">' + chips + '</div>' +
-      '<div class="card dark tight" style="margin-top:7px">' +
-      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">' + S.formation + ' · ' + f.tag + '</b><span class="meta">' + (master ? f.desc : '현대 포메이션') + '</span></div>' +
-      kpiHTML + '</div>' +
-      '<div class="pitch" id="pitch-squad">' +
-      '<canvas id="pitch-bg"></canvas>' +
-      '<div class="pitch-head">조직력 <em>' + chemistry() + '</em> · 전력 <em>' + teamPower() + '</em></div>' +
-      toks + '</div>' +
-      '<div class="card tight" style="margin-top:8px">' +
-      '<div class="card-head"><b>벤치</b><span class="meta">벤치 선택 후 피치 선수 탭 = 교체</span></div>' +
-      '<div class="hcards">' + benchHTML + '</div></div>' +
-      '<div class="card tight">' +
-      '<div class="card-head"><b>라커룸 성향</b><span class="meta">같은 성향 3명 이상 시너지</span></div>' + synHTML + '</div>' +
-      '<div class="grid3" style="margin-bottom:9px">' +
+
+      '<aside class="sq-right">' +
+      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') + '<span class="mgr-go">감독실 ›</span></div>' +
+      '<div class="sq-card"><div class="card-head"><b>포메이션</b><span class="meta">' + f.tag + '</span></div>' +
+      '<div class="fwrap">' + chips + '</div></div>' +
+      '<div class="sq-card">' + kpiHTML + '</div>' +
+      '<div class="sq-actions">' +
       '<button class="btn dark sm" data-act="autolineup">자동 배치</button>' +
       '<button class="btn sm" data-act="rolesheet">역할 지정</button>' +
       '<button class="btn primary sm" data-act="evolvelist">롤 진화</button>' +
-      '</div>';
+      '</div>' +
+      '<div class="sq-card sq-syn"><div class="card-head"><b>라커룸 성향</b><span class="meta">3명↑ 시너지</span></div>' + synHTML + '</div>' +
+      '</aside></div>';
 
     drawPitchBG();
     placePitchPlayers();
@@ -741,27 +737,38 @@
     var cv = document.getElementById('pitch-bg');
     if (!cv) { return; }
     var wrap = cv.parentNode;
-    var w = wrap.clientWidth || 350;
-    var h = wrap.clientHeight || 420;
+    var w = wrap.clientWidth || 360;
+    var h = wrap.clientHeight || 240;
     var dpr = Math.min(2, global.devicePixelRatio || 1);
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
     var g = cv.getContext('2d');
+    if (!g) { return; }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var m = Math.max(8, Math.round(Math.min(w, h) * 0.032));
-    pitchBox = { x: m, y: m, w: w - m * 2, h: h - m * 2 };
-    DS.Art.drawPitch(g, w, h, { margin: m, crowd: false });
+    pitchBox = { x: 0, y: 0, w: w, h: h };
+    DS.Art.drawPitch(g, w, h, { landscape: true, crowd: false, proj: DS.Art.PROJ });
+  }
+
+  /* 전술판 가로 투영 — 경기 피치와 같은 원근을 쓴다 */
+  function sqPt(u, v) {
+    var P = DS.Art.PROJ;
+    var l = pitchBox.x + pitchBox.w * (P.farL + (P.nearL - P.farL) * v);
+    var r = pitchBox.x + pitchBox.w * (P.farR + (P.nearR - P.farR) * v);
+    var y = pitchBox.y + pitchBox.h * (P.farY + (P.nearY - P.farY) * (0.52 * v + 0.48 * v * v));
+    return { x: l + u * (r - l), y: y, s: P.s0 + (P.s1 - P.s0) * v };
   }
 
   function placePitchPlayers() {
     var dots = document.querySelectorAll('#pitch-squad .tok');
-    var i, x, y;
+    var i, u, v, pt;
     for (i = 0; i < dots.length; i++) {
-      x = parseFloat(dots[i].style.left);
-      y = parseFloat(dots[i].style.top);
-      if (isNaN(x) || isNaN(y)) { continue; }
-      dots[i].style.left = (pitchBox.x + x / 100 * pitchBox.w).toFixed(1) + 'px';
-      dots[i].style.top = (pitchBox.y + y / 100 * pitchBox.h).toFixed(1) + 'px';
+      u = parseFloat(dots[i].style.left) / 100;
+      v = parseFloat(dots[i].style.top) / 100;
+      if (isNaN(u) || isNaN(v)) { continue; }
+      pt = sqPt(u, v);
+      dots[i].style.left = pt.x.toFixed(1) + 'px';
+      dots[i].style.top = pt.y.toFixed(1) + 'px';
+      dots[i].style.transform = 'translate(-50%,-50%) scale(' + (0.82 + (pt.s - 0.85) * 0.85).toFixed(2) + ')';
     }
   }
 
@@ -1545,6 +1552,7 @@
     var box = document.getElementById('screen-match');
     if (!box) { return; }
     if (DS.Match && DS.Match.running) { return; }
+    box.classList.add('idle');
     var next = currentOpponent(), html = '';
     html += '<div class="hero" style="margin-bottom:10px">' +
       '<img class="hero-img" style="height:132px;object-position:70% 45%" src="assets/hero-banner.jpg" alt="">' +
@@ -1574,40 +1582,57 @@
   }
 
   function renderMatchLive(oppTeam, kind) {
+    document.body.classList.add('in-match');
     var box = document.getElementById('screen-match');
+    if (box) { box.classList.remove('idle'); }
     box.innerHTML =
-      '<div class="sb">' +
-      '<div class="sb-team"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="22" height="26"></canvas><span class="sb-name">' + esc(S.club.name) + '</span></div>' +
-      '<div style="text-align:center"><div class="sb-score"><b id="m-gf">0</b><i>:</i><b id="m-ga">0</b></div><span class="sb-clock" id="m-clock">00\'</span></div>' +
-      '<div class="sb-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="22" height="26"></canvas><span class="sb-name">' + esc(oppTeam.short) + '</span></div>' +
-      '</div>' +
+      '<div class="m-top">' +
+      '<div class="mt-team home"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="20" height="24"></canvas>' +
+      '<span class="mt-name">' + esc(S.club.name) + '</span></div>' +
+      '<div class="mt-mid"><div class="mt-score"><b id="m-gf">0</b><i>:</i><b id="m-ga">0</b></div>' +
+      '<span class="mt-clock" id="m-clock">00\'</span></div>' +
+      '<div class="mt-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="20" height="24"></canvas>' +
+      '<span class="mt-name">' + esc(oppTeam.short) + '</span></div>' +
+      '<div class="mt-tools">' +
+      '<button class="tbtn" data-act="auto" id="m-auto" title="자동 개입">자동</button>' +
+      '<div class="seg mini" id="m-speeds">' +
+      '<button data-act="speed" data-v="1" class="on">×1</button>' +
+      '<button data-act="speed" data-v="2">×2</button>' +
+      '<button data-act="speed" data-v="3">×3</button></div>' +
+      '<button class="tbtn ico" data-act="pause" id="m-pause">Ⅱ</button>' +
+      '<button class="tbtn danger" data-act="exitmatch">나가기</button>' +
+      '</div></div>' +
+
+      '<div class="m-body">' +
+      '<div class="m-pitch-col"><div class="pitch-wrap">' +
+      '<canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
-      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas>' +
-      '<div id="m-banner" class="goal-banner"></div></div>' +
-      '<div class="mgr-live"><span class="mgr-live-ico">👔</span><b>' + esc(mgr().name) + '</b><span>' +
-      esc(DS.managerTraitText(mgr())) + '</span>' + (mgrSync() ? '<em class="sync">고유 포메이션 시너지</em>' : '') + '</div>' +
+      '<div id="m-banner" class="goal-banner"></div>' +
+      '</div></div>' +
+
+      '<aside class="m-side">' +
       '<div class="mom">' +
-      '<div class="mom-top"><b>MOMENTUM</b>' +
-      '<span class="uses" id="m-uses">개입 6/6</span>' +
+      '<div class="mom-top"><b>MOMENTUM</b><span class="uses" id="m-uses">개입 6/6</span>' +
       '<span class="val"><span id="m-mom-val">0</span><small>/100</small></span></div>' +
       '<div class="mom-bar"><i id="m-mom-fill"></i></div>' +
       '<div class="mom-buffs" id="m-buffs"></div>' +
-      '<div class="hand" id="m-hand"></div>' +
       '</div>' +
-      '<div class="ctrls">' +
-      '<div><span class="ctrl-lbl">배속</span><div class="seg" id="m-speeds">' +
-      '<button data-act="speed" data-v="1" class="on">×1</button><button data-act="speed" data-v="2">×2</button><button data-act="speed" data-v="3">×3</button></div></div>' +
-      '<div><span class="ctrl-lbl">전술</span><div class="seg" id="m-tactics">' +
-      '<button data-act="tactics" data-v="defense" class="' + (S.tactics === 'defense' ? 'on' : '') + '">수비</button>' +
-      '<button data-act="tactics" data-v="balanced" class="' + (S.tactics === 'balanced' ? 'on' : '') + '">균형</button>' +
-      '<button data-act="tactics" data-v="attack" class="' + (S.tactics === 'attack' ? 'on' : '') + '">공격</button></div></div>' +
-      '<div style="margin-left:auto"><span class="ctrl-lbl">선수</span><button class="btn dark sm" data-act="subs">교체</button></div>' +
-      '</div>' +
-      '<div class="cmt" style="margin-top:8px"><div class="cmt-head"><b>LIVE</b><span>중계석</span></div>' +
-      '<div class="cmt-body" id="m-comm-body"></div></div>';
+      '<div class="hand v7" id="m-hand"></div>' +
+      '<div class="m-tac"><span class="ctrl-lbl">전술</span><div class="seg" id="m-tactics">' +
+      '<button data-act="tactics" data-v="defense" class="' + (S.tactics === 'defense' ? 'on' : '') + '">수 비</button>' +
+      '<button data-act="tactics" data-v="balanced" class="' + (S.tactics === 'balanced' ? 'on' : '') + '">균 형</button>' +
+      '<button data-act="tactics" data-v="attack" class="' + (S.tactics === 'attack' ? 'on' : '') + '">공 격</button></div></div>' +
+      '<div class="m-acts"><button class="btn dark sm wide" data-act="subs">선수 교체</button></div>' +
+      '</aside></div>' +
+
+      '<div class="m-ticker">' +
+      '<span class="tk-lbl">🎙 캐스터</span>' +
+      '<div class="cmt-body" id="m-comm-body"></div>' +
+      '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · ' + esc(DS.managerTraitText(mgr())) + '</span>' +
+      '</div>';
     paintEmblems(box);
     var hand = document.getElementById('m-hand');
-    if (hand) { hand.innerHTML = '<div class="tiny" style="grid-column:1/-1;color:rgba(233,244,221,.4)">카드를 불러오는 중…</div>'; }
+    if (hand) { hand.innerHTML = '<div class="tiny" style="color:rgba(233,244,221,.4)">카드를 불러오는 중…</div>'; }
   }
 
   function updateHud(st) {
@@ -1643,9 +1668,11 @@
         var h = '', i, c;
         for (i = 0; i < st.hand.length; i++) {
           c = st.hand[i];
-          h += '<button class="tcard" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '">' +
-            '<span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
-            '<span class="cd"></span><span class="cost"><em>' + c.cost + '</em> M</span>' +
+          h += '<button class="tcard v7" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '">' +
+            '<span class="tc-face">' + (c.face ? '<img src="' + c.face + '" alt="">' : '') + '</span>' +
+            '<span class="tc-main"><span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
+            '<span class="cd"></span></span>' +
+            '<span class="cost"><em>' + c.cost + '</em> M</span>' +
             '</button>';
         }
         hand.innerHTML = h;
@@ -1711,6 +1738,7 @@
     for (i = 0; i < btns.length; i++) { btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === active); }
     var main = document.getElementById('main');
     if (main) { main.scrollTop = 0; }
+    if (tab !== 'match') { document.body.classList.remove('in-match'); }
     renderAll();
   }
 
@@ -2075,6 +2103,51 @@
       toast(t.textContent + ' 전술로 전환');
       return;
     }
+    if (act === 'auto') {
+      var autoOn = (DS.Match && DS.Match.setAuto) ? DS.Match.setAuto(!(DS.Match.isAuto && DS.Match.isAuto())) : false;
+      var ab = document.getElementById('m-auto');
+      if (ab) { ab.classList.toggle('on', !!autoOn); }
+      return;
+    }
+    if (act === 'pause') {
+      if (!DS.Match || !DS.Match.running) { return; }
+      if (DS.Match.paused) { DS.Match.resume(true); } else { DS.Match.pause(); }
+      var pb = document.getElementById('m-pause');
+      if (pb) {
+        pb.classList.toggle('on', !!DS.Match.paused);
+        pb.textContent = DS.Match.paused ? '▶' : 'Ⅱ';
+      }
+      return;
+    }
+    if (act === 'exitmatch') {
+      if (global.confirm('경기를 중단하고 나가시겠어요?')) { leaveMatchNow(); }
+      return;
+    }
+    if (act === 'rotgo') {
+      document.body.classList.add('rot-off');
+      try {
+        var de = document.documentElement;
+        var lock = function () {
+          try {
+            if (global.screen && screen.orientation && screen.orientation.lock) {
+              var pr = screen.orientation.lock('landscape');
+              if (pr && pr['catch']) { pr['catch'](function () {}); }
+            }
+          } catch (e) { /* 미지원 기기 */ }
+        };
+        if (de.requestFullscreen) {
+          var fr = de.requestFullscreen();
+          if (fr && fr.then) { fr.then(lock)['catch'](lock); } else { lock(); }
+        } else { lock(); }
+      } catch (e2) { /* 미지원 기기 */ }
+      toast('가로 화면으로 전환합니다.');
+      return;
+    }
+    if (act === 'rotstay') {
+      document.body.classList.add('rot-off');
+      toast('세로 화면으로 계속합니다. 가로로 돌리면 더 넓게 보입니다.');
+      return;
+    }
     if (act === 'subs') { openSubs(false); return; }
     if (act === 'subclose') {
       if (DS.Match && DS.Match.running) { DS.Match.resume(subHalf ? false : true); }
@@ -2177,6 +2250,15 @@
     });
   }
 
+  /* ═════════════════  가로 회전 안내 ═════════════════ */
+  function checkRotate() {
+    var w = global.innerWidth || 0, h = global.innerHeight || 0;
+    var portrait = h > w && w > 0 && w < 900;
+    if (document.body && document.body.classList) {
+      document.body.classList.toggle('rot', portrait);
+    }
+  }
+
   /* ═════════════════  부트 ═════════════════ */
   function boot() {
     var saved = load();
@@ -2203,9 +2285,12 @@
     });
 
     global.addEventListener('resize', function () {
+      checkRotate();
       if (currentTab === 'squad') { drawPitchBG(); placePitchPlayers(); }
       if (DS.Match && DS.Match.running) { DS.Match.resize(); }
     });
+    if (global.addEventListener) { global.addEventListener('orientationchange', checkRotate); }
+    checkRotate();
 
     document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); } });
     global.addEventListener('beforeunload', save);

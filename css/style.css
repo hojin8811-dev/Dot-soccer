@@ -1013,3 +1013,229 @@ main::-webkit-scrollbar { width: 0; height: 0; }
 .mcard-sub { display: block; font-size: 8.5px; font-weight: 700; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mcard-tr { display: block; font-size: 8.5px; font-weight: 800; color: var(--ink2); margin-top: 1px; }
 .mcard .btn { flex: 0 0 auto; }
+
+/* ═══════════════════════════════════════════════════════════════
+   도트싸커 v7 — 가로(16:9) 전면 레이아웃
+   · 왼쪽 탭 레일 + 슬림 상단 바 + 다단 본문
+   · 경기 화면: 상단 슬림 스코어바 / 좌 피치 72% / 우 전술 사이드바 / 하단 티커
+   ═══════════════════════════════════════════════════════════════ */
+#app { max-width: 1280px; }
+
+/* ── 상단 바 ── */
+.topbar { height: 36px; padding: 0 10px; gap: 6px; }
+.tb-emblem { width: 20px; height: 23px; }
+.tb-name { font-size: 12px; max-width: 190px; }
+.tb-sub { font-size: 9px; }
+.tb-chip { height: 22px; font-size: 10.5px; padding: 0 8px; border-radius: 11px; }
+.tb-chip svg { width: 12px; height: 12px; }
+
+/* ── 왼쪽 탭 레일 ── */
+.tabbar {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 54px;
+  display: flex; flex-direction: column; gap: 3px; grid-template-columns: none;
+  padding: 6px 4px; border-top: none; border-right: 1px solid rgba(200, 241, 105, .14);
+  background: rgba(5, 23, 19, .97); z-index: 30;
+}
+.tabbar button { width: 100%; height: 57px; border-radius: 11px; gap: 3px; font-size: 8px; }
+.tabbar button svg { width: 20px; height: 20px; }
+.tabbar button.on { box-shadow: none; }
+
+/* ── 본문: 다단 대시보드 ── */
+main { margin-left: 54px; padding: 7px 8px 8px; }
+.screen.on {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));
+  gap: 7px; align-content: start;
+}
+.screen.on > .card, .screen.on > .mgr-wrap, .screen.on > .grid3 { margin: 0; }
+.hero { grid-column: 1 / -1; margin: 0; }
+.hero-img { height: 104px; }
+.hero-title { font-size: 21px; }
+.card { padding: 10px 11px; margin-bottom: 7px; border-radius: 13px; }
+.card-head { margin-bottom: 6px; }
+.kpi { padding: 6px 5px; }
+.kpi b { font-size: 15px; }
+.tbl td { padding: 3px 0; }
+.pitch-head { font-size: 8px; }
+
+/* ── 경기 화면 셸 ── */
+body.in-match .topbar { display: none; }
+body.in-match .tabbar { display: none; }
+body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
+#screen-match.on.it, #screen-match.on { display: flex; flex-direction: column; height: 100%; gap: 0; }
+#screen-match.on.idle {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));
+  gap: 7px; align-content: start; height: auto; padding: 7px 8px 8px; overflow-y: auto;
+}
+#screen-match.on.idle > .card, #screen-match.on.idle > .mgr-wrap { margin: 0; }
+
+/* 상단 슬림 바 */
+.m-top {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 8px;
+  background: linear-gradient(180deg, rgba(13, 44, 37, .99), rgba(6, 24, 20, .99));
+  border-bottom: 1px solid rgba(200, 241, 105, .16);
+}
+.mt-team { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.mt-team.away { flex-direction: row-reverse; }
+.mt-team canvas { width: 20px; height: 24px; flex: 0 0 auto; }
+.mt-name { font-size: 11.5px; font-weight: 800; color: #e9f4dd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.mt-team.away .mt-name { color: #ffd9cf; }
+.mt-mid { display: flex; align-items: center; gap: 6px; }
+.mt-score { display: flex; align-items: baseline; gap: 3px; }
+.mt-score b { font-size: 20px; font-weight: 900; color: #f6fdef; letter-spacing: -1px; line-height: 1; }
+.mt-score i { font-style: normal; color: rgba(233, 244, 221, .45); font-size: 12px; }
+.mt-clock { font-size: 9.5px; font-weight: 900; color: var(--lime); background: rgba(200, 241, 105, .13); border-radius: 7px; padding: 2px 6px; letter-spacing: .3px; }
+.mt-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.tbtn {
+  height: 24px; padding: 0 8px; border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .06);
+  color: #dfeece; font-size: 9.5px; font-weight: 800; cursor: pointer;
+}
+.tbtn.ico { width: 28px; padding: 0; }
+.tbtn.on { background: var(--lime); color: #1d3b07; border-color: var(--lime); }
+.tbtn.danger { color: #ffbdb0; border-color: rgba(255, 120, 100, .38); }
+.seg.mini button { height: 22px; min-width: 26px; font-size: 9.5px; padding: 0 5px; }
+
+/* 피치 + 사이드바 */
+.m-body { flex: 1 1 auto; display: flex; min-height: 0; }
+.m-pitch-col { flex: 1 1 auto; min-width: 0; position: relative; }
+.pitch-wrap { position: absolute; inset: 0; margin: 0; border: none; border-radius: 0; }
+#m-pitch { display: block; width: 100%; height: 100%; }
+.pitch-wrap .sit { position: absolute; left: 7px; top: 5px; z-index: 5; margin: 0; min-height: 21px; padding: 3px 8px; }
+
+.m-side {
+  flex: 0 0 27%; min-width: 198px; max-width: 272px;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 5px 6px 6px;
+  background: linear-gradient(180deg, rgba(9, 33, 28, .97), rgba(5, 20, 17, .99));
+  border-left: 1px solid rgba(200, 241, 105, .15);
+}
+.m-side .mom { padding: 5px 7px; border-radius: 10px; }
+.m-side .mom-top { margin-bottom: 4px; }
+.m-side .mom-top b { font-size: 8px; }
+.m-side .mom-top .val { font-size: 13px; }
+.m-side .mom-top .uses { font-size: 8px; }
+.m-side .mom-bar { height: 6px; }
+.m-side .mom-buffs { margin-top: 4px; gap: 3px; }
+.m-side .buffchip { font-size: 7px; padding: 1px 4px; }
+
+/* 전술 카드 (얼굴 썸네일 + 효과 + 코스트) */
+.hand.v7 { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.tcard.v7 {
+  display: flex; align-items: center; gap: 5px; flex: 1 1 0; min-height: 0; max-height: 76px;
+  padding: 3px 5px; border-radius: 10px; text-align: left;
+}
+.tcard.v7::before { width: 30px; height: 30px; right: -8px; top: -8px; }
+.tc-face {
+  flex: 0 0 auto; width: 36px; height: 44px; border-radius: 8px; overflow: hidden;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .14);
+}
+.tc-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 10%; }
+.tc-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.tcard.v7 .tag { font-size: 6.5px; letter-spacing: .4px; }
+.tcard.v7 .nm { font-size: 9.5px; margin: 1px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcard.v7 .cd { font-size: 7.5px; color: rgba(233, 244, 221, .5); font-weight: 700; white-space: nowrap; overflow: hidden; height: 10px; }
+.tcard.v7 .cost { position: static; margin-left: auto; font-size: 8px; }
+.tcard.v7 .cost em { font-size: 9.5px; }
+
+.m-tac { flex: 0 0 auto; }
+.m-tac .seg { width: 100%; }
+.m-tac .seg button { flex: 1 1 0; min-width: 0; font-size: 9.5px; }
+.m-acts { flex: 0 0 auto; }
+.m-acts .btn { height: 26px; font-size: 10px; }
+
+/* 하단 티커 */
+.m-ticker {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  height: 27px; padding: 0 8px;
+  background: rgba(4, 18, 15, .98); border-top: 1px solid rgba(200, 241, 105, .16);
+}
+.tk-lbl { flex: 0 0 auto; font-size: 8.5px; font-weight: 900; color: #0d2a24; background: var(--lime); border-radius: 6px; padding: 2px 6px; }
+#m-comm-body.cmt-body {
+  flex: 1 1 auto; max-height: 20px; height: 20px; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 0;
+}
+#m-comm-body .cmt-line { font-size: 10.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#m-comm-body .cmt-line:nth-last-child(n+2) { display: none; }
+.tk-mgr { flex: 0 0 auto; max-width: 33%; font-size: 9px; color: rgba(233, 244, 221, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── 마이팀: 가로 전술판 + 감독 카드 2단 ── */
+#screen-squad.on { display: block; }
+.sq { display: flex; gap: 7px; height: 100%; }
+.sq-left { flex: 1 1 60%; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.sq-right { flex: 0 0 38%; max-width: 350px; display: flex; flex-direction: column; gap: 5px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.sq-right::-webkit-scrollbar { width: 0; }
+.sq-mode { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.sq-mode .modehint { font-size: 9px; color: rgba(233, 244, 221, .55); white-space: nowrap; }
+.sq-org { margin-left: auto; font-size: 9.5px; font-weight: 700; color: rgba(233, 244, 221, .72); white-space: nowrap; }
+.sq-org em { font-style: normal; color: var(--lime); font-weight: 900; }
+.sq-pitch {
+  position: relative; flex: 1 1 auto; min-height: 140px; width: 100%;
+  aspect-ratio: auto; max-height: none;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(200, 241, 105, .18); background: #0d3b32;
+}
+.sq-pitch .tok { width: 46px; margin: 0; transform: translate(-50%, -50%); }
+.sq-pitch .tok .ring { width: 32px; height: 32px; margin: 0 auto; }
+.sq-pitch .tok .nm { font-size: 7.5px; margin-top: -1px; padding: 0 2px; }
+.sq-pitch .tok .rl { font-size: 6.5px; height: 12px; padding: 0 3px; top: 20px; }
+.sq-bench {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
+  background: rgba(9, 34, 28, .72); border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 10px; padding: 3px 5px;
+}
+.sqb-lbl { flex: 0 0 auto; font-size: 7.5px; font-weight: 900; color: rgba(233, 244, 221, .5); letter-spacing: .4px; }
+.sq-bench .pcard {
+  flex: 1 1 0; min-width: 0; padding: 2px; border-radius: 8px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09);
+}
+.sq-bench .pcard .ph { width: 24px; height: 24px; margin: 0 auto 1px; border-width: 1px; }
+.sq-bench .pcard .pn { font-size: 7.5px; color: #e9f4dd; }
+.sq-bench .pcard .pm { font-size: 6.5px; gap: 2px; }
+.sq-bench .pcard .pb { font-size: 6px; height: 11px; padding: 0 3px; }
+.sq-bench .pcard .ov { font-size: 8.5px; color: #eafbd2; }
+.sq-card { background: var(--card); border-radius: 12px; padding: 7px 9px; box-shadow: var(--shadow2); }
+.sq-card .card-head { margin-bottom: 4px; }
+.sq-card .kpis { border-radius: 9px; }
+.fwrap { display: flex; flex-wrap: wrap; gap: 4px; }
+.fwrap .fchip { flex: 1 1 calc(25% - 4px); min-width: 0; padding: 4px 3px; border-radius: 8px; }
+.fwrap .fchip b { font-size: 9.5px; }
+.fwrap .fchip span { font-size: 6.5px; overflow: hidden; text-overflow: ellipsis; }
+.sq-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.sq-syn .row { padding: 1px 0; }
+.mgr-wrap { padding: 6px 8px; }
+
+/* ── 모달 · 교체 · 컷인 (가로) ── */
+#modal { align-items: center; }
+.sheet { max-width: 640px; margin: 0 auto; border-radius: 16px; max-height: 94%; }
+.sheet-body { padding: 10px 13px 12px; }
+.sub-panel {
+  left: 50%; right: auto; transform: translateX(-50%);
+  width: min(680px, 94%); bottom: 8px; max-height: 92%; padding: 10px 12px;
+}
+.sub-list { max-height: 120px; }
+.cutin-art { width: auto; height: 96%; aspect-ratio: 1; right: 3%; }
+.cutin-name { font-size: 26px; }
+.cutin-body { width: 60%; }
+.gcutin .cutin-body { width: 58%; }
+#toast { bottom: 44px; }
+
+/* ── 가로 회전 안내 ── */
+.rotate { position: fixed; inset: 0; z-index: 300; display: none; align-items: center; justify-content: center;
+  background: radial-gradient(70% 60% at 50% 40%, #10453a, #051714 72%); }
+body.rot .rotate { display: flex; }
+body.rot-off .rotate { display: none; }
+.rot-in { text-align: center; padding: 20px; color: #eaf6dd; max-width: 300px; }
+.rot-in svg { width: 52px; height: 52px; stroke: var(--lime); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; animation: rotWob 2.6s ease-in-out infinite; }
+.rot-in b { display: block; font-size: 17px; font-weight: 900; margin: 10px 0 6px; letter-spacing: -.4px; }
+.rot-in span { display: block; font-size: 11px; line-height: 1.65; color: rgba(233, 244, 221, .7); margin-bottom: 14px; }
+.rot-in .btn { display: block; width: 100%; margin-bottom: 6px; }
+@keyframes rotWob { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-90deg); } }
+
+/* 아주 낮은 가로 화면(높이 340 이하) 보정 */
+@media (max-height: 360px) {
+  .topbar { height: 32px; }
+  .m-top { height: 32px; }
+  .m-ticker { height: 24px; }
+  .tabbar button { height: 50px; }
+}

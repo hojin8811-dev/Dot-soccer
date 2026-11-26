@@ -1,19 +1,19 @@
 {
-  "name": "도트싸커 v6 — 22명이 뛰는 SD 필드 플레이",
+  "name": "도트싸커 v7 — 가로 16:9 스타디움 · 2.5등신 필드",
   "short_name": "도트싸커",
-  "description": "330명 고유 일러스트 선수와 고유 포메이션·특기를 가진 감독 32명, 포메이션대로 움직이는 진짜 축구 AI, 실시간 모멘텀 전술 카드 12종의 오리지널 축구 구단 RPG",
+  "description": "330명 고유 일러스트 선수가 16:9 가로 스타디움을 직접 뛰는 2.5등신 필드 플레이, 포메이션대로 움직이는 진짜 축구 AI, 실시간 모멘텀 전술 카드 12종의 오리지널 축구 구단 RPG",
   "lang": "ko",
   "dir": "ltr",
-  "start_url": "./index.html?v=6&source=pwa",
+  "start_url": "./index.html?v=7&source=pwa",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "landscape",
   "background_color": "#08231e",
   "theme_color": "#0b332c",
   "categories": ["games", "sports"],
   "icons": [
-    { "src": "icons/icon-192.png?v=6", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png?v=6", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png?v=6", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icons/icon-192.png?v=7", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=7", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png?v=7", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

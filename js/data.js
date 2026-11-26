@@ -1612,6 +1612,14 @@
     g.fillRect(x + r * 0.42, y + r * 0.18, Math.ceil(r * 0.3), Math.ceil(r * 0.3));
   };
 
+  /* 가로 피치 원근 투영 상수 (match.js · 마이팀 전술판이 함께 쓴다) */
+  Art.PROJ = {
+    farL: 0.070, farR: 0.930,
+    nearL: 0.028, nearR: 0.972,
+    farY: 0.318, nearY: 0.910,
+    s0: 0.85, s1: 1.12
+  };
+
   Art.pitchMargin = function (W, H) {
     return Math.max(9, Math.round(Math.min(W, H) * 0.032));
   };
@@ -1619,6 +1627,7 @@
   /* ── 현대 잔디 경기장 ── */
   Art.drawPitch = function (g, W, H, opt) {
     opt = opt || {};
+    if (opt.landscape) { Art.drawPitchLandscape(g, W, H, opt); return; }
     var deep = '#0e3b32', mid = '#12493c', light = '#16564276';
     var i, cols = 9;
     var bg = g.createLinearGradient(0, 0, 0, H);
@@ -1716,6 +1725,98 @@
       }
       g.globalAlpha = 1;
     }
+  };
+
+  /* ── 가로(16:9) 잔디 경기장 — 골대가 좌우, 홈은 왼쪽→오른쪽 공격 (이미지 로드 전 폴백) ── */
+  Art.drawPitchLandscape = function (g, W, H, opt) {
+    opt = opt || {};
+    var P = opt.proj || Art.PROJ;
+    var i, a, b;
+    function pt(u, v) {
+      var l = W * (P.farL + (P.nearL - P.farL) * v);
+      var r = W * (P.farR + (P.nearR - P.farR) * v);
+      var y = H * (P.farY + (P.nearY - P.farY) * (0.52 * v + 0.48 * v * v));
+      return { x: l + u * (r - l), y: y };
+    }
+    var bg = g.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0a2b25');
+    bg.addColorStop(0.45, '#12523f');
+    bg.addColorStop(1, '#0d3b2f');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+    /* 잔디 줄무늬 (길이 방향) */
+    for (i = 0; i < 12; i++) {
+      if (i % 2 === 0) {
+        a = pt(i / 12, 0); b = pt(i / 12, 1);
+        g.fillStyle = 'rgba(255,255,255,0.035)';
+        g.beginPath();
+        g.moveTo(a.x, a.y); g.lineTo(b.x, b.y);
+        var c2 = pt((i + 1) / 12, 1), d2 = pt((i + 1) / 12, 0);
+        g.lineTo(c2.x, c2.y); g.lineTo(d2.x, d2.y); g.closePath(); g.fill();
+      }
+    }
+    /* 관중석 띠 */
+    if (opt.crowd !== false) {
+      var ch = Math.max(10, Math.round(H * 0.1));
+      var top = g.createLinearGradient(0, 0, 0, ch * 1.7);
+      top.addColorStop(0, 'rgba(4,16,14,0.96)');
+      top.addColorStop(1, 'rgba(8,34,28,0)');
+      g.fillStyle = top; g.fillRect(0, 0, W, ch * 1.7);
+      var bot = g.createLinearGradient(0, H, 0, H - ch * 1.5);
+      bot.addColorStop(0, 'rgba(4,16,14,0.96)');
+      bot.addColorStop(1, 'rgba(8,34,28,0)');
+      g.fillStyle = bot; g.fillRect(0, H - ch * 1.5, W, ch * 1.5);
+      var colors = ['#7fe3b0', '#f2d06b', '#5fa8e8', '#ef7f6b', '#c9a6f0'];
+      for (i = 0; i < 110; i++) {
+        var cx = (i * 41 + 13) % W;
+        g.fillStyle = colors[i % colors.length];
+        g.globalAlpha = 0.16 + ((i * 11) % 7) / 28;
+        g.fillRect(cx, ch * 0.35 + ((i * 7) % 3) * 2.4, 1.8, 1.8);
+        g.fillRect(cx + 4, H - ch * 1.1 - ((i * 5) % 3) * 2.4, 1.8, 1.8);
+      }
+      g.globalAlpha = 1;
+    }
+    var lw = Math.max(1, Math.round(W / 260));
+    g.strokeStyle = 'rgba(228,255,240,0.55)';
+    g.lineWidth = lw;
+    function line(u1, v1, u2, v2) {
+      var p1 = pt(u1, v1), p2 = pt(u2, v2);
+      g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke();
+    }
+    line(0, 0, 1, 0); line(1, 0, 1, 1); line(1, 1, 0, 1); line(0, 1, 0, 0);
+    line(0.5, 0, 0.5, 1);
+    /* 센터서클 (원근 타원) */
+    g.beginPath();
+    for (i = 0; i <= 40; i++) {
+      var th = i / 40 * Math.PI * 2;
+      a = pt(0.5 + 0.088 * Math.cos(th), 0.5 + 0.135 * Math.sin(th));
+      if (i === 0) { g.moveTo(a.x, a.y); } else { g.lineTo(a.x, a.y); }
+    }
+    g.closePath(); g.stroke();
+    a = pt(0.5, 0.5);
+    g.fillStyle = 'rgba(228,255,240,0.75)';
+    g.beginPath(); g.arc(a.x, a.y, Math.max(1.4, lw), 0, Math.PI * 2); g.fill();
+    /* 페널티 박스 · 골 에어리어 · 페널티 스팟 */
+    [[0, 1], [1, -1]].forEach(function (e) {
+      var u0 = e[0];
+      line(u0, 0.215, u0 + e[1] * 0.165, 0.215);
+      line(u0 + e[1] * 0.165, 0.215, u0 + e[1] * 0.165, 0.785);
+      line(u0 + e[1] * 0.165, 0.785, u0, 0.785);
+      line(u0, 0.365, u0 + e[1] * 0.058, 0.365);
+      line(u0 + e[1] * 0.058, 0.365, u0 + e[1] * 0.058, 0.635);
+      line(u0 + e[1] * 0.058, 0.635, u0, 0.635);
+      a = pt(u0 + e[1] * 0.11, 0.5);
+      g.beginPath(); g.arc(a.x, a.y, Math.max(1.3, lw), 0, Math.PI * 2); g.fill();
+      /* 골대 */
+      g.save();
+      g.strokeStyle = 'rgba(240,255,250,0.9)';
+      g.lineWidth = 2;
+      var gd = (e[1] < 0 ? -1 : 1) * 0.028;
+      line(u0, 0.435, u0 + gd, 0.44);
+      line(u0 + gd, 0.44, u0 + gd, 0.56);
+      line(u0 + gd, 0.56, u0, 0.565);
+      g.restore();
+    });
   };
 
   /* ── 엠블럼 ── */

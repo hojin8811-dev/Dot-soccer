@@ -111,9 +111,45 @@
     goal:      { label: 'GOAL!',        sub: '골망을 흔듭니다',         tone: 'hot' }
   };
 
-  /* ─────────────────────────  좌표 · 기본  ───────────────────────── */
-  function sx(x) { return field.x + (x / WORLD_W) * field.w; }
-  function sy(y) { return field.y + (y / WORLD_H) * field.h; }
+  /* ─────────────────────────  좌표 · 기본  ─────────────────────────
+     시뮬레이션 좌표: y = 공격축(0 = 상대 골문, WORLD_H = 우리 골문), x = 폭(0 = 왼 터치라인).
+     v7 화면은 가로 16:9 피치라서, 공격축을 화면 x(왼→오른쪽), 폭을 화면 y(먼쪽→가까운쪽)로 투영한다.
+     → 홈팀은 화면 왼쪽 골대에서 오른쪽 골대로, 원정팀은 오른쪽에서 왼쪽으로 공격한다. */
+  var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
+  var pitchImg = null;
+  var pitchImgTried = false;
+  var portraits = {};             /* pic 번호 → { img, ready } */
+  var portraitLeft = 0;
+
+  /* 월드 좌표 → 화면 좌표 (사다리꼴 원근 투영) */
+  function scr(wx, wy) {
+    var u = clamp((WORLD_H - wy) / WORLD_H, -0.03, 1.03);
+    var v = clamp(wx / WORLD_W, 0, 1);
+    var l = field.x + field.w * (PROJ.farL + (PROJ.nearL - PROJ.farL) * v);
+    var r = field.x + field.w * (PROJ.farR + (PROJ.nearR - PROJ.farR) * v);
+    var yy = field.y + field.h * (PROJ.farY + (PROJ.nearY - PROJ.farY) * (0.52 * v + 0.48 * v * v));
+    return { x: l + u * (r - l), y: yy, v: v, s: PROJ.s0 + (PROJ.s1 - PROJ.s0) * v };
+  }
+  function depthPx(z) { return z * (field.h / WORLD_H) * 1.5; }
+
+  /* 2.5등신 전신 일러스트 프리로드 풀 */
+  function loadPortrait(p) {
+    var pl = p && p.player ? p.player : p;
+    if (!pl) { return { img: null, ready: false }; }
+    var n = pl.pic || 1;
+    var rec = portraits[n];
+    if (rec) { return rec; }
+    rec = { img: new global.Image(), ready: false };
+    portraits[n] = rec;
+    portraitLeft++;
+    rec.img.onload = function () {
+      rec.ready = rec.img.naturalWidth > 0;
+      portraitLeft--;
+    };
+    rec.img.onerror = function () { rec.ready = false; portraitLeft--; };
+    rec.img.src = DS.Art.portraitSrc(pl);
+    return rec;
+  }
   function goalDir(side) { return side === 'home' ? -1 : 1; }        /* 공격 방향 y */
   function ownGoalY(side) { return side === 'home' ? WORLD_H : 0; }
   function attackGoalY(side) { return side === 'home' ? 0 : WORLD_H; }
@@ -356,10 +392,14 @@
     for (i = 0; i < hand.length; i++) {
       def = DS.cardOf(hand[i].key);
       if (!def) { continue; }
+      var ace = aceFor(def.fx);
       out.hand.push({
         key: def.key, name: def.name, cost: def.cost, tag: def.tag, color: def.color,
         icon: def.icon, ready: hand[i].readyAt <= 0 && momentum >= def.cost && cardUses < CARD_LIMIT,
-        cooldown: Math.max(0, Math.ceil(hand[i].readyAt))
+        cooldown: Math.max(0, Math.ceil(hand[i].readyAt)),
+        face: ace ? DS.Art.headSrc(ace.player) : '',
+        ace: ace ? ace.name : '',
+        desc: def.desc
       });
     }
     for (var k in buffs) {
@@ -538,6 +578,9 @@
     if (!canvas) { return; }
     ctx = canvas.getContext('2d');
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
+    /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
+    var pi;
+    for (pi = 0; pi < players.length; pi++) { loadPortrait(players[pi]); }
     benchState = (cfg.bench || []).map(function (b) {
       return { player: b.player, pos: b.player.pos, rating: DS.ratingOf(b.player), used: false };
     });
@@ -599,6 +642,31 @@
     lastT = 0;
     if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
   };
+  var autoCards = false;
+  var autoT = 5;
+
+  /* 자동 개입 — 모멘텀이 넉넉할 때 손패에서 가장 싼 카드를 알아서 쓴다 */
+  function tryAutoCard() {
+    if (!M.running || cardUses >= CARD_LIMIT) { return false; }
+    if (cutinHold > 0 || play.phase === 'setpiece' || play.phase === 'goal') { return false; }
+    var best = null, i, def;
+    for (i = 0; i < hand.length; i++) {
+      def = DS.cardOf(hand[i].key);
+      if (!def || hand[i].readyAt > 0 || momentum < def.cost) { continue; }
+      if (!best || def.cost < best.cost) { best = def; }
+    }
+    if (!best) { return false; }
+    return M.playCard(best.key);
+  }
+
+  M.setAuto = function (on) {
+    autoCards = !!on;
+    autoT = 3;
+    say(autoCards ? '자동 개입 ON — 상황에 맞춰 전술 카드를 알아서 씁니다.' : '자동 개입 OFF — 직접 카드를 고르세요.', 'tactic');
+    return autoCards;
+  };
+  M.isAuto = function () { return autoCards; };
+
   M.handState = hudState;
   /* 진단용: 경기 상태 스냅샷 (디버깅 · QA리포트) */
   M.diag = function () {
@@ -692,8 +760,8 @@
   function resize() {
     if (!canvas) { return; }
     var rect = canvas.parentNode.getBoundingClientRect();
-    W = Math.max(280, Math.round(rect.width));
-    H = Math.max(220, Math.round(rect.height));
+    W = Math.max(320, Math.round(rect.width));
+    H = Math.max(180, Math.round(rect.height));
     dpr = Math.min(2, global.devicePixelRatio || 1);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
@@ -703,13 +771,24 @@
     if (!ctx) { return; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
-    var pm = DS.Art.pitchMargin(W, H);
-    SPR_H = Math.round(clamp(W * 0.152, 44, 62));
-    /* 상단 골라인 위로 선수 머리가 잘리지 않도록 스프라이트 높이만큼 여백을 둔다 */
-    var topPad = Math.round(Math.min(H * 0.26, SPR_H * 0.95 + 8));
-    var botPad = Math.round(pm * 0.75);
-    field = { x: pm, y: topPad, w: W - pm * 2, h: H - topPad - botPad };
+    /* 가로 피치 — 스타디움 이미지가 캔버스를 꽉 채운다 */
+    field = { x: 0, y: 0, w: W, h: H };
+    SPR_H = Math.round(clamp(H * 0.155, 36, 78));
+    loadPitchImage();
     buildPitchLayer();
+  }
+
+  function loadPitchImage() {
+    if (pitchImgTried) { return; }
+    pitchImgTried = true;
+    var img = new global.Image();
+    img.onload = function () {
+      pitchImg = img;
+      buildPitchLayer();
+      if (M.running) { draw(); }
+    };
+    img.onerror = function () { pitchImg = null; };
+    img.src = 'assets/stadium-pitch.png';
   }
 
   function buildPitchLayer() {
@@ -719,7 +798,20 @@
     var g = pitchLayer.getContext('2d');
     if (!g) { return; }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    DS.Art.drawPitch(g, W, H, { margin: field.x, crowd: true, rect: field });
+    if (pitchImg && pitchImg.naturalWidth) {
+      /* 16:9 스타디움 이미지를 cover 로 — 남는 쪽만 살짝 잘라낸다 */
+      var iw = pitchImg.naturalWidth, ih = pitchImg.naturalHeight;
+      var sc = Math.max(W / iw, H / ih);
+      var dw = iw * sc, dh = ih * sc;
+      g.drawImage(pitchImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      var vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.22, W / 2, H * 0.55, Math.max(W, H) * 0.74);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, 'rgba(3,18,14,0.40)');
+      g.fillStyle = vg;
+      g.fillRect(0, 0, W, H);
+    } else {
+      DS.Art.drawPitch(g, W, H, { landscape: true, crowd: true });
+    }
   }
 
   /* ─────────────────────────  중계 · 상황 배너  ───────────────────────── */
@@ -1790,6 +1882,10 @@
       }
     }
     momentum = clamp(momentum + dt * 0.42, 0, 100);
+    if (autoCards) {
+      autoT -= dt;
+      if (autoT <= 0) { autoT = 8; tryAutoCard(); }
+    }
     play.runT -= dt;
     if (play.runT <= 0) { play.runT = 2.0 + Math.random() * 2.4; assignRuns(); }
     if (play.counterT > 0) { play.counterT -= dt; }
@@ -2069,26 +2165,14 @@
     if (cfg.onEnd) { cfg.onEnd(res); }
   }
 
-  /* ─────────────────────────  그리기  ───────────────────────── */
-  /* 필드 선수는 구단 유니폼, 골키퍼는 GK 전용 색으로 구분 */
-  function kitOf(p) {
-    if (p.pos === 'GK') {
-      return p.side === 'home'
-        ? { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' }
-        : { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' };
-    }
-    return p.kit;
-  }
-
-  function spriteOf(p, pose) {
-    var kit = kitOf(p);
-    var frame = (pose === 'run' || pose === 'dribble') ? (Math.floor(p.phase) % 4) : 0;
-    return DS.Art.sdSprite(p.player, kit, { pose: pose, frame: frame, gk: isGK(p), t: simTime });
-  }
+  /* ─────────────────────────  그리기 (가로 피치 · 2.5등신 전신 일러스트)  ───────────────────────── */
+  var TEAM_FX = {
+    home: { ring: '#41d9ff', fill: 'rgba(65,217,255,', deep: '#0d5f9e', plate: '#0b2f45' },
+    away: { ring: '#ff6a4d', fill: 'rgba(255,106,77,', deep: '#8f2413', plate: '#3a1210' }
+  };
 
   function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
     ctx.lineTo(x + w - r, y);
     ctx.quadraticCurveTo(x + w, y, x + w, y + r);
     ctx.lineTo(x + w, y + h - r);
@@ -2103,14 +2187,16 @@
   function drawPressZone() {
     if (buffOf('press') <= 0) { return; }
     var pc = pressConfig('home');
-    var rr = pc.radius * (field.w / WORLD_W);
+    var c = scr(ball.x, ball.y);
+    var rx = pc.radius * (field.w / WORLD_W) * 0.62;
+    var ry = rx * 0.42;
     ctx.save();
     ctx.globalAlpha = 0.30;
     ctx.strokeStyle = '#ff9f8a';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.3;
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
-    ctx.arc(sx(ball.x), sy(ball.y), rr, 0, Math.PI * 2);
+    ctx.ellipse(c.x, c.y, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -2119,7 +2205,8 @@
     var pl = play.passLine;
     if (!pl || pl.t <= 0) { return; }
     var a = clamp(pl.t / pl.t0, 0, 1);
-    var x1 = sx(pl.x1), y1 = sy(pl.y1), x2 = sx(pl.x2), y2 = sy(pl.y2);
+    var p1 = scr(pl.x1, pl.y1), p2 = scr(pl.x2, pl.y2);
+    var x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
     var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
     var nx = -(y2 - y1), ny = (x2 - x1);
     var len = Math.hypot(nx, ny) || 1;
@@ -2145,31 +2232,36 @@
     ctx.restore();
   }
 
+  /* 슈팅 궤적 — 공 발광 트레일 */
   function drawShotTrail() {
-    if (ball.kind !== 'shot' || ball.trail.length < 2) { return; }
-    var i, t, x, y, r;
+    if (ball.trail.length < 2) { return; }
+    var shooting = ball.kind === 'shot';
+    var i, t, pt, r;
     var longShot = ball.shot && ball.shot.long;
     for (i = 0; i < ball.trail.length; i++) {
-      t = i / ball.trail.length;
-      x = sx(ball.trail[i].x); y = sy(ball.trail[i].y) - (ball.trail[i].z || 0) * (field.h / WORLD_H) * 1.55;
-      r = 2.6 + t * 3.4;
+      t = (i + 1) / ball.trail.length;
+      pt = scr(ball.trail[i].x, ball.trail[i].y);
+      var y = pt.y - depthPx(ball.trail[i].z || 0);
+      r = (shooting ? 3.2 : 2.0) + t * (shooting ? 4.2 : 2.2);
       ctx.beginPath();
-      var gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0, longShot ? 'rgba(255,236,140,' + (0.55 * t) + ')' : 'rgba(255,200,120,' + (0.45 * t) + ')');
+      var gr = ctx.createRadialGradient(pt.x, y, 0, pt.x, y, r);
+      gr.addColorStop(0, shooting
+        ? (longShot ? 'rgba(255,236,140,' + (0.55 * t) + ')' : 'rgba(255,210,130,' + (0.5 * t) + ')')
+        : 'rgba(200,255,220,' + (0.24 * t) + ')');
       gr.addColorStop(1, 'rgba(255,90,30,0)');
       ctx.fillStyle = gr;
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(pt.x, y, r, 0, Math.PI * 2);
       ctx.fill();
     }
     if (longShot) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(255,248,190,0.75)';
+      ctx.strokeStyle = 'rgba(255,248,190,0.7)';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       for (i = 1; i < ball.trail.length; i++) {
-        var px = sx(ball.trail[i].x), py = sy(ball.trail[i].y);
-        if (i === 1) { ctx.moveTo(px, py); }
-        else { ctx.lineTo(px + (i % 2 ? 2.4 : -2.4), py + (i % 2 ? -2 : 2)); }
+        var pp = scr(ball.trail[i].x, ball.trail[i].y);
+        if (i === 1) { ctx.moveTo(pp.x, pp.y); }
+        else { ctx.lineTo(pp.x + (i % 2 ? 2.4 : -2.4), pp.y + (i % 2 ? -2 : 2)); }
       }
       ctx.stroke();
       ctx.restore();
@@ -2183,15 +2275,15 @@
     var txt = b.text;
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.font = '900 8.5px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 9.5px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var tw = ctx.measureText(txt).width;
-    var bw = tw + 14, bh = 15;
+    var bw = tw + 15, bh = 16;
     var rise = (1 - clamp(b.t / b.t0, 0, 1)) * 4;
     var below = false;
-    var by = py - sprH - 10 - rise - (extraUp || 0);
-    if (by < 4) { by = py + 5 + (extraUp || 0); below = true; }
+    var by = py - sprH - 8 - rise - (extraUp || 0);
+    if (by < 3) { by = py + 6 + (extraUp || 0); below = true; }
     var bx = px - bw / 2;
     if (bx < 3) { bx = 3; }
     if (bx + bw > W - 3) { bx = W - 3 - bw; }
@@ -2220,159 +2312,193 @@
     ctx.restore();
   }
 
+  /* 선수 1명 — 그림자 · 팀 오라 링 · 2.5등신 전신 일러스트 + 동작 연출 */
+  function drawPlayer(p) {
+    var g = scr(p.x, p.y);
+    var pose = poseOf(p);
+    var sprH = SPR_H * g.s;
+    var flip = p.facing < 0;
+    var rec = loadPortrait(p);
+    var tf = TEAM_FX[p.side];
+    var isCarrier = ball.carrier === p;
+    var t = simTime;
+    var bounce = 0, rot = 0, lift = 0, squash = 1;
+
+    if (pose === 'dive') {
+      var dk = clamp(1 - p.diveT / 0.7, 0, 1);
+      rot = Math.sin(dk * Math.PI * 0.62) * 1.25 * (p.diveDir >= 0 ? 1 : -1);
+      lift = -Math.sin(dk * Math.PI) * sprH * 0.18;
+      flip = false;
+    } else if (pose === 'tackle') {
+      rot = 0.58 * clamp(p.poseT / 0.52, 0, 1);
+      lift = -sprH * 0.10;
+    } else if (pose === 'kick') {
+      rot = 0.17;
+      lift = -sprH * 0.02;
+    } else if (pose === 'pass') {
+      rot = 0.10;
+    } else if (pose === 'celebrate') {
+      lift = -Math.abs(Math.sin(t * 6.4)) * sprH * 0.22;
+      rot = Math.sin(t * 6.4) * 0.05;
+    } else if (pose === 'run' || pose === 'dribble') {
+      bounce = -Math.abs(Math.sin(p.phase * 1.55)) * sprH * 0.055;
+      rot = 0.07;
+      squash = 1 + Math.sin(p.phase * 3.1) * 0.012;
+    } else {
+      squash = 1 + Math.sin(t * 2.2 + p.phase) * 0.012;
+    }
+
+    /* 지면 그림자 */
+    var shw = sprH * 0.30, shh = sprH * 0.105;
+    if (pose === 'tackle' || pose === 'dive') { shw *= 1.28; shh *= 0.82; }
+    ctx.fillStyle = 'rgba(3,20,14,0.36)';
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y + 1, shw, shh, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* 팀 오라 링 — 홈 시안/블루, 원정 레드/오렌지 */
+    var pulse = 0.5 + 0.5 * Math.sin(t * 4 + p.phase * 2);
+    var hot = p.skillT > 0 || p.glow > 0;
+    ctx.save();
+    ctx.strokeStyle = tf.ring;
+    ctx.lineWidth = isCarrier ? 2.3 : 1.5;
+    ctx.globalAlpha = isCarrier ? 0.95 : (hot ? 0.85 : 0.5);
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y + 1, shw * 1.12, shh * 1.12, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = (hot ? 0.30 : (isCarrier ? 0.20 : 0.07)) + (isCarrier ? pulse * 0.08 : 0);
+    ctx.fillStyle = tf.fill + '1)';
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y + 1, shw * 1.12, shh * 1.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (isCarrier) {
+      ctx.globalAlpha = 0.55 + pulse * 0.35;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y + 1, shw * 1.42, shh * 1.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+
+    /* 2.5등신 전신 일러스트 */
+    if (rec.ready) {
+      var S = sprH * 1.18;
+      ctx.save();
+      ctx.translate(g.x, g.y + bounce);
+      if (flip) { ctx.scale(-1, 1); }
+      if (rot) {
+        ctx.translate(0, -S * 0.50);
+        ctx.rotate(rot);
+        ctx.translate(0, S * 0.50);
+      }
+      if (squash !== 1) { ctx.scale(1 / squash, squash); }
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
+      ctx.restore();
+    } else {
+      /* 로드 전 폴백 — 팀 컬러 실루엣 */
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = tf.deep;
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y - sprH * 0.42, sprH * 0.16, sprH * 0.40, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(g.x, g.y - sprH * 0.92, sprH * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* 공 소유자 이름표 */
+    if (isCarrier) {
+      ctx.font = '700 9px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      var label = short(p.name);
+      var tw2 = ctx.measureText(label).width + 10;
+      ctx.fillStyle = 'rgba(6,26,22,0.80)';
+      roundRect(g.x - tw2 / 2, g.y + 5, tw2, 12, 6);
+      ctx.fill();
+      ctx.fillStyle = p.side === 'home' ? '#d9f7ff' : '#ffe2d8';
+      ctx.fillText(label, g.x, g.y + 11.5);
+      ctx.textAlign = 'left';
+    }
+  }
+
   function draw() {
     if (!ctx) { return; }
     ctx.clearRect(0, 0, W, H);
     if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
-    else { DS.Art.drawPitch(ctx, W, H, { crowd: true }); }
+    else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
 
     drawPressZone();
     drawPassLine();
+
+    var arr = players.slice().sort(function (a, b) {
+      if (Math.abs(a.x - b.x) > 0.6) { return a.x - b.x; }
+      return b.y - a.y;
+    });
+    var i, p;
+
     drawShotTrail();
 
-    var sprH = SPR_H;
-    var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
-    var i, p, px, py, sprite, offY, dx, dy;
+    for (i = 0; i < arr.length; i++) { drawPlayer(arr[i]); }
 
-    for (i = 0; i < arr.length; i++) {
-      p = arr[i];
-      px = sx(p.x); py = sy(p.y);
-      offY = 0;
-
-      /* 그림자 — 태클·다이빙은 낮고 넓게 */
-      var pz = poseOf(p);
-      var shW = pz === 'tackle' || pz === 'dive' ? sprH * 0.38 : sprH * 0.27;
-      var shH = pz === 'tackle' || pz === 'dive' ? sprH * 0.075 : sprH * 0.088;
-      ctx.fillStyle = 'rgba(4,20,16,0.34)';
-      ctx.beginPath();
-      ctx.ellipse(px, py - 0.5, shW, shH, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      /* 발밑 아우라 링 (스킬·카드 발동) */
-      if ((p.skillT > 0 || p.glow > 0) && p.side === 'home') {
-        var aa = clamp(Math.max(p.skillT, p.glow), 0, 1);
-        ctx.save();
-        ctx.globalAlpha = 0.35 + aa * 0.45;
-        ctx.strokeStyle = p.side === 'home' ? '#d8ff8a' : '#ff8c78';
-        ctx.lineWidth = 2.2;
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.ellipse(px, py - 0.5, sprH * 0.33, sprH * 0.125, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 0.13 + aa * 0.14;
-        ctx.fillStyle = p.side === 'home' ? '#c8f169' : '#ff8c78';
-        ctx.beginPath();
-        ctx.ellipse(px, py - 0.5, sprH * 0.33, sprH * 0.125, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      } else if (ball.carrier === p) {
-        ctx.strokeStyle = p.side === 'home' ? 'rgba(200,241,105,0.95)' : 'rgba(255,140,120,0.9)';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.ellipse(px, py - 0.5, sprH * 0.32, sprH * 0.12, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      var pose = poseOf(p);
-      sprite = spriteOf(p, pose);
-      var wDraw = sprH * (DS.Art.SD_SIZE.w / DS.Art.SD_SIZE.h);
-      var rot = 0, lift = 0;
-      if (pose === 'dive') {
-        var dk = clamp(1 - p.diveT / 0.7, 0, 1);
-        rot = Math.sin(dk * Math.PI * 0.62) * 1.0 * (p.facing < 0 ? -p.diveDir : p.diveDir);
-        lift = -Math.sin(dk * Math.PI) * 6;
-      } else if (pose === 'tackle') {
-        rot = -0.62 * clamp(p.poseT / 0.52, 0, 1);
-        lift = 2.5;
-      } else if (pose === 'celebrate') {
-        lift = -Math.abs(Math.sin(simTime * 7.5)) * 4;
-      }
-      ctx.save();
-      ctx.imageSmoothingEnabled = true;
-      ctx.translate(px, py + 2);
-      if (p.facing < 0) { ctx.scale(-1, 1); }
-      if (rot) {
-        ctx.translate(0, -sprH * 0.42);
-        ctx.rotate(rot);
-        ctx.translate(0, sprH * 0.42);
-      }
-      ctx.drawImage(sprite, -wDraw / 2, -sprH + 4 + lift, wDraw, sprH);
-      ctx.restore();
-
-      /* 홈 팀 공 소유자 이름 */
-      if (p.side === 'home' && ball.carrier === p) {
-        ctx.font = '600 8px system-ui, -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        var label = short(p.name);
-        var tw = ctx.measureText(label).width + 8;
-        ctx.fillStyle = 'rgba(8,32,27,0.78)';
-        roundRect(px - tw / 2, py + 1, tw, 11, 5.5);
-        ctx.fill();
-        ctx.fillStyle = '#eaffd0';
-        ctx.fillText(label, px, py + 9);
-      }
-    }
-
-    /* 스킬 태그 말풍선 (겹치면 위로 쌓는다) */
+    /* 말풍선 (겹치면 위로 쌓는다) */
     var placed = [];
     for (i = 0; i < arr.length; i++) {
       p = arr[i];
       if (!p.bubble) { continue; }
-      var bpx = sx(p.x), bpy = sy(p.y);
-      var up = 0, guard = 0;
-      for (var q = 0; q < placed.length && guard < 4; q++) {
-        if (Math.abs(placed[q].x - bpx) < 46 && Math.abs(placed[q].y - bpy) < 26) {
-          up += 16; guard++;
-        }
+      var g = scr(p.x, p.y);
+      var up = 0, guard = 0, q;
+      for (q = 0; q < placed.length && guard < 4; q++) {
+        if (Math.abs(placed[q].x - g.x) < 52 && Math.abs(placed[q].y - g.y) < 26) { up += 17; guard++; }
       }
-      placed.push({ x: bpx, y: bpy });
-      drawBubble(p, bpx, bpy, sprH, up);
+      placed.push({ x: g.x, y: g.y });
+      drawBubble(p, g.x, g.y, SPR_H * g.s, up);
     }
 
     /* 볼 — 높이(z)에 따라 지면 그림자와 분리된다 */
-    var bx = sx(ball.x), by = sy(ball.y);
-    var zpx = ball.z * (field.h / WORLD_H) * 1.55;
-    var ballY = by - zpx - 2.5;
-    if (zpx > 0.5) {
+    var bp = scr(ball.x, ball.y);
+    var zpx = depthPx(ball.z);
+    var r = Math.max(4.0, W / 115) * (1 + Math.min(0.3, zpx * 0.004));
+    if (zpx > 0.6) {
       ctx.save();
-      ctx.globalAlpha = clamp(0.34 - zpx * 0.006, 0.06, 0.34);
+      ctx.globalAlpha = clamp(0.36 - zpx * 0.006, 0.06, 0.36);
       ctx.fillStyle = '#04140f';
       ctx.beginPath();
-      ctx.ellipse(bx, by, Math.max(2.2, 4.6 - zpx * 0.045), Math.max(1.1, 2.1 - zpx * 0.02), 0, 0, Math.PI * 2);
+      ctx.ellipse(bp.x, bp.y, Math.max(2.4, 5 - zpx * 0.05), Math.max(1.2, 2.2 - zpx * 0.02), 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
     if (ball.kind === 'shot') {
-      var gr2 = ctx.createRadialGradient(bx, ballY, 1, bx, ballY, 12);
-      gr2.addColorStop(0, 'rgba(255,236,150,0.75)');
+      var byy = bp.y - zpx - r;
+      var gr2 = ctx.createRadialGradient(bp.x, byy, 1, bp.x, byy, r * 3.4);
+      gr2.addColorStop(0, 'rgba(255,236,150,0.8)');
       gr2.addColorStop(1, 'rgba(255,120,40,0)');
       ctx.fillStyle = gr2;
-      ctx.beginPath(); ctx.arc(bx, ballY, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(bp.x, byy, r * 3.4, 0, Math.PI * 2); ctx.fill();
     }
-    DS.Art.drawBall(ctx, bx, ballY, Math.max(3.4, W / 105) * (1 + Math.min(0.35, zpx * 0.004)));
-
-    /* 시간 오버레이 */
-    ctx.fillStyle = 'rgba(6,26,22,0.78)';
-    roundRect(W - 56, H - 24, 50, 18, 9); ctx.fill();
-    ctx.strokeStyle = 'rgba(200,241,105,0.5)';
-    ctx.lineWidth = 1; roundRect(W - 56, H - 24, 50, 18, 9); ctx.stroke();
-    ctx.fillStyle = '#d6ff8a';
-    ctx.font = '700 10px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText((minute() < 10 ? '0' : '') + minute() + "'", W - 31, H - 14);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    void dx; void dy;
+    DS.Art.drawBall(ctx, bp.x, bp.y - zpx - r * 0.35, r);
 
     if (M.halftime && M.running) {
       ctx.fillStyle = 'rgba(4,20,16,0.55)';
-      ctx.fillRect(0, H / 2 - 20, W, 40);
+      ctx.fillRect(0, H / 2 - 22, W, 44);
       ctx.fillStyle = '#d6ff8a';
+      ctx.font = '800 16px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('HALF TIME', W / 2, H / 2 + 6);
+      ctx.textAlign = 'left';
+    }
+    if (M.paused && M.running && !M.halftime) {
+      ctx.fillStyle = 'rgba(4,20,16,0.45)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#eaffd0';
       ctx.font = '800 15px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('HALF TIME', W / 2, H / 2 + 5);
+      ctx.fillText('PAUSE', W / 2, H / 2 + 5);
       ctx.textAlign = 'left';
     }
   }
@@ -2386,13 +2512,26 @@
         pos: p.pos, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
         pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
-        bubble: p.bubble ? p.bubble.text : null
+        bubble: p.bubble ? p.bubble.text : null,
+        screen: (function () {
+          var g = scr(p.x, p.y);
+          return { x: Math.round(g.x), y: Math.round(g.y), scale: Math.round(g.s * 100) / 100, sprH: Math.round(SPR_H * g.s) };
+        })(),
+        art: (function () { var rec = portraits[p.player.pic || 1]; return rec && rec.ready ? 'loaded' : 'pending'; })()
       };
       if (p.side === 'home') { h.push(row); } else { a.push(row); }
     }
     var pcs = pressConfig('home');
+    var ready = 0, kk;
+    for (kk in portraits) { if (portraits.hasOwnProperty(kk) && portraits[kk].ready) { ready++; } }
     return {
       clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey, paused: M.paused, halftime: M.halftime,
+      view: {
+        mode: 'landscape', w: W, h: H, sprH: SPR_H, field: field,
+        pitchImage: !!(pitchImg && pitchImg.naturalWidth),
+        portraitsReady: ready, portraitsTotal: (function () { var n = 0; for (kk in portraits) { if (portraits.hasOwnProperty(kk)) { n++; } } return n; })(),
+        homeAttack: 'left→right', awayAttack: 'right→left'
+      },
       ball: { x: Math.round(ball.x), y: Math.round(ball.y), z: Math.round(ball.z * 10) / 10, vz: Math.round(ball.vz), kind: ball.kind, shot: !!ball.shot },
       passLine: play.passLine ? true : false,
       formation: {
