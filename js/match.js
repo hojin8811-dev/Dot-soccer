@@ -2417,6 +2417,12 @@
       }
       if (squash !== 1) { ctx.scale(1 / squash, squash); }
       ctx.imageSmoothingEnabled = true;
+      /* 팀 컬러 림 라이트 — 일러스트 유니폼 색이 제각각이어도 편이 한눈에 구분된다 */
+      ctx.shadowColor = p.side === 'home' ? 'rgba(60,210,255,0.85)' : 'rgba(255,96,64,0.85)';
+      ctx.shadowBlur = isCarrier ? 12 : 7;
+      ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
       ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
       ctx.restore();
     } else {
