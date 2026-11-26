@@ -999,14 +999,17 @@
   }
 
   function aptMap(p) {
-    var html = '', code, v, lay, hi;
-    for (var i = 0; i < DS.APT_LIST.length; i++) {
-      code = DS.APT_LIST[i];
+    var html = '', slots = DS.APT_MAP_SLOTS || DS.APT_LIST, slot, code, v, lay, hi, x, y;
+    for (var i = 0; i < slots.length; i++) {
+      slot = slots[i];
+      code = slot.code || slot;
       v = p.apt[code] || 1;
       lay = DS.APT_LAYOUT[code];
       if (!lay) { continue; }
+      x = slot.side === 'R' ? 100 - lay.x : lay.x;
+      y = lay.y;
       hi = code === p.pos ? ' hi' : (v >= 7 ? ' mid' : '');
-      html += '<div class="aptcell' + hi + '" style="left:' + lay.x + '%;top:' + lay.y + '%">' +
+      html += '<div class="aptcell' + hi + '" style="left:' + x + '%;top:' + y + '%">' +
         '<span class="v">' + v + '</span><span class="c">' + code + '</span></div>';
     }
     return '<div class="aptmap">' + html + '</div>';

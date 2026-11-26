@@ -75,18 +75,31 @@
   DS.posName = function (code) { return POS[code] ? POS[code].name : code; };
 
   /* 포지션 적성 배치 (미니 피치 위 좌표 %, 위 = 상대 골대) */
-  /* 적성 피치맵: 13 포지션 전부, 좌우 완전 대칭 (위 = 상대 골대)
-     중앙축 x=50 한 줄: AM → CM → DM → CB → GK (DM은 CM 뒤쪽), y 16%씩 고르게
+  /* 적성 피치맵: 13 포지션, 좌우 완전 대칭 (위 = 상대 골대)
+     중앙축 x=50 한 줄: AM → DM → GK (DM은 CM 두 자리 뒤쪽 정중앙)
+     좌우 2자리: CM(좌 37 / 우 63), CB(좌 38 / 우 62) — 좌표는 왼쪽 자리 기준,
+     오른쪽 자리는 슬롯 side:'R'로 x를 100 기준 뒤집어 그린다
      좌우 날개: ST/CF · LWF/RWF · LWB/RWB · LB/RB 는 x=50 기준 정대칭 */
   var APT_LAYOUT = {
     ST:  { x: 41, y: 11 }, CF: { x: 59, y: 11 },
     LWF: { x: 11, y: 25 }, AM: { x: 50, y: 25 }, RWF: { x: 89, y: 25 },
-    LWB: { x: 7,  y: 40 }, CM: { x: 50, y: 40 }, RWB: { x: 93, y: 40 },
+    LWB: { x: 7,  y: 40 }, CM: { x: 37, y: 40 }, RWB: { x: 93, y: 40 },
     DM:  { x: 50, y: 56 },
-    LB:  { x: 23, y: 71 }, CB: { x: 50, y: 71 }, RB: { x: 77, y: 71 },
+    LB:  { x: 17, y: 71 }, CB: { x: 38, y: 71 }, RB: { x: 83, y: 71 },
     GK:  { x: 50, y: 87 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
+  /* 피치맵 표시 슬롯(15개) — CM·CB는 좌우 한 자리씩 두 번 그린다.
+     포지션 목록(APT_LIST)은 13종 그대로 두고 표시용으로만 2자리를 만든다. */
+  var APT_MAP_SLOTS = [
+    { code: 'ST' }, { code: 'CF' },
+    { code: 'LWF' }, { code: 'AM' }, { code: 'RWF' },
+    { code: 'LWB' }, { code: 'CM', side: 'L' }, { code: 'CM', side: 'R' }, { code: 'RWB' },
+    { code: 'DM' },
+    { code: 'LB' }, { code: 'CB', side: 'L' }, { code: 'CB', side: 'R' }, { code: 'RB' },
+    { code: 'GK' }
+  ];
+  DS.APT_MAP_SLOTS = APT_MAP_SLOTS;
   var APT_LIST = POS_ORDER.slice();
   var APT_NEAR = {
     GK:  ['CB'],

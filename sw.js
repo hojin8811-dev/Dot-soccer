@@ -1,12 +1,12 @@
-/*! 도트싸커 v11 — 원형 초상화 토큰 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v11a-20261126';
+/*! 도트싸커 v12 — 적성 피치맵 CM·CB 좌우 2자리 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v12a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=11&b=37', './js/data.js?v=11&b=37', './js/match.js?v=11&b=37', './js/game.js?v=11&b=37',
+        './css/style.css?v=12&b=38', './js/data.js?v=12&b=38', './js/match.js?v=12&b=38', './js/game.js?v=12&b=38',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
