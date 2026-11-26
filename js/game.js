@@ -1581,8 +1581,8 @@
       '<div style="text-align:center"><div class="sb-score"><b id="m-gf">0</b><i>:</i><b id="m-ga">0</b></div><span class="sb-clock" id="m-clock">00\'</span></div>' +
       '<div class="sb-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="22" height="26"></canvas><span class="sb-name">' + esc(oppTeam.short) + '</span></div>' +
       '</div>' +
-      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
+      '<div class="pitch-wrap"><canvas id="m-pitch"></canvas>' +
       '<div id="m-banner" class="goal-banner"></div></div>' +
       '<div class="mgr-live"><span class="mgr-live-ico">👔</span><b>' + esc(mgr().name) + '</b><span>' +
       esc(DS.managerTraitText(mgr())) + '</span>' + (mgrSync() ? '<em class="sync">고유 포메이션 시너지</em>' : '') + '</div>' +
@@ -2118,6 +2118,58 @@
     return best;
   }
 
+  /* ═════════════════  뒤로가기 가드 (앱 이탈 방지) ═════════════════ */
+  var backGuard = { lastAt: 0, leaving: false, armed: false };
+
+  function anyOverlayOpen() {
+    var m = document.getElementById('modal');
+    if (m && String(m.className).indexOf('on') >= 0) { return true; }
+    var ov = document.getElementById('m-overlay');
+    if (ov && String(ov.className).indexOf('on') >= 0) { return true; }
+    return false;
+  }
+  function armGuard() {
+    try { history.pushState({ ds: 'guard' }, ''); backGuard.armed = true; } catch (e) { /* noop */ }
+  }
+  function leaveMatchNow() {
+    if (DS.Match && DS.Match.running) { DS.Match.stop(); }
+    if (DS.Match && DS.Match.resume) { try { DS.Match.resume(true); } catch (e) { /* noop */ } }
+    closeSubs();
+    setTab('home');
+    toast('경기를 중단했습니다.');
+  }
+  function installBackGuard() {
+    if (!global.history || !history.pushState || !global.addEventListener) { return; }
+    try {
+      history.replaceState({ ds: 'root' }, '');
+      history.pushState({ ds: 'guard' }, '');
+      backGuard.armed = true;
+    } catch (e) { return; }
+    global.addEventListener('popstate', function () {
+      if (backGuard.leaving) { return; }
+      /* 1) 경기 진행 중 — 확인 후 중단 */
+      if (DS.Match && DS.Match.running && !DS.Match.paused) {
+        if (global.confirm('경기를 중단하고 나가시겠어요?')) { leaveMatchNow(); }
+        armGuard();
+        return;
+      }
+      /* 2) 열린 시트/모달 닫기 */
+      if (anyOverlayOpen()) { closeSubs(); closeModal(); armGuard(); return; }
+      /* 3) 다른 탭이면 홈으로 */
+      if (currentTab !== 'home') { setTab('home'); armGuard(); return; }
+      /* 4) 홈 — 두 번 누르면 종료 */
+      var now = Date.now();
+      if (now - backGuard.lastAt < 2000) {
+        backGuard.leaving = true;
+        try { history.back(); } catch (e) { /* noop */ }
+        return;
+      }
+      backGuard.lastAt = now;
+      toast('한 번 더 누르면 종료됩니다');
+      armGuard();
+    });
+  }
+
   /* ═════════════════  부트 ═════════════════ */
   function boot() {
     var saved = load();
@@ -2150,6 +2202,7 @@
 
     document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); } });
     global.addEventListener('beforeunload', save);
+    installBackGuard();
   }
 
   DS.game = {

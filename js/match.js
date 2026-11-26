@@ -28,6 +28,8 @@
   var ctx = null;
   var W = 390, H = 430, dpr = 1;
   var field = { x: 6, y: 6, w: 378, h: 418 };
+  var SPR_H = 56;            /* 피치 선수 스프라이트 높이(px) */
+  var BALL_G = 150;          /* 공 중력(월드 단위/s^2) */
   var pitchLayer = null;
 
   var players = [];
@@ -67,7 +69,7 @@
 
   /* ── 볼 ── */
   var ball = {
-    x: 50, y: 60, vx: 0, vy: 0,
+    x: 50, y: 60, vx: 0, vy: 0, z: 0, vz: 0,
     carrier: null, from: null, receiver: null,
     kind: 'idle', flight: 0, dur: 0,
     aim: null, shot: null, trail: [], assist: null
@@ -88,7 +90,9 @@
     sitKey: '',
     setpiece: null,
     passLine: null,
-    looseT: 0
+    looseT: 0,
+    supT: 0,
+    runT: 1.5
   };
 
   /* 전술 상황 배너 문구 */
@@ -115,6 +119,19 @@
   function attackGoalY(side) { return side === 'home' ? 0 : WORLD_H; }
   function progressOf(side, y) { return side === 'home' ? (WORLD_H - y) / WORLD_H : y / WORLD_H; }
   function short(n) { return n && n.length > 3 ? n.slice(1) : n; }
+  /* ── 선수 모션 포즈 ── */
+  function setPose(p, name, dur) {
+    if (!p) { return; }
+    if (p.pose === name && p.poseT > dur * 0.5) { return; }
+    p.pose = name;
+    p.poseT = dur;
+  }
+  function poseOf(p) {
+    if (isGK(p) && p.diveT > 0.05) { return 'dive'; }
+    if (p.poseT > 0 && p.pose) { return p.pose; }
+    if (ball.carrier === p) { return p.moving ? 'dribble' : 'idle'; }
+    return p.moving ? 'run' : 'idle';
+  }
   function d2(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
   function isGK(p) { return p.pos === 'GK'; }
   function groupOf(p) { return DS.posGroup(p.pos); }
@@ -252,9 +269,11 @@
       side: side, player: player, kit: kit, role: role, pos: pos,
       baseX: bx, baseY: by, x: bx, y: by, tx: bx, ty: by,
       vx: 0, vy: 0, phase: Math.random() * 4, frame: 0,
+      pose: null, poseT: 0, lean: 0, speed: 0,
       facing: side === 'home' ? 1 : -1, diveT: 0, diveDir: 1, stun: 0,
       goals: 0, assists: 0, yellows: 0, name: player.name, off: false,
       moving: false, glow: 0, skillT: 0, bubble: null, throughRun: null,
+      support: null, runTo: null, runT: 0, supportT: 0,
       mark: null, zone: zoneFor(pos, by, side), homeX: bx, homeY: by,
       kind: 'keep'
     };
@@ -549,7 +568,7 @@
       setpiece: null, passLine: null, looseT: 0
     };
     ball = {
-      x: 50, y: 60, vx: 0, vy: 0, carrier: null, from: null, receiver: null,
+      x: 50, y: 60, vx: 0, vy: 0, z: 0, vz: 0, carrier: null, from: null, receiver: null,
       kind: 'idle', flight: 0, dur: 0, aim: null, shot: null, trail: [], assist: null
     };
     updateScoreboard();
@@ -685,7 +704,11 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     var pm = DS.Art.pitchMargin(W, H);
-    field = { x: pm, y: pm, w: W - pm * 2, h: H - pm * 2 };
+    SPR_H = Math.round(clamp(W * 0.162, 46, 66));
+    /* 상단 골라인 위로 선수 머리가 잘리지 않도록 스프라이트 높이만큼 여백을 둔다 */
+    var topPad = Math.round(Math.min(H * 0.26, SPR_H * 0.98 + 12));
+    var botPad = Math.round(pm * 0.75);
+    field = { x: pm, y: topPad, w: W - pm * 2, h: H - topPad - botPad };
     buildPitchLayer();
   }
 
@@ -696,7 +719,7 @@
     var g = pitchLayer.getContext('2d');
     if (!g) { return; }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    DS.Art.drawPitch(g, W, H, { margin: field.x, crowd: true });
+    DS.Art.drawPitch(g, W, H, { margin: field.x, crowd: true, rect: field });
   }
 
   /* ─────────────────────────  중계 · 상황 배너  ───────────────────────── */
@@ -816,12 +839,70 @@
     void isolate;
   }
 
+  /* 볼 주변 삼각 지원: 가장 가까운 동료 2명이 전진/후방 패스 각으로 벌어진다 */
+  function assignSupport(carrier) {
+    var i, p, list = [], d;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== carrier.side || p === carrier || p.off || isGK(p)) { continue; }
+      d = Math.hypot(p.x - carrier.x, p.y - carrier.y);
+      if (d < 30) { list.push({ p: p, d: d }); }
+    }
+    list.sort(function (a, b) { return a.d - b.d; });
+    var dir = goalDir(carrier.side);
+    var a = list[0] ? list[0].p : null, b = list[1] ? list[1].p : null;
+    if (a) {
+      a.support = {
+        x: clamp(carrier.x + (carrier.x < 50 ? 8 : -8), 5, 95),
+        y: clamp(carrier.y + dir * 12, 5, 115)
+      };
+      a.supportT = 0.9;
+    }
+    if (b) {
+      b.support = {
+        x: clamp(carrier.x + (carrier.x < 50 ? -9 : 9), 5, 95),
+        y: clamp(carrier.y - dir * 8, 5, 115)
+      };
+      b.supportT = 0.9;
+    }
+  }
+
+  /* 오프더볼 침투: 수비 라인 뒤 대각선 공간으로 뛰는 선수를 주기적으로 만든다 */
+  function assignRuns() {
+    var carrier = ball.carrier, i, p, best = null, bv = -1;
+    if (!carrier) { return; }
+    var defSide = carrier.side === 'home' ? 'away' : 'home';
+    var line = defLineY(defSide);
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== carrier.side || p === carrier || p.off || isGK(p)) { continue; }
+      if (!isFwdGroup(p) && !isMidGroup(p)) { continue; }
+      var prog = progressOf(p.side, p.y);
+      if (prog > 0.72) { continue; }
+      if (Math.hypot(p.x - carrier.x, p.y - carrier.y) < 12) { continue; }
+      var v = (isFwdGroup(p) ? 20 : 0) + progressOf(p.side, p.y) * 20 + Math.random() * 10;
+      if (v > bv) { bv = v; best = p; }
+    }
+    if (!best) { return; }
+    var dir = goalDir(best.side);
+    best.runTo = {
+      x: clamp(best.x + (best.baseX < 50 ? 6 : -6) + range(-4, 4), 6, 94),
+      y: clamp(line - dir * range(3, 8), 4, 116)
+    };
+    best.runT = 1.5;
+    if (chance(0.5)) { bubble(best, '🏃 침투!', '#c3a6ff', 1.1); }
+  }
+
   function updateTargets(dt) {
     var atk = play.atkSide;
     var def = atk === 'home' ? 'away' : 'home';
     var carrier = ball.carrier;
     var pressers = carrier ? assignPressers(def, pressConfig(def)) : [];
-    if (carrier) { assignMarks(def); }
+    if (carrier) {
+      assignMarks(def);
+      play.supT -= dt;
+      if (play.supT <= 0) { play.supT = 0.4; assignSupport(carrier); }
+    }
     var i, p;
     for (i = 0; i < players.length; i++) {
       p = players[i];
@@ -883,11 +964,17 @@
     var a = anchorOf(p);
     var push = stagePush(p, st);
     var g = groupOf(p);
-    var kx = g === 'DF' ? 0.16 : (g === 'MF' ? 0.24 : 0.26);
-    var ky = g === 'DF' ? 0.14 : (g === 'MF' ? 0.20 : 0.22);
+    var kx = g === 'DF' ? 0.34 : (g === 'MF' ? 0.36 : 0.28);   /* 볼-사이드 압축 */
+    var ky = g === 'DF' ? 0.16 : (g === 'MF' ? 0.22 : 0.24);
     var spread = 0.80 + m.width / 100 * 0.55;   /* 폭 지표: 넓은 포메이션은 더 벌어진다 */
     var tx = 50 + (a.x - 50) * spread + (ball.x - 50) * kx;
     var ty = a.y + (ball.y - 60) * ky + z.dir * push;
+
+    /* 반대편 윙어는 폭을 유지해 전환 패스 각을 만든다 */
+    var farWing = (a.x < 38 && ball.x > 62) || (a.x > 62 && ball.x < 38);
+    if (farWing && !isFwdGroup(p) && st !== 'final') {
+      tx = 50 + (a.x - 50) * (spread + 0.12);
+    }
 
     /* 측면: 윙어·윙백은 터치라인까지 벌린다 */
     if ((p.pos === 'LWF' || p.pos === 'LWB') && (st === 'wide' || st === 'final')) { tx = 2; }
@@ -919,6 +1006,17 @@
     /* 오프사이드 트랩: 수비 라인이 동시에 전진 */
     if (p.side === 'home' && buffOf('offside') > 0 && g === 'DF' && ball.y < 70) { ty += z.dir * 3; }
 
+    /* 삼각 지원: 볼 주변 동료가 패스 각으로 벌어진다 */
+    if (p.supportT > 0 && p.support) {
+      tx = tx * 0.42 + p.support.x * 0.58;
+      ty = ty * 0.42 + p.support.y * 0.58;
+    }
+    /* 수비 뒷공간 대각선 침투 */
+    if (p.runT > 0 && p.runTo) {
+      tx = tx * 0.34 + p.runTo.x * 0.66;
+      ty = ty * 0.34 + p.runTo.y * 0.66;
+    }
+
     p.tx = clamp(tx, z.xMin, z.xMax);
     p.ty = clamp(ty, a.y - z.fwd - 8, a.y + z.back + 8);
     p.ty = clamp(p.ty, 3, WORLD_H - 3);
@@ -931,7 +1029,7 @@
     var g = groupOf(p);
     var m = metricsOf(p.side);
     var compress = 0.80 - (m.width / 100) * 0.12;   /* 좁은 포메이션은 중앙으로 더 모인다 */
-    var tx = 50 + (a.x - 50) * compress + (ball.x - 50) * 0.18;
+    var tx = 50 + (a.x - 50) * compress + (ball.x - 50) * 0.32;
     var ty = a.y + (ball.y - 60) * 0.14;
     var drop = 0;
     if (play.recoverT > 0 && play.recoverSide === p.side) { drop += 4; }
@@ -986,12 +1084,13 @@
       p.vy = (dy / d) * spd;
       p.x += (dx / d) * step;
       p.y += (dy / d) * step;
-      p.phase += dt * (7 + spd * 0.22);
+      p.phase += dt * (6.4 + spd * 0.26) * Math.min(1.35, d / 3 + 0.55);
       p.frame = Math.floor(p.phase) % 4;
-      if (Math.abs(dx) > 0.5) { p.facing = dx > 0 ? 1 : -1; }
+      if (Math.abs(dx) > 0.4) { p.facing = dx > 0 ? 1 : -1; }
       p.moving = true;
+      p.speed = spd;
     } else {
-      p.vx = 0; p.vy = 0; p.moving = false; p.frame = 0;
+      p.vx = 0; p.vy = 0; p.moving = false; p.frame = 0; p.speed = 0;
     }
     p.x = clamp(p.x, 2, WORLD_W - 2);
     p.y = clamp(p.y, 2, WORLD_H - 2);
@@ -1060,7 +1159,7 @@
     }
   }
 
-  function kickBall(from, tx, ty, speed, kind, receiver) {
+  function kickBall(from, tx, ty, speed, kind, receiver, loft) {
     var dx = tx - ball.x, dy = ty - ball.y;
     var d = Math.max(1.2, Math.hypot(dx, dy));
     ball.carrier = null;
@@ -1072,7 +1171,15 @@
     ball.vx = dx / ball.dur;
     ball.vy = dy / ball.dur;
     ball.aim = { x: tx, y: ty };
-    ball.trail = [{ x: ball.x, y: ball.y }];
+    ball.trail = [{ x: ball.x, y: ball.y, z: 0 }];
+    /* 높이: 로프트가 있으면 발을 떠나 포물선을 그린다 (땅볼 패스는 z=0) */
+    if (loft) {
+      ball.vz = BALL_G * ball.dur * (0.48 + 0.22 * Math.min(1, d / 45));
+      ball.z = 0.8;
+    } else {
+      ball.vz = 0;
+      ball.z = 0;
+    }
     M.phase = kind === 'shot' ? 'shot' : 'pass';
   }
 
@@ -1159,7 +1266,8 @@
     speed = clamp(dist * 2.4, 32, 74) * (buffOf('tiki') > 0 ? 1.14 : 1);
     ball.x = p.x;
     ball.y = p.y + goalDir(p.side) * 0.8;
-    kickBall(p, tx, ty, speed, 'pass', q);
+    kickBall(p, tx, ty, speed, 'pass', q, type === 'short' ? 0 : 1);
+    setPose(p, type === 'cross' || type === 'through' ? 'kick' : 'pass', 0.28);
     ball.assist = p;
     stats.passes++;
     if (p.side === 'home') { charge(0.5 + (buffOf('tiki') > 0 ? 0.35 : 0) + (buffOf('build') > 0 ? 0.3 : 0)); }
@@ -1189,6 +1297,23 @@
     p.kind = 'dribble';
   }
 
+  /* 압박을 받을 때 안전한 백패스/원터치 옵션 */
+  function backPass(p) {
+    var dir = goalDir(p.side), best = null, bv = -1, i, q, d, back, open, v;
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q === p || q.side !== p.side || q.off) { continue; }
+      d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < 6 || d > 24) { continue; }
+      back = (q.y - p.y) * dir;                 /* 뒤쪽 = 음수 */
+      open = nearestOpponent(q, 22).dist;
+      v = open * 1.4 - Math.abs(d - 12) * 0.5 + (back < 0 ? 8 : 0) - back * 0.2;
+      if (v > bv) { bv = v; best = q; }
+    }
+    if (!best || bv < 6) { return false; }
+    return kickPass(p, best, 'short');
+  }
+
   function decide() {
     var p = ball.carrier;
     if (!p) { return; }
@@ -1206,8 +1331,18 @@
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
       if (chance(pShot)) { shoot(p, dist); return; }
     }
-    /* 2) 측면 크로스 */
+    /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다 */
+    if (pressure < 3.4 && chance(0.55)) {
+      if (backPass(p)) { actionTimer = 0.14; return; }
+    }
+
+    /* 2) 측면 크로스 · 컷백 */
     if ((play.stage === 'wide' || play.stage === 'final') && (p.x < 22 || p.x > 78) && dist < 34) {
+      var box = bestBoxTarget(p.side);
+      if (box && dist < 28 && chance(0.72)) {
+        bubble(p, p.x < 22 ? '→ 컷백!' : '← 컷백!', '#ffd98a', 1.2);
+        if (kickPass(p, box, 'cross')) { return; }
+      }
       if (passBall(p)) { return; }
     }
     /* 3) 패스 */
@@ -1239,8 +1374,9 @@
 
     ball.x = p.x;
     ball.y = p.y;
-    kickBall(p, tx, gy, speed, 'shot', null);
+    kickBall(p, tx, gy, speed, 'shot', null, longshot ? 1 : 0);
     ball.dur = Math.max(0.28, Math.hypot(tx - p.x, gy - p.y) / speed);
+    if (longshot) { ball.vz = BALL_G * ball.dur * 0.46; ball.z = 1.0; }
     ball.shot = {
       by: p, xg: xg, onTarget: onTarget, isGoal: isGoal,
       long: longshot, tx: tx, gy: gy
@@ -1254,6 +1390,7 @@
       goalStats.awayShots++;
       awayXg += xg;
     }
+    setPose(p, 'kick', 0.38);
     bubble(p, longshot ? '🔥 중거리 슛!' : '🎯 슛!', longshot ? '#ffb066' : '#ffe28a', 1.3);
     say(U.josa(short(p.name), '이/가') + ' ' + (longshot ? '중거리에서 대포알을 때립니다!' : '과감하게 슛!') + ' ' +
       pick(['발끝에서 불꽃이 튑니다!', '골문을 향해 낮게 깔아 찹니다!', '수비수 머리 위로 감아 찹니다!', '있는 힘껏 때렸습니다!']), 'shot');
@@ -1327,6 +1464,7 @@
     goals.push({ min: mn, half: half, side: side, name: scorer.name, assist: assistName });
     updateScoreboard();
     var isHome = side === 'home';
+    setPose(scorer, 'celebrate', 2.4);
     bubble(scorer, '⚽ 골!', '#ffe98a', 1.8);
     banner('GOAL!', short(scorer.name) + (isHome ? ' · ' + cfg.homeName : ' · ' + cfg.awayName));
     setSit('goal', short(scorer.name) + ' 득점', true);
@@ -1423,6 +1561,7 @@
     addRating(carrier, -0.06);
     carrier.stun = 0.4;
     carrier.dribbleT = 0;
+    setPose(defender, 'tackle', 0.52);
     bubble(defender, buffOf('press') > 0 ? '🛡️ 압박!' : '🦵 태클!', buffOf('press') > 0 ? '#ff9f8a' : '#ffd98a', 1.2);
     giveBall(defender);
     if (defender.side === 'home') { charge(1.7); }
@@ -1576,7 +1715,7 @@
     }
     var speed = Math.max(40, Math.hypot(tx - ball.x, ty - ball.y) / dur);
     var by = sp.type === 'corner' ? (scorer || taker) : (taker || scorer);
-    kickBall(taker || by, tx, ty, speed, 'shot', null);
+    kickBall(taker || by, tx, ty, speed, 'shot', null, 1);
     ball.dur = dur;
     var onT = 0.55 + (side === 'home' ? mfx('jump') * 0.01 : 0) - (side === 'away' ? mfx('def') * 0.006 : 0);
     ball.shot = {
@@ -1651,6 +1790,8 @@
       }
     }
     momentum = clamp(momentum + dt * 0.42, 0, 100);
+    play.runT -= dt;
+    if (play.runT <= 0) { play.runT = 2.0 + Math.random() * 2.4; assignRuns(); }
     if (play.counterT > 0) { play.counterT -= dt; }
     if (play.recoverT > 0) { play.recoverT -= dt; }
     if (play.markT > 0) { play.markT -= dt; }
@@ -1664,8 +1805,11 @@
       if (pp.skillT > 0) { pp.skillT -= dt; }
       if (pp.glow > 0) { pp.glow -= dt; }
       if (pp.diveT > 0) { pp.diveT -= dt; }
+      if (pp.poseT > 0) { pp.poseT -= dt; if (pp.poseT <= 0) { pp.pose = null; } }
       if (pp.dribbleT > 0) { pp.dribbleT -= dt; }
       if (pp.throughRun) { pp.throughRun.t -= dt; if (pp.throughRun.t <= 0) { pp.throughRun = null; } }
+      if (pp.supportT > 0) { pp.supportT -= dt; }
+      if (pp.runT > 0) { pp.runT -= dt; }
     }
 
     /* 골 세리머니 */
@@ -1801,6 +1945,7 @@
       possession[c.side] += dt;
       ball.x = c.x + (50 - c.x) * 0.012;
       ball.y = c.y + goalDir(c.side) * 1.4;
+      ball.z = 0; ball.vz = 0;
       ball.flight = 0;
       var near = nearestOpponent(c, 4.0);
       if (near.player && near.dist < 3.1) { tryTackle(near.player, c, dt); }
@@ -1815,11 +1960,16 @@
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     ball.flight += dt;
+    if (ball.z > 0 || ball.vz > 0) {
+      ball.z += ball.vz * dt;
+      ball.vz -= BALL_G * dt;
+      if (ball.z <= 0) { ball.z = 0; ball.vz = 0; }
+    }
     if (ball.trail.length === 0) { ball.trail.push({ x: ball.x, y: ball.y }); }
     else {
       var last = ball.trail[ball.trail.length - 1];
       if (Math.hypot(last.x - ball.x, last.y - ball.y) > 0.8) {
-        ball.trail.push({ x: ball.x, y: ball.y });
+        ball.trail.push({ x: ball.x, y: ball.y, z: ball.z });
         if (ball.trail.length > 16) { ball.trail.shift(); }
       }
     }
@@ -1930,13 +2080,10 @@
     return p.kit;
   }
 
-  function spriteOf(p) {
+  function spriteOf(p, pose) {
     var kit = kitOf(p);
-    var key = p.player.id + '|' + kit.shirt + '|' + (p.moving ? p.frame : 0) + '|' + (p.facing > 0 ? 1 : 0) + '|' + (p.player.pic || 0);
-    if (spriteCache[key]) { return spriteCache[key]; }
-    var c = DS.Art.sdSprite(p.player, kit, p.moving ? p.frame : 0, p.facing);
-    spriteCache[key] = c;
-    return c;
+    var frame = (pose === 'run' || pose === 'dribble') ? (Math.floor(p.phase) % 4) : 0;
+    return DS.Art.sdSprite(p.player, kit, { pose: pose, frame: frame, gk: isGK(p), t: simTime });
   }
 
   function roundRect(x, y, w, h, r) {
@@ -2004,7 +2151,7 @@
     var longShot = ball.shot && ball.shot.long;
     for (i = 0; i < ball.trail.length; i++) {
       t = i / ball.trail.length;
-      x = sx(ball.trail[i].x); y = sy(ball.trail[i].y);
+      x = sx(ball.trail[i].x); y = sy(ball.trail[i].y) - (ball.trail[i].z || 0) * (field.h / WORLD_H) * 1.55;
       r = 2.6 + t * 3.4;
       ctx.beginPath();
       var gr = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -2083,7 +2230,7 @@
     drawPassLine();
     drawShotTrail();
 
-    var sprH = clamp(W * 0.134, 40, 54);
+    var sprH = SPR_H;
     var arr = players.slice().sort(function (a, b) { return a.y - b.y; });
     var i, p, px, py, sprite, offY, dx, dy;
 
@@ -2092,10 +2239,13 @@
       px = sx(p.x); py = sy(p.y);
       offY = 0;
 
-      /* 그림자 */
+      /* 그림자 — 태클·다이빙은 낮고 넓게 */
+      var pz = poseOf(p);
+      var shW = pz === 'tackle' || pz === 'dive' ? sprH * 0.38 : sprH * 0.27;
+      var shH = pz === 'tackle' || pz === 'dive' ? sprH * 0.075 : sprH * 0.088;
       ctx.fillStyle = 'rgba(4,20,16,0.34)';
       ctx.beginPath();
-      ctx.ellipse(px, py - 0.5, sprH * 0.29, sprH * 0.095, 0, 0, Math.PI * 2);
+      ctx.ellipse(px, py - 0.5, shW, shH, 0, 0, Math.PI * 2);
       ctx.fill();
 
       /* 발밑 아우라 링 (스킬·카드 발동) */
@@ -2123,21 +2273,30 @@
         ctx.stroke();
       }
 
-      sprite = spriteOf(p);
+      var pose = poseOf(p);
+      sprite = spriteOf(p, pose);
+      var wDraw = sprH * (DS.Art.SD_SIZE.w / DS.Art.SD_SIZE.h);
+      var rot = 0, lift = 0;
+      if (pose === 'dive') {
+        var dk = clamp(1 - p.diveT / 0.7, 0, 1);
+        rot = Math.sin(dk * Math.PI * 0.62) * 1.0 * (p.facing < 0 ? -p.diveDir : p.diveDir);
+        lift = -Math.sin(dk * Math.PI) * 6;
+      } else if (pose === 'tackle') {
+        rot = -0.62 * clamp(p.poseT / 0.52, 0, 1);
+        lift = 2.5;
+      } else if (pose === 'celebrate') {
+        lift = -Math.abs(Math.sin(simTime * 7.5)) * 4;
+      }
       ctx.save();
       ctx.imageSmoothingEnabled = true;
-      if (p.diveT > 0) {
-        var dk = clamp(1 - p.diveT / 0.7, 0, 1);
-        var ang = p.diveDir * Math.sin(dk * Math.PI * 0.62) * 1.18;
-        offY = -Math.sin(dk * Math.PI) * 5;
-        ctx.translate(px, py);
-        ctx.rotate(ang);
-        ctx.translate(-px, -py);
+      ctx.translate(px, py + 2);
+      if (p.facing < 0) { ctx.scale(-1, 1); }
+      if (rot) {
+        ctx.translate(0, -sprH * 0.42);
+        ctx.rotate(rot);
+        ctx.translate(0, sprH * 0.42);
       }
-      ctx.drawImage(sprite,
-        Math.round(px - sprH * 0.355),
-        Math.round(py - sprH + 4 + offY),
-        Math.round(sprH * 0.71), Math.round(sprH));
+      ctx.drawImage(sprite, -wDraw / 2, -sprH + 4 + lift, wDraw, sprH);
       ctx.restore();
 
       /* 홈 팀 공 소유자 이름 */
@@ -2171,9 +2330,19 @@
       drawBubble(p, bpx, bpy, sprH, up);
     }
 
-    /* 볼 */
+    /* 볼 — 높이(z)에 따라 지면 그림자와 분리된다 */
     var bx = sx(ball.x), by = sy(ball.y);
-    var ballY = by - Math.min(8, Math.abs(ball.vy) * 0.035) - 2.5;
+    var zpx = ball.z * (field.h / WORLD_H) * 1.55;
+    var ballY = by - zpx - 2.5;
+    if (zpx > 0.5) {
+      ctx.save();
+      ctx.globalAlpha = clamp(0.34 - zpx * 0.006, 0.06, 0.34);
+      ctx.fillStyle = '#04140f';
+      ctx.beginPath();
+      ctx.ellipse(bx, by, Math.max(2.2, 4.6 - zpx * 0.045), Math.max(1.1, 2.1 - zpx * 0.02), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     if (ball.kind === 'shot') {
       var gr2 = ctx.createRadialGradient(bx, ballY, 1, bx, ballY, 12);
       gr2.addColorStop(0, 'rgba(255,236,150,0.75)');
@@ -2181,7 +2350,7 @@
       ctx.fillStyle = gr2;
       ctx.beginPath(); ctx.arc(bx, ballY, 12, 0, Math.PI * 2); ctx.fill();
     }
-    DS.Art.drawBall(ctx, bx, ballY, Math.max(3.4, W / 105));
+    DS.Art.drawBall(ctx, bx, ballY, Math.max(3.4, W / 105) * (1 + Math.min(0.35, zpx * 0.004)));
 
     /* 시간 오버레이 */
     ctx.fillStyle = 'rgba(6,26,22,0.78)';

@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v5 — 330명 고유 일러스트 · 32명 감독 전술</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. 330명 고유 일러스트 선수, 고유 포메이션과 8종 특기를 가진 감독 32명, 포메이션대로 움직이는 진짜 축구 AI.">
+<title>도트싸커 v6 — 2만 리그의 진짜 축구 · SD 필드 플레이 진화</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. 330명 고유 일러스트 선수, 22명이 개성 있게 뛰는 SD 필드 플레이, 포메이션대로 움직이는 진짜 축구 AI, 실시간 모멘텀 전술 카드.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=5">
+<link rel="manifest" href="manifest.webmanifest?v=6">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=5&b=21">
+<link rel="stylesheet" href="css/style.css?v=6&b=22">
 </head>
 <body>
 <div id="app">
@@ -48,14 +48,14 @@
   <div id="modal"></div>
   <div id="toast" class="toast"></div>
 </div>
-<script src="js/data.js?v=5&b=21"></script>
-<script src="js/match.js?v=5&b=21"></script>
-<script src="js/game.js?v=5&b=21"></script>
+<script src="js/data.js?v=6&b=22"></script>
+<script src="js/match.js?v=6&b=22"></script>
+<script src="js/game.js?v=6&b=22"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=5').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=6').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

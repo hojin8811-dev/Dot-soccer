@@ -1647,7 +1647,8 @@
     g.fillRect(0, 0, W, H);
 
     var m = opt.margin || Art.pitchMargin(W, H);
-    var fx = m, fy = m, fw = W - m * 2, fh = H - m * 2;
+    var r = opt.rect || { x: m, y: m, w: W - m * 2, h: H - m * 2 };
+    var fx = r.x, fy = r.y, fw = r.w, fh = r.h;
     var lw = Math.max(1, Math.round(W / 240));
     g.strokeStyle = 'rgba(228,255,240,0.55)';
     g.lineWidth = lw;
