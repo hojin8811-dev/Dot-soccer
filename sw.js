@@ -1,12 +1,12 @@
 /*! 도트싸커 v8 — 선수 크기 절반 · 전술 대형 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v8a-20261126';
+var CACHE = 'dot-soccer-v9a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=8&b=27', './js/data.js?v=8&b=27', './js/match.js?v=8&b=27', './js/game.js?v=8&b=27',
+        './css/style.css?v=9&b=28', './js/data.js?v=9&b=28', './js/match.js?v=9&b=28', './js/game.js?v=9&b=28',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

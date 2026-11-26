@@ -1048,19 +1048,19 @@ main { margin-left: 54px; padding: 7px 8px 8px; }
 }
 .screen.on > .card, .screen.on > .mgr-wrap, .screen.on > .grid3 { margin: 0; }
 .hero { grid-column: 1 / -1; margin: 0; }
-.hero-img { height: 84px; }
-.hero-title { font-size: 19px; }
-.hero-in { padding: 9px 12px 11px; }
+.hero-img { height: 70px; }
+.hero-title { font-size: 18px; }
+.hero-in { padding: 8px 12px 9px; }
 .hero-kicker { font-size: 8px; }
-.vs { padding: 2px 0 6px; }
+.vs { padding: 0 0 4px; }
 .vs-team canvas { width: 30px; height: 35px; }
 .vs-mid b { font-size: 13px; }
-.card .btn.wide { height: 32px; }
-.card { padding: 10px 11px; margin-bottom: 7px; border-radius: 13px; }
-.card-head { margin-bottom: 6px; }
-.kpi { padding: 6px 5px; }
-.kpi b { font-size: 15px; }
-.tbl td { padding: 3px 0; }
+.card .btn.wide { height: 30px; }
+.card { padding: 8px 10px; margin-bottom: 6px; border-radius: 13px; }
+.card-head { margin-bottom: 5px; }
+.kpi { padding: 5px 4px; }
+.kpi b { font-size: 14px; }
+.tbl td { padding: 2.5px 0; }
 .pitch-head { font-size: 8px; }
 
 /* ── 경기 화면 셸 ── */
@@ -1151,6 +1151,31 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
 .m-acts { flex: 0 0 auto; }
 .m-acts .btn { height: 26px; font-size: 10px; }
 
+/* ── v9 실시간 미니 스탯 (점유율 · 슈팅 · 지친 선수) — 카드와 전술 버튼 사이 ── */
+.m-live {
+  flex: 0 0 auto; margin-top: auto; display: flex; flex-direction: column; gap: 3px;
+  padding: 5px 6px 6px; border-radius: 10px;
+  background: rgba(255, 255, 255, .05); border: 1px solid rgba(200, 241, 105, .16);
+}
+.m-live .lv-row { display: flex; align-items: center; gap: 5px; height: 13px; }
+.m-live .lv-lbl { flex: 0 0 auto; font-size: 7.5px; font-weight: 900; letter-spacing: .3px; color: rgba(233, 244, 221, .55); }
+.m-live .lv-bar { flex: 1 1 auto; height: 6px; border-radius: 4px; overflow: hidden; position: relative;
+  background: linear-gradient(90deg, rgba(255, 96, 72, .55) 0%, rgba(255, 96, 72, .55) 100%); }
+.m-live .lv-bar > i { display: block; height: 100%; width: 50%; border-radius: 4px;
+  background: linear-gradient(90deg, #2e7bff, #63d8ff); transition: width .3s linear; box-shadow: 0 0 6px rgba(80, 200, 255, .55); }
+.m-live .lv-row b { flex: 0 0 auto; font-size: 9px; font-weight: 900; color: #eaf6dd; }
+.m-live .lv-shots { margin-left: auto; letter-spacing: .3px; }
+.m-live .lv-shots em { font-style: normal; color: rgba(233, 244, 221, .35); font-size: 8px; margin: 0 1px; }
+.m-live .lv-min { flex: 0 0 auto; font-size: 8px; font-weight: 900; color: var(--lime); }
+.m-live .lv-tired { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; font-size: 7.5px; font-weight: 800;
+  color: rgba(233, 244, 221, .72); min-height: 12px; }
+.m-live .lv-tired.none { color: rgba(233, 244, 221, .35); }
+.m-live .lv-tired b { font-size: 7.5px; font-weight: 900; color: #ffd23b; }
+.m-live .lv-chip { padding: 1px 4px; border-radius: 6px; background: rgba(255, 210, 59, .16);
+  border: 1px solid rgba(255, 210, 59, .38); color: #ffe28a; }
+.m-live .lv-chip.hot { background: rgba(255, 59, 48, .2); border-color: rgba(255, 90, 78, .55); color: #ffb3ab; }
+.m-live .lv-more { color: rgba(233, 244, 221, .5); }
+
 /* 하단 티커 */
 .m-ticker {
   flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
@@ -1218,9 +1243,11 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
 .sheet-body { padding: 10px 13px 12px; }
 .sub-panel {
   left: 50%; right: auto; transform: translateX(-50%);
-  width: min(680px, 94%); bottom: 8px; max-height: 92%; padding: 10px 12px;
+  width: min(760px, 96%); bottom: 8px; max-height: 94%; padding: 10px 12px;
 }
-.sub-list { max-height: 120px; }
+.sub-list { max-height: 172px; }
+.sub-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 5px; }
+.sub-item { min-height: 17px; padding: 1px 5px; }
 .cutin-art { width: auto; height: 96%; aspect-ratio: 1; right: 3%; }
 .cutin-name { font-size: 26px; }
 .cutin-body { width: 60%; }

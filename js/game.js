@@ -1618,6 +1618,11 @@
       '<div class="mom-buffs" id="m-buffs"></div>' +
       '</div>' +
       '<div class="hand v7" id="m-hand"></div>' +
+      '<div class="m-live" id="m-live">' +
+      '<div class="lv-row"><span class="lv-lbl">점유</span><span class="lv-bar"><i id="m-poss"></i></span><b id="m-poss-v">50%</b></div>' +
+      '<div class="lv-row"><span class="lv-lbl">슈팅</span><b class="lv-shots" id="m-shots">0 <em>:</em> 0</b><span class="lv-min" id="m-min">0\'</span></div>' +
+      '<div class="lv-tired none" id="m-tired">체력 40% 이하 없음</div>' +
+      '</div>' +
       '<div class="m-tac"><span class="ctrl-lbl">전술</span><div class="seg" id="m-tactics">' +
       '<button data-act="tactics" data-v="defense" class="' + (S.tactics === 'defense' ? 'on' : '') + '">수 비</button>' +
       '<button data-act="tactics" data-v="balanced" class="' + (S.tactics === 'balanced' ? 'on' : '') + '">균 형</button>' +
@@ -1660,6 +1665,37 @@
     if (usesEl) {
       usesEl.textContent = '개입 ' + (st.usesLeft === undefined ? 6 : st.usesLeft) + '/' + (st.limit || 6);
       usesEl.classList.toggle('out', st.usesLeft === 0);
+    }
+    /* v9 — 실시간 미니 스탯 */
+    if (st.poss) {
+      var possEl = document.getElementById('m-poss');
+      var possV = document.getElementById('m-poss-v');
+      if (possEl) { possEl.style.width = st.poss[0] + '%'; }
+      if (possV) { possV.textContent = st.poss[0] + '%'; }
+      var shotsEl = document.getElementById('m-shots');
+      if (shotsEl) { shotsEl.innerHTML = st.shots[0] + ' <em>:</em> ' + st.shots[1]; }
+      var minEl = document.getElementById('m-min');
+      if (minEl) { minEl.textContent = (st.minute || 0) + "'"; }
+      var tiredEl = document.getElementById('m-tired');
+      if (tiredEl) {
+        var sig = (st.tired || []).map(function (x) { return x.name + x.stam; }).join(',');
+        if (tiredEl.getAttribute('data-sig') !== sig) {
+          tiredEl.setAttribute('data-sig', sig);
+          if (!st.tired || !st.tired.length) {
+            tiredEl.className = 'lv-tired none';
+            tiredEl.innerHTML = '체력 40% 이하 없음';
+          } else {
+            var th = '<b>체력 경고 ' + st.tired.length + '명</b>';
+            for (var ti = 0; ti < st.tired.length && ti < 3; ti++) {
+              var tt = st.tired[ti];
+              th += '<span class="lv-chip' + (tt.stam < 25 ? ' hot' : '') + '">' + esc(tt.name) + ' ' + tt.stam + '%</span>';
+            }
+            if (st.tired.length > 3) { th += '<span class="lv-more">+' + (st.tired.length - 3) + '</span>'; }
+            tiredEl.className = 'lv-tired';
+            tiredEl.innerHTML = th;
+          }
+        }
+      }
     }
     var hand = document.getElementById('m-hand');
     if (hand) {

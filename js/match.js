@@ -117,7 +117,13 @@
      → 홈팀은 화면 왼쪽 골대에서 오른쪽 골대로, 원정팀은 오른쪽에서 왼쪽으로 공격한다. */
   var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
   var pitchImg = null;
-  var portraits = {};             /* pic 번호 → { img, ready } */
+  /* v9 — 피치 전용 '공 없는 팀 통일 유니폼 몸통' + '고유 얼굴' 합성 */
+  var HEAD_R = 0.47;              /* 두상 높이 / 선수 전체 키 */
+  var BODY_R = 0.60;              /* 몸통 높이 / 선수 전체 키 (두상과 0.07 겹침) */
+  var SPRITE_POSES = ['run-a', 'run-b', 'kick', 'tackle', 'gk-idle', 'gk-dive'];
+  var bodySprites = {};           /* 'run-a|home' → { img, ready } */
+  var portraits = {};             /* pic 번호 → { img, ready } — 마이팀·카드용 전신(그대로 사용) */
+  var heads = {};                 /* pic 번호 → { img, ready } — 피치 머리 */
   var portraitLeft = 0;
   var portraitNeed = 0;
   var artGateOn = false;          /* 22명 일러스트가 준비될 때까지 킥오프를 잠깐 미룬다 */
@@ -152,6 +158,44 @@
     rec.img.src = DS.Art.portraitSrc(pl);
     return rec;
   }
+  /* ── 피치 몸통 스프라이트 (팀 유니폼 색 고정 · 공 없음) ── */
+  function bodyVariant(p) {
+    if (isGK(p)) { return p.side === 'home' ? 'gk-home' : 'gk-away'; }
+    return p.side === 'home' ? 'home' : 'away';
+  }
+  function loadBody(pose, variant) {
+    var key = pose + '|' + variant;
+    var rec = bodySprites[key];
+    if (rec) { return rec; }
+    rec = { img: new global.Image(), ready: false };
+    bodySprites[key] = rec;
+    rec.img.onload = function () { rec.ready = rec.img.naturalWidth > 0; };
+    rec.img.onerror = function () { rec.ready = false; };
+    rec.img.src = DS.Art.assetPrefix + 'assets/pitch-bodies/' + pose + '-' + variant + '.png';
+    return rec;
+  }
+  function loadHead(p) {
+    var n = (p && p.player && p.player.pic) ? p.player.pic : 1;
+    var rec = heads[n];
+    if (rec) { return rec; }
+    rec = { img: new global.Image(), ready: false };
+    heads[n] = rec;
+    rec.img.onload = function () { rec.ready = rec.img.naturalWidth > 0; };
+    rec.img.onerror = function () { rec.ready = false; };
+    rec.img.src = 'assets/portraits/head/p' + (n < 10 ? '0' + n : n) + '.png';
+    return rec;
+  }
+  /* 선수 상태 → 몸통 스프라이트 포즈 */
+  function spritePoseOf(p) {
+    var ps = poseOf(p);
+    if (ps === 'dive') { return 'gk-dive'; }
+    if (ps === 'tackle') { return 'tackle'; }
+    if (ps === 'kick' || ps === 'pass') { return 'kick'; }
+    if (ps === 'run' || ps === 'dribble') { return (Math.floor(p.phase * 0.5) % 2) ? 'run-b' : 'run-a'; }
+    if (isGK(p)) { return 'gk-idle'; }
+    return 'run-b';
+  }
+
   function goalDir(side) { return side === 'home' ? -1 : 1; }        /* 공격 방향 y */
   function ownGoalY(side) { return side === 'home' ? WORLD_H : 0; }
   function attackGoalY(side) { return side === 'home' ? 0 : WORLD_H; }
@@ -313,7 +357,7 @@
       moving: false, glow: 0, skillT: 0, bubble: null, throughRun: null,
       support: null, runTo: null, runT: 0, supportT: 0,
       mark: null, zone: zoneFor(pos, by, side), homeX: bx, homeY: by,
-      kind: 'keep'
+      stam: 100, kind: 'keep'
     };
   }
 
@@ -390,6 +434,23 @@
       momentum: Math.round(momentum), hand: [], buffs: [], uses: cardUses,
       usesLeft: Math.max(0, CARD_LIMIT - cardUses), limit: CARD_LIMIT
     };
+    /* v9 — 실시간 미니 스탯 (점유율 · 슈팅 · 지친 선수) */
+    var totP = possession.home + possession.away;
+    var hPos = Math.round(possession.home / Math.max(0.001, totP) * 100);
+    out.minute = minute();
+    out.score = [M.homeScore, M.awayScore];
+    out.poss = [hPos, 100 - hPos];
+    out.shots = [goalStats.homeShots, goalStats.awayShots];
+    out.tired = [];
+    var j, q;
+    for (j = 0; j < players.length; j++) {
+      q = players[j];
+      if (q.side !== 'home' || q.off) { continue; }
+      if (q.stam <= 40) {
+        out.tired.push({ name: short(q.name), pos: q.pos, stam: Math.round(q.stam) });
+      }
+    }
+    out.tired.sort(function (a, b) { return a.stam - b.stam; });
     var i, def;
     for (i = 0; i < hand.length; i++) {
       def = DS.cardOf(hand[i].key);
@@ -582,7 +643,12 @@
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
     var pi;
-    for (pi = 0; pi < players.length; pi++) { loadPortrait(players[pi]); }
+    for (pi = 0; pi < players.length; pi++) {
+      loadPortrait(players[pi]);
+      loadHead(players[pi]);
+      var vv = bodyVariant(players[pi]);
+      for (var bq = 0; bq < SPRITE_POSES.length; bq++) { loadBody(SPRITE_POSES[bq], vv); }
+    }
     benchState = (cfg.bench || []).map(function (b) {
       return { player: b.player, pos: b.player.pos, rating: DS.ratingOf(b.player), used: false };
     });
@@ -1208,6 +1274,15 @@
     }
     p.x = clamp(p.x, 2, WORLD_W - 2);
     p.y = clamp(p.y, 2, WORLD_H - 2);
+
+    /* 체력 소모 — 달린 양·지구력·압박 성향으로 결정. GK는 절반 */
+    if (!p.off) {
+      var toughS = (p.player && p.player.stamina) ? p.player.stamina : 6;
+      var drain = (0.60 + (p.moving ? 0.21 : 0)) * (1.22 - toughS * 0.038);
+      if (isGK(p)) { drain *= 0.55; }
+      if (p.side === 'home' && buffOf('press') > 0) { drain *= 1.10; }
+      p.stam = clamp(p.stam - drain * dt, 3, 100);
+    }
   }
 
   /* 화면 픽셀 → 월드 단위 환산비 (원근 투영 때문에 월드 단위 간격은 화면에서 왜곡된다) */
@@ -1989,6 +2064,10 @@
       halftimeDone = true;
       M.paused = true;
       M.halftime = true;
+      for (var hi = 0; hi < players.length; hi++) {
+        players[hi].stam = clamp(players[hi].stam + 11, 3, 100);
+      }
+      hudDirty = true;
       say('전반 종료! ' + M.homeScore + ' : ' + M.awayScore, 'big');
       say('선수들이 물을 들이킵니다. 하프타임에 교체를 준비하세요.', 'normal');
       if (cfg.onHalftime) { cfg.onHalftime(); }
@@ -2433,13 +2512,15 @@
     ctx.restore();
   }
 
-  /* 선수 1명 — 그림자 · 팀 오라 링 · 2.5등신 전신 일러스트 + 동작 연출 */
+  /* 선수 1명 — 그림자 · 팀 오라 링 · [공 없는 팀 유니폼 몸통 + 고유 얼굴] 합성 + 동작 연출 */
   function drawPlayer(p) {
     var g = scr(p.x, p.y);
     var pose = poseOf(p);
+    var sprPose = spritePoseOf(p);
     var sprH = SPR_H * g.s;
     var flip = p.facing < 0;
-    var rec = loadPortrait(p);
+    var headRec = loadHead(p);
+    var bodyRec = loadBody(sprPose, bodyVariant(p));
     var tf = TEAM_FX[p.side];
     var isCarrier = ball.carrier === p;
     var t = simTime;
@@ -2447,23 +2528,20 @@
 
     if (pose === 'dive') {
       var dk = clamp(1 - p.diveT / 0.7, 0, 1);
-      rot = Math.sin(dk * Math.PI * 0.62) * 1.25 * (p.diveDir >= 0 ? 1 : -1);
-      lift = -Math.sin(dk * Math.PI) * sprH * 0.18;
-      flip = false;
+      lift = -sprH * (0.10 + Math.sin(dk * Math.PI) * 0.16);
     } else if (pose === 'tackle') {
-      rot = 0.58 * clamp(p.poseT / 0.52, 0, 1);
-      lift = -sprH * 0.10;
-    } else if (pose === 'kick') {
-      rot = 0.17;
       lift = -sprH * 0.02;
+    } else if (pose === 'kick') {
+      rot = 0.06;
+      lift = -sprH * 0.03;
     } else if (pose === 'pass') {
-      rot = 0.10;
+      rot = 0.04;
     } else if (pose === 'celebrate') {
-      lift = -Math.abs(Math.sin(t * 6.4)) * sprH * 0.22;
-      rot = Math.sin(t * 6.4) * 0.05;
+      lift = -Math.abs(Math.sin(t * 6.4)) * sprH * 0.24;
+      rot = Math.sin(t * 6.4) * 0.06;
     } else if (pose === 'run' || pose === 'dribble') {
-      bounce = -Math.abs(Math.sin(p.phase * 1.55)) * sprH * 0.055;
-      rot = 0.07;
+      bounce = -Math.abs(Math.sin(p.phase * 1.55)) * sprH * 0.06;
+      rot = 0.03;
       squash = 1 + Math.sin(p.phase * 3.1) * 0.012;
     } else {
       squash = 1 + Math.sin(t * 2.2 + p.phase) * 0.012;
@@ -2471,86 +2549,100 @@
 
     /* 지면 그림자 */
     var shw = sprH * 0.30, shh = sprH * 0.105;
-    if (pose === 'tackle' || pose === 'dive') { shw *= 1.28; shh *= 0.82; }
-    ctx.fillStyle = 'rgba(3,20,14,0.36)';
+    if (pose === 'tackle' || pose === 'dive') { shw *= 1.32; shh *= 0.86; }
+    ctx.fillStyle = 'rgba(3,20,14,0.42)';
     ctx.beginPath();
     ctx.ellipse(g.x, g.y + 1, shw, shh, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    /* 팀 오라 링 — 홈 시안/블루, 원정 레드/오렌지 */
+    /* 팀 오라 링 — 0.1초 안에 피아 구분 (홈 시안 / 원정 레드) */
     var pulse = 0.5 + 0.5 * Math.sin(t * 4 + p.phase * 2);
     var hot = p.skillT > 0 || p.glow > 0;
     ctx.save();
-    ctx.strokeStyle = tf.ring;
-    ctx.lineWidth = isCarrier ? 1.8 : 1.15;
-    ctx.globalAlpha = isCarrier ? 0.95 : (hot ? 0.85 : 0.5);
     ctx.beginPath();
-    ctx.ellipse(g.x, g.y + 1, shw * 1.12, shh * 1.12, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = (hot ? 0.30 : (isCarrier ? 0.20 : 0.07)) + (isCarrier ? pulse * 0.08 : 0);
-    ctx.fillStyle = tf.fill + '1)';
-    ctx.beginPath();
-    ctx.ellipse(g.x, g.y + 1, shw * 1.12, shh * 1.12, 0, 0, Math.PI * 2);
+    ctx.ellipse(g.x, g.y + 1, shw * 1.16, shh * 1.16, 0, 0, Math.PI * 2);
+    ctx.fillStyle = tf.fill + (isCarrier ? '0.34)' : (hot ? '0.26)' : '0.17)'));
     ctx.fill();
+    ctx.lineWidth = isCarrier ? 2.3 : 1.7;
+    ctx.strokeStyle = tf.ring;
+    ctx.globalAlpha = isCarrier ? 1 : 0.92;
+    ctx.shadowColor = tf.ring;
+    ctx.shadowBlur = isCarrier ? 7 : 3.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    /* 안쪽 두 번째 링 — 잔디 위에서도 또렷하다 */
+    ctx.globalAlpha = 0.55 + pulse * 0.22;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y + 1, shw * 0.92, shh * 0.92, 0, 0, Math.PI * 2);
+    ctx.stroke();
     if (isCarrier) {
-      ctx.globalAlpha = 0.55 + pulse * 0.35;
+      ctx.globalAlpha = 0.7 + pulse * 0.3;
       ctx.setLineDash([4, 4]);
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
-      ctx.ellipse(g.x, g.y + 1, shw * 1.42, shh * 1.42, 0, 0, Math.PI * 2);
+      ctx.ellipse(g.x, g.y + 1, shw * 1.5, shh * 1.5, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
     }
     ctx.restore();
 
-    /* 2.5등신 전신 일러스트 */
-    if (rec.ready) {
-      var S = sprH * 1.18;
+    /* [몸통(팀 유니폼·공 없음) + 머리(고유 얼굴)] 합성 */
+    var bodyH = sprH * BODY_R;
+    var headH = sprH * HEAD_R;
+    if (bodyRec.ready) {
+      var bodyW = bodyRec.img.naturalWidth * bodyH / Math.max(1, bodyRec.img.naturalHeight);
       ctx.save();
-      ctx.translate(g.x, g.y + bounce);
+      ctx.translate(g.x, g.y + bounce + lift);
       if (flip) { ctx.scale(-1, 1); }
       if (rot) {
-        ctx.translate(0, -S * 0.50);
+        ctx.translate(0, -sprH * 0.45);
         ctx.rotate(rot);
-        ctx.translate(0, S * 0.50);
+        ctx.translate(0, sprH * 0.45);
       }
       if (squash !== 1) { ctx.scale(1 / squash, squash); }
       ctx.imageSmoothingEnabled = true;
-      /* 팀 컬러 림 라이트 — 일러스트 유니폼 색이 제각각이어도 편이 한눈에 구분된다 */
-      ctx.shadowColor = p.side === 'home' ? 'rgba(60,210,255,0.85)' : 'rgba(255,96,64,0.85)';
-      ctx.shadowBlur = isCarrier ? 10 : 5.5;
-      ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
+      /* 팀 컬러 림 라이트 — 멀리서도 같은 편이 한눈에 보인다 */
+      ctx.shadowColor = tf.ring;
+      ctx.shadowBlur = isCarrier ? 9 : 5;
+      ctx.drawImage(bodyRec.img, -bodyW / 2, -bodyH, bodyW, bodyH);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
-      ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
+      ctx.drawImage(bodyRec.img, -bodyW / 2, -bodyH, bodyW, bodyH);
+      if (headRec.ready) {
+        var headW = headRec.img.naturalWidth * headH / Math.max(1, headRec.img.naturalHeight);
+        var hy = -bodyH - headH + sprH * 0.075;   /* 턱을 카라에 살짝 겹친다 */
+        ctx.drawImage(headRec.img, -headW / 2, hy, headW, headH);
+      }
       ctx.restore();
     } else {
-      /* 로드 전 폴백 — 팀 컬러 2.5등신 미니 실루엣 (일러스트가 도착하면 바로 교체) */
+      /* 로드 전 폴백 — 팀 컬러 2.5등신 미니 실루엣 */
       ctx.save();
       ctx.globalAlpha = 0.82;
       var fh = sprH;
-      /* 다리 */
       ctx.fillStyle = tf.plate;
       ctx.fillRect(g.x - fh * 0.13, g.y - fh * 0.28, fh * 0.10, fh * 0.28);
       ctx.fillRect(g.x + fh * 0.03, g.y - fh * 0.28, fh * 0.10, fh * 0.28);
-      /* 몸통 */
       ctx.fillStyle = tf.deep;
       ctx.beginPath();
       ctx.ellipse(g.x, g.y - fh * 0.44, fh * 0.19, fh * 0.19, 0, 0, Math.PI * 2);
       ctx.fill();
-      /* 어깨 라인 */
       ctx.strokeStyle = tf.ring;
       ctx.lineWidth = Math.max(0.8, fh * 0.045);
       ctx.beginPath();
       ctx.moveTo(g.x - fh * 0.17, g.y - fh * 0.50);
       ctx.lineTo(g.x + fh * 0.17, g.y - fh * 0.50);
       ctx.stroke();
-      /* 머리 */
       ctx.fillStyle = tf.deep;
       ctx.beginPath();
       ctx.arc(g.x, g.y - fh * 0.74, fh * 0.17, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+    }
+
+    /* 체력 경고 배지 — 40% 이하 노랑 · 25% 미만 빨강 */
+    if (p.stam <= 40) {
+      drawFatigue(p, g, sprH, bounce + lift);
     }
 
     /* 공 소유자 이름표 */
@@ -2569,6 +2661,33 @@
       ctx.fillText(label, g.x, g.y + 4 + lh / 2 + 0.4);
       ctx.textAlign = 'left';
     }
+  }
+
+  /* 체력 40% 이하 경고 — 머리 위 작은 게이지 (노랑 25~40% / 빨강 25% 미만) */
+  function drawFatigue(p, g, sprH, liftY) {
+    var critical = p.stam < 25;
+    var col = critical ? '#ff3b30' : '#ffd23b';
+    var y = g.y + (liftY || 0) - sprH * 1.02 - 4;
+    if (y < 4) { y = g.y + 6; }
+    var w = clamp(sprH * 0.34, 8, 14), h = clamp(sprH * 0.15, 3.4, 5.6);
+    var pulse = critical ? 0.55 + 0.45 * Math.sin(simTime * 9) : 0.92;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = 'rgba(6,20,16,0.55)';
+    roundRect(g.x - w / 2 - 1, y - h / 2 - 1, w + 2, h + 2, (h + 2) / 2);
+    ctx.fill();
+    ctx.fillStyle = col;
+    roundRect(g.x - w / 2, y - h / 2, w, h, h / 2);
+    ctx.fill();
+    /* 남은 체력만큼만 채운다 */
+    ctx.fillStyle = 'rgba(8,24,18,0.72)';
+    roundRect(g.x - w / 2 + w * (p.stam / 40) * 0.98, y - h / 2, w * (1 - (p.stam / 40) * 0.98), h, h / 2);
+    ctx.fill();
+    ctx.strokeStyle = critical ? 'rgba(255,190,180,0.95)' : 'rgba(30,40,10,0.55)';
+    ctx.lineWidth = 0.8;
+    roundRect(g.x - w / 2, y - h / 2, w, h, h / 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function draw() {
@@ -2676,6 +2795,7 @@
         pos: p.pos, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
         pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
+        stam: Math.round(p.stam), spritePose: spritePoseOf(p), bodyVariant: bodyVariant(p),
         bubble: p.bubble ? p.bubble.text : null,
         screen: (function () {
           var g = scr(p.x, p.y);
