@@ -2689,12 +2689,14 @@
       g.beginPath(); g.ellipse(cx - 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
       g.beginPath(); g.ellipse(cx + 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
 
-      /* 얼굴 — 일러스트 크롭 */
+      /* 얼굴 — 일러스트 크롭 (투명 여백은 피부색으로 채운다) */
       var img = Art.headImage(p);
+      g.fillStyle = skin;
+      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.fill();
       g.save();
       g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
       if (img && (img.naturalWidth || img.width) > 0) {
-        g.drawImage(img, cx - 15.4, cy - 16.0, 30.8, 32.0);
+        g.drawImage(img, cx - 19.2, cy - 20.6, 38.4, 40.0);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
