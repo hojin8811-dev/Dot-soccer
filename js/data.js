@@ -2315,9 +2315,10 @@
     headImgCache[n] = img;
     return img;
   };
+  /* 이미지가 디코드되면 complete 플래그가 늦게 서는 브라우저가 있어 naturalWidth 로 판정 */
   Art.headReady = function (p) {
     var img = Art.headImage(p);
-    return !!(img && img.complete && (img.naturalWidth || img.width) > 0);
+    return !!(img && (img.naturalWidth || img.width) > 0);
   };
   /* 경기 전 얼굴 이미지 프리로드 — 첫 프레임부터 얼굴이 뜨도록 */
   Art.preloadHeads = function (list) {
@@ -2692,7 +2693,7 @@
       var img = Art.headImage(p);
       g.save();
       g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
-      if (img && img.complete && (img.naturalWidth || img.width) > 0) {
+      if (img && (img.naturalWidth || img.width) > 0) {
         g.drawImage(img, cx - 15.4, cy - 16.0, 30.8, 32.0);
       } else {
         g.fillStyle = skin;

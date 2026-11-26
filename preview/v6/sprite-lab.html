@@ -96,7 +96,7 @@
       cv.setAttribute('data-pose', h.pose);
       paintCell(cv);
       var img = Art.headImage(h.p);
-      if (img && !img.complete) { img.onload = function () { paintCell(cv); }; }
+      if (img && !(img.naturalWidth > 0)) { img.onload = function () { paintCell(cv); }; }
     })(hc[i], heroes[i]);
   }
 
@@ -110,14 +110,14 @@
       cv.__gk = cv.getAttribute('data-gk') === '1';
       paintCell(cv);
       var img = Art.headImage(cv.__fake);
-      if (img && !img.complete) { img.onload = function () { paintCell(cv); }; }
+      if (img && !(img.naturalWidth > 0)) { img.onload = function () { paintCell(cv); }; }
     })(cvs[i]);
   }
   /* 이미지 늦게 뜨는 경우 한 번 더 */
   setTimeout(function () {
     var all = host.querySelectorAll('canvas');
     for (var k = 0; k < all.length; k++) { paintCell(all[k]); }
-  }, 1200);
+  }, 2200);
 })();
 </script>
 </body>
