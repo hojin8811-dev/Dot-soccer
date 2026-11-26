@@ -1215,9 +1215,9 @@
     { hair: 'spiky',    color: '#e3c169', skin: '#f7d7b2' },
     { hair: 'ponytail', color: '#d5d8dc', skin: '#f6d4ae' }
   ];
-  /* v21 — p331~p500 신규 170종. 아트가 함께 배포될 때 PIC_MAX 를 500으로 올린다.
-     500일 때 gk = 6·15·20 · 294~330 · 471~500 = 70종 / field = 430종 (assets/portraits/pools.json 과 같다) */
-  var PIC_MAX = 330;
+  /* v21 — p331~p500 신규 170종. gk = 6·15·20 · 294~330 · 331~350 = 60종 / field = 440종
+     (assets/portraits/pools.json 과 같다) */
+  var PIC_MAX = 500;
   DS.PIC_COUNT = PIC_MAX;
   DS.PIC_LEGACY = 330;
   /* p37~p330: 일러스트 시트에서 슬라이스된 나머지 선수 — 번호 기반으로 헤어·피부를 고정 배정 */
@@ -1246,7 +1246,7 @@
   (function () {
     var n;
     for (n = 294; n <= DS.PIC_LEGACY; n++) { GK_PORTRAITS.push(n); }
-    for (n = 471; n <= DS.PIC_COUNT; n++) { GK_PORTRAITS.push(n); }
+    for (n = 331; n <= 350; n++) { GK_PORTRAITS.push(n); }
     for (n = 1; n <= DS.PIC_COUNT; n++) {
       if (GK_PORTRAITS.indexOf(n) < 0) { FIELD_PORTRAITS.push(n); }
     }
@@ -2548,9 +2548,8 @@
     var n = (p && p.pic) ? p.pic : 1;
     return Art.assetPrefix + 'assets/portraits/p' + pad3(n) + '.png';
   };
-  /* 감독 일러스트 (assets/managers/m01~m32) — v21 아트가 들어오기 전에는
-     m33~m50도 기존 32장의 얼굴을 돌려 쓴다(깨진 이미지 방지). 아트 배포 시 MGR_ART_MAX 를 50으로. */
-  var MGR_ART_MAX = 32;
+  /* m33~m50 신규 감독 일러스트(m33~m50.png)가 함께 배포되므로 폴백을 쓰지 않는다. */
+  var MGR_ART_MAX = 50;
   function mgrArtNo(mgr) {
     var n = parseInt((mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '1', 10) || 1;
     if (n > MGR_ART_MAX) { n = ((n - MGR_ART_MAX - 1) % MGR_ART_MAX) + 1; }
