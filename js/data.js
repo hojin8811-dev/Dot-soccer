@@ -2702,7 +2702,7 @@
       g.save();
       g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
       if (img && (img.naturalWidth || img.width) > 0) {
-        g.drawImage(img, cx - 15.4, cy - 15.4, 30.8, 31.6);
+        g.drawImage(img, cx - 17.0, cy - 19.2, 34.0, 36.0);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
