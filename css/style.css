@@ -1044,12 +1044,18 @@ main::-webkit-scrollbar { width: 0; height: 0; }
 main { margin-left: 54px; padding: 7px 8px 8px; }
 .screen.on {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));
-  gap: 7px; align-content: start;
+  gap: 7px; align-content: start; align-items: start;
 }
 .screen.on > .card, .screen.on > .mgr-wrap, .screen.on > .grid3 { margin: 0; }
 .hero { grid-column: 1 / -1; margin: 0; }
-.hero-img { height: 104px; }
-.hero-title { font-size: 21px; }
+.hero-img { height: 84px; }
+.hero-title { font-size: 19px; }
+.hero-in { padding: 9px 12px 11px; }
+.hero-kicker { font-size: 8px; }
+.vs { padding: 2px 0 6px; }
+.vs-team canvas { width: 30px; height: 35px; }
+.vs-mid b { font-size: 13px; }
+.card .btn.wide { height: 32px; }
 .card { padding: 10px 11px; margin-bottom: 7px; border-radius: 13px; }
 .card-head { margin-bottom: 6px; }
 .kpi { padding: 6px 5px; }
