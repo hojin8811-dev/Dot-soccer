@@ -1651,7 +1651,8 @@ body.rot-off .rotate { display: none; }
 .yth.on { border-color: var(--lime2); box-shadow: 0 0 0 1px var(--lime2) inset; }
 .yth .ph { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; background: #e8e4d5; }
 .yth .nm { font-size: 9px; font-weight: 900; }
-.yth .mt { display: flex; align-items: center; gap: 2px; font-size: 7px; }
+.yth .mt { display: flex; align-items: center; gap: 2px; font-size: 7px; flex-wrap: nowrap; }
+.yth .mt .ov { margin-left: auto; padding-right: 1px; }
 .yth .ov { font-size: 10px; font-weight: 900; color: var(--ink); }
 .yth .pot { font-size: 7px; display: flex; align-items: center; gap: 2px; }
 .yth .pot .stars { font-size: 8px; letter-spacing: .5px; }

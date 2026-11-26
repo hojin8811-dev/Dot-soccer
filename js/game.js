@@ -1654,7 +1654,7 @@
       fxHTML +
       '<button class="btn wide ' + (mgrSync() ? 'ghost' : 'primary') + '" style="margin:8px 0 4px" data-act="mgrform" ' + (mgrSync() ? 'disabled' : '') + '>' +
       (mgrSync() ? m.formation + ' · 고유 포메이션 적용중' : m.formation + ' · 고유 포메이션 원클릭 적용') + '</button>' +
-      '<div class="band">보유 감독 <span>' + S.managers.length + '명 / 32명</span></div>' +
+      '<div class="band">보유 감독 <span>' + S.managers.length + '명 / ' + DS.MANAGERS.length + '명</span></div>' +
       '<div class="mlist">' + ownHTML + '</div>' +
       '<div class="band">영입 후보 <span>골드로 영입 · 즉시 선임</span></div>' +
       '<div class="mlist">' + candHTML + '</div>' +

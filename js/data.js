@@ -754,7 +754,7 @@
   DS.MANAGER_TRAIT_LIST = MANAGER_TRAIT_LIST;
   DS.managerTrait = function (key) { return MANAGER_TRAITS[key] || MANAGER_TRAITS.org; };
 
-  /* ─────────────────────────  감독 32명 (100% 가상 창작)  ───────────────────────── */
+  /* ─────────────────────────  감독 50명 (100% 가상 창작)  ───────────────────────── */
   /* rarity: 동/은/금/전설 · formation: 고유 포메이션 · alt: 두 번째 포메이션
      tacticStyle: 전술 철학(경기 엔진이 실제 좌표·패스·압박을 바꾼다) · tacticLine: 1줄 전술 특징 · traits: 특기 1~2종 */
   var MANAGERS = [
