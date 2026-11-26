@@ -28,7 +28,7 @@
   var ctx = null;
   var W = 390, H = 430, dpr = 1;
   var field = { x: 6, y: 6, w: 378, h: 418 };
-  var SPR_H = 56;            /* 피치 선수 스프라이트 높이(px) */
+  var SPR_H = 28;            /* 피치 선수 스프라이트 높이(px) — v8: v7의 절반 */
   var BALL_G = 150;          /* 공 중력(월드 단위/s^2) */
   var pitchLayer = null;
 
@@ -780,7 +780,7 @@
     ctx.imageSmoothingEnabled = true;
     /* 가로 피치 — 스타디움 이미지가 캔버스를 꽉 채운다 */
     field = { x: 0, y: 0, w: W, h: H };
-    SPR_H = Math.round(clamp(H * 0.168, 38, 82));
+    SPR_H = Math.round(clamp(H * 0.084, 20, 42));   /* v8: v7(0.168)의 정확히 절반 크기 */
     loadPitchImage();
     buildPitchLayer();
   }
@@ -1069,21 +1069,25 @@
     var a = anchorOf(p);
     var push = stagePush(p, st);
     var g = groupOf(p);
-    var kx = g === 'DF' ? 0.34 : (g === 'MF' ? 0.36 : 0.28);   /* 볼-사이드 압축 */
-    var ky = g === 'DF' ? 0.16 : (g === 'MF' ? 0.22 : 0.24);
-    var spread = 0.80 + m.width / 100 * 0.55;   /* 폭 지표: 넓은 포메이션은 더 벌어진다 */
-    var tx = 50 + (a.x - 50) * spread + (ball.x - 50) * kx;
-    var ty = a.y + (ball.y - 60) * ky + z.dir * push;
+    var kx = g === 'DF' ? 0.17 : (g === 'MF' ? 0.19 : 0.13);   /* v8: 볼 쪽 압축을 줄여 포메이션 대형을 지킨다 */
+    var ky = g === 'DF' ? 0.08 : (g === 'MF' ? 0.11 : 0.12);
+    var spread = 0.94 + m.width / 100 * 0.52;   /* 폭 지표: 넓은 포메이션은 더 벌어진다 */
+    /* 공에서 먼 선수일수록 자기 구역을 지킨다 (전원이 볼로 몰리지 않게) */
+    var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 18) / 55, 0.14, 1);
+    var tx = 50 + (a.x - 50) * spread + (ball.x - 50) * kx * hold;
+    var ty = a.y + (ball.y - 60) * ky * hold + z.dir * push;
 
     /* 반대편 윙어는 폭을 유지해 전환 패스 각을 만든다 */
     var farWing = (a.x < 38 && ball.x > 62) || (a.x > 62 && ball.x < 38);
     if (farWing && !isFwdGroup(p) && st !== 'final') {
-      tx = 50 + (a.x - 50) * (spread + 0.12);
+      tx = 50 + (a.x - 50) * (spread + 0.10);
     }
 
-    /* 측면: 윙어·윙백은 터치라인까지 벌린다 */
-    if ((p.pos === 'LWF' || p.pos === 'LWB') && (st === 'wide' || st === 'final')) { tx = 2; }
-    if ((p.pos === 'RWF' || p.pos === 'RWB') && (st === 'wide' || st === 'final')) { tx = 98; }
+    /* 측면: 윙어·윙백은 전 구간에서 터치라인을 넓게 쓴다 */
+    if (p.pos === 'LWF') { tx = st === 'build' ? 11 : 3.5; }
+    else if (p.pos === 'RWF') { tx = st === 'build' ? 89 : 96.5; }
+    else if (p.pos === 'LWB') { tx = st === 'build' ? 9 : 4; }
+    else if (p.pos === 'RWB') { tx = st === 'build' ? 91 : 96; }
 
     /* 윙백 오버래핑: 폭 넓은 백3·백5 포메이션은 터치라인을 타고 박스 옆까지 올라간다 */
     if ((p.pos === 'LWB' || p.pos === 'RWB') && m.width >= 64) {
@@ -1096,7 +1100,7 @@
     /* 최전방: 박스 안으로 파고든다 */
     if (isFwdGroup(p) && st === 'final') {
       ty = attackGoalY(p.side) - z.dir * 13;
-      tx = 50 + (a.x - 50) * 0.42;
+      tx = 50 + (a.x - 50) * 0.72;
     }
 
     /* 하프스페이스 카드: AM/WF 대각선 침투 */
@@ -1133,9 +1137,14 @@
     var a = anchorOf(p);
     var g = groupOf(p);
     var m = metricsOf(p.side);
-    var compress = 0.80 - (m.width / 100) * 0.12;   /* 좁은 포메이션은 중앙으로 더 모인다 */
-    var tx = 50 + (a.x - 50) * compress + (ball.x - 50) * 0.32;
-    var ty = a.y + (ball.y - 60) * 0.14;
+    var compress = 0.94 - (m.width / 100) * 0.06;   /* 좁은 포메이션은 중앙으로 더 모인다 */
+    /* 공에서 먼 수비수는 자기 구역·라인 간격을 유지한다 */
+    var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 16) / 50, 0.16, 1);
+    var tx = 50 + (a.x - 50) * compress + (ball.x - 50) * 0.18 * hold;
+    var ty = a.y + (ball.y - 60) * 0.08 * hold;
+    /* 윙어·윙백은 수비 시에도 터치라인 폭을 지켜 상대 전환 패스를 막는다 */
+    if (p.pos === 'LWF' || p.pos === 'LWB') { tx = Math.min(tx, 13); }
+    if (p.pos === 'RWF' || p.pos === 'RWB') { tx = Math.max(tx, 87); }
     var drop = 0;
     if (play.recoverT > 0 && play.recoverSide === p.side) { drop += 4; }
     if (tactic === 'defense' && p.side === 'home') { drop += 3; }
@@ -1145,7 +1154,7 @@
       var mk = p.mark;
       var gap = p.side === 'home' ? 2.4 : -2.4;
       var tight = (p.side === 'home' && buffOf('def') > 0 && isDefGroup(p)) ? 0.62 : 0;
-      var w = 0.5 + tight * 0.25;
+      var w = 0.40 + tight * 0.28;
       tx = tx * (1 - w) + (mk.x + tight * 0.7 * (mk.x < 50 ? 1 : -1)) * w;
       ty = ty * (1 - w) + (mk.y + gap) * w;
       if (p.side === 'home' && buffOf('offside') > 0 && g === 'DF') { ty -= 3; }
@@ -1201,20 +1210,46 @@
     p.y = clamp(p.y, 2, WORLD_H - 2);
   }
 
+  /* 화면 픽셀 → 월드 단위 환산비 (원근 투영 때문에 월드 단위 간격은 화면에서 왜곡된다) */
+  function sepRates(v) {
+    var l = field.x + field.w * (PROJ.farL + (PROJ.nearL - PROJ.farL) * v);
+    var r = field.x + field.w * (PROJ.farR + (PROJ.nearR - PROJ.farR) * v);
+    return {
+      ky: Math.max(0.5, (r - l) / WORLD_H),
+      kx: Math.max(0.2, field.h * (PROJ.nearY - PROJ.farY) * (0.52 + 0.96 * v) / WORLD_W)
+    };
+  }
+
+  /* v8: 화면 픽셀 기준 분리 — 22명이 한 덩어리로 뭉치지 않게 선수 크기에 맞춘 최소 이격을 강제한다 */
   function separate() {
-    var i, j, a, b, dx, dy, d, minD = 3.0;
-    for (i = 0; i < players.length; i++) {
-      a = players[i];
-      for (j = i + 1; j < players.length; j++) {
-        b = players[j];
-        dx = b.x - a.x; dy = b.y - a.y;
-        d = Math.hypot(dx, dy);
-        if (d > 0.01 && d < minD) {
-          var push = (minD - d) * 0.32;
-          a.x -= (dx / d) * push; a.y -= (dy / d) * push;
-          b.x += (dx / d) * push; b.y += (dy / d) * push;
+    var i, j, a, b, dx, dy, rt, sx, sy, dpx, minPx, push, ux, uy, sa, sb, pass;
+    for (pass = 0; pass < 2; pass++) {
+      for (i = 0; i < players.length; i++) {
+        a = players[i];
+        for (j = i + 1; j < players.length; j++) {
+          b = players[j];
+          dx = b.x - a.x; dy = b.y - a.y;
+          rt = sepRates(clamp((WORLD_H - (a.y + b.y) / 2) / WORLD_H, 0, 1));
+          sx = -dy * rt.ky;              /* 화면 x 차이(px) */
+          sy = dx * rt.kx;               /* 화면 y 차이(px) */
+          dpx = Math.hypot(sx, sy);
+          sa = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(a.x / WORLD_W, 0, 1);
+          sb = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(b.x / WORLD_W, 0, 1);
+          minPx = SPR_H * 0.56 * (sa + sb) / 2;
+          if (dpx > 0.01 && dpx < minPx) {
+            push = (minPx - dpx) * 0.5 * 0.86;
+            ux = sx / dpx; uy = sy / dpx;
+            a.x -= (uy * push) / rt.kx;
+            a.y += (ux * push) / rt.ky;
+            b.x += (uy * push) / rt.kx;
+            b.y -= (ux * push) / rt.ky;
+          }
         }
       }
+    }
+    for (i = 0; i < players.length; i++) {
+      players[i].x = clamp(players[i].x, 2, WORLD_W - 2);
+      players[i].y = clamp(players[i].y, 2, WORLD_H - 2);
     }
   }
 
@@ -1328,6 +1363,8 @@
         score += Math.min(18, Math.max(0, fwd)) * mfx('org') * 0.03;
       }
       if (q.mark && q.mark === p) { score -= 4; }
+      /* 반대편 전환: 볼에서 먼 쪽 윙어·풀백이 비어 있으면 적극적으로 본다 */
+      if (Math.abs(q.x - p.x) > 22 && open > 6) { score += 9; }
       score += Math.random() * 5;
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
     }
@@ -1335,8 +1372,8 @@
     var type = 'short';
     if (play.stage === 'final' && (p.x < 24 || p.x > 76) && best.fwd > -2) { type = 'cross'; }
     else if (through && best.fwd > 5 && best.open > 4) { type = 'through'; }
+    else if (Math.abs(best.q.x - p.x) > 20 && chance(0.62)) { type = 'switch'; }
     else if (play.stage === 'mid' && best.fwd > 8 && best.open > 8 && chance(0.45)) { type = 'through'; }
-    else if (Math.abs(best.q.x - p.x) > 26 && Math.abs(p.x - 50) < 24) { type = 'switch'; }
     else if (best.fwd > 5) { type = 'progressive'; }
     return kickPass(p, best.q, type);
   }
@@ -1368,7 +1405,7 @@
       if (buffOf('tiki') > 0 && chance(0.5)) { bubble(p, '👟 원투패스!', '#8ff0b6', 1.1); }
     }
     var dist = Math.hypot(tx - p.x, ty - p.y);
-    speed = clamp(dist * 2.4, 32, 74) * (buffOf('tiki') > 0 ? 1.14 : 1);
+    speed = clamp(dist * 2.9, 40, 90) * (buffOf('tiki') > 0 ? 1.14 : 1);
     ball.x = p.x;
     ball.y = p.y + goalDir(p.side) * 0.8;
     kickBall(p, tx, ty, speed, 'pass', q, type === 'short' ? 0 : 1);
@@ -2069,7 +2106,7 @@
       if (near.player && near.dist < 3.1) { tryTackle(near.player, c, dt); }
       actionTimer -= dt;
       if (actionTimer <= 0 && ball.carrier === c) {
-        actionTimer = 0.32 + Math.random() * 0.2;
+        actionTimer = 0.26 + Math.random() * 0.16;
         decide();
       }
       return;
@@ -2088,7 +2125,7 @@
       var last = ball.trail[ball.trail.length - 1];
       if (Math.hypot(last.x - ball.x, last.y - ball.y) > 0.8) {
         ball.trail.push({ x: ball.x, y: ball.y, z: ball.z });
-        if (ball.trail.length > 16) { ball.trail.shift(); }
+        if (ball.trail.length > 22) { ball.trail.shift(); }
       }
     }
 
@@ -2206,6 +2243,53 @@
     ctx.closePath();
   }
 
+  /* 실제 경기 공 — 일러스트에 그려진 공과 헷갈리지 않게 네온 링·진한 외곽선·그림자 */
+  function drawMatchBall(x, y, r, groundY) {
+    var hot = ball.kind === 'shot';
+    var airborne = ball.z > 0.05;
+    var gy = (groundY == null ? y + r * 1.02 : groundY);
+    /* 바닥 그림자 — 공중에 뜨면 지면에 따로 남는다 */
+    ctx.save();
+    ctx.globalAlpha = airborne ? 0.24 : 0.42;
+    ctx.fillStyle = '#02110c';
+    ctx.beginPath();
+    ctx.ellipse(x, gy + (airborne ? 0 : r * 0.02), r * 1.08, r * 0.46, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    /* 네온 발광 링 */
+    var glowR = r * (hot ? 3.2 : 2.4);
+    var gr = ctx.createRadialGradient(x, y, r * 0.45, x, y, glowR);
+    gr.addColorStop(0, hot ? 'rgba(255,246,186,0.95)' : 'rgba(206,255,246,0.80)');
+    gr.addColorStop(0.5, hot ? 'rgba(255,196,84,0.38)' : 'rgba(120,242,255,0.30)');
+    gr.addColorStop(1, 'rgba(120,242,255,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2); ctx.fill();
+    /* 흰 공 본체 */
+    ctx.save();
+    ctx.shadowColor = hot ? 'rgba(255,222,126,0.95)' : 'rgba(150,255,242,0.92)';
+    ctx.shadowBlur = r * 1.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    /* 선명한 검은 외곽선 */
+    ctx.lineWidth = Math.max(1.2, r * 0.22);
+    ctx.strokeStyle = '#08120d';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    /* 오각 패널 — 굴러가는 느낌으로 살짝 회전 */
+    ctx.fillStyle = '#14211b';
+    ctx.beginPath(); ctx.arc(x - r * 0.06, y - r * 0.10, r * 0.32, 0, Math.PI * 2); ctx.fill();
+    var k, a2;
+    for (k = 0; k < 4; k++) {
+      a2 = simTime * 1.7 + k * Math.PI / 2;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a2) * r * 0.64, y + Math.sin(a2) * r * 0.64, r * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    /* 하이라이트 */
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.arc(x - r * 0.30, y - r * 0.36, r * 0.20, 0, Math.PI * 2); ctx.fill();
+  }
+
   function drawPressZone() {
     if (buffOf('press') <= 0) { return; }
     var pc = pressConfig('home');
@@ -2235,9 +2319,9 @@
     var bend = Math.min(16, len * 0.10);
     mx += nx / len * bend; my += ny / len * bend;
     ctx.save();
-    ctx.globalAlpha = 0.35 + a * 0.6;
+    ctx.globalAlpha = 0.5 + a * 0.5;
     ctx.strokeStyle = pl.color;
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.6;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
@@ -2297,14 +2381,15 @@
     var txt = b.text;
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.font = '900 9.5px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 ' + (clamp(SPR_H * 0.30, 7.4, 9.5)).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var tw = ctx.measureText(txt).width;
-    var bw = tw + 15, bh = 16;
+    var bh = Math.round(clamp(SPR_H * 0.48, 12, 16));
+    var bw = tw + bh * 0.9;
     var rise = (1 - clamp(b.t / b.t0, 0, 1)) * 4;
     var below = false;
-    var by = py - sprH - 8 - rise - (extraUp || 0);
+    var by = py - sprH - 5 - rise - (extraUp || 0);
     if (by < 3) { by = py + 6 + (extraUp || 0); below = true; }
     var bx = px - bw / 2;
     if (bx < 3) { bx = 3; }
@@ -2383,7 +2468,7 @@
     var hot = p.skillT > 0 || p.glow > 0;
     ctx.save();
     ctx.strokeStyle = tf.ring;
-    ctx.lineWidth = isCarrier ? 2.3 : 1.5;
+    ctx.lineWidth = isCarrier ? 1.8 : 1.15;
     ctx.globalAlpha = isCarrier ? 0.95 : (hot ? 0.85 : 0.5);
     ctx.beginPath();
     ctx.ellipse(g.x, g.y + 1, shw * 1.12, shh * 1.12, 0, 0, Math.PI * 2);
@@ -2419,7 +2504,7 @@
       ctx.imageSmoothingEnabled = true;
       /* 팀 컬러 림 라이트 — 일러스트 유니폼 색이 제각각이어도 편이 한눈에 구분된다 */
       ctx.shadowColor = p.side === 'home' ? 'rgba(60,210,255,0.85)' : 'rgba(255,96,64,0.85)';
-      ctx.shadowBlur = isCarrier ? 12 : 7;
+      ctx.shadowBlur = isCarrier ? 10 : 5.5;
       ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
       ctx.shadowBlur = 0;
       ctx.shadowColor = 'transparent';
@@ -2441,16 +2526,18 @@
 
     /* 공 소유자 이름표 */
     if (isCarrier) {
-      ctx.font = '700 9px system-ui, -apple-system, sans-serif';
+      var lb = clamp(SPR_H * 0.26, 6.5, 9);
+      ctx.font = '700 ' + lb.toFixed(1) + 'px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       var label = short(p.name);
-      var tw2 = ctx.measureText(label).width + 10;
+      var lh = lb + 3.4;
+      var tw2 = ctx.measureText(label).width + lh * 0.8;
       ctx.fillStyle = 'rgba(6,26,22,0.80)';
-      roundRect(g.x - tw2 / 2, g.y + 5, tw2, 12, 6);
+      roundRect(g.x - tw2 / 2, g.y + 4, tw2, lh, lh / 2);
       ctx.fill();
       ctx.fillStyle = p.side === 'home' ? '#d9f7ff' : '#ffe2d8';
-      ctx.fillText(label, g.x, g.y + 11.5);
+      ctx.fillText(label, g.x, g.y + 4 + lh / 2 + 0.4);
       ctx.textAlign = 'left';
     }
   }
@@ -2482,7 +2569,7 @@
       var g = scr(p.x, p.y);
       var up = 0, guard = 0, q;
       for (q = 0; q < placed.length && guard < 4; q++) {
-        if (Math.abs(placed[q].x - g.x) < 52 && Math.abs(placed[q].y - g.y) < 26) { up += 17; guard++; }
+        if (Math.abs(placed[q].x - g.x) < 44 && Math.abs(placed[q].y - g.y) < 22) { up += 13; guard++; }
       }
       placed.push({ x: g.x, y: g.y });
       drawBubble(p, g.x, g.y, SPR_H * g.s, up);
@@ -2491,7 +2578,7 @@
     /* 볼 — 높이(z)에 따라 지면 그림자와 분리된다 */
     var bp = scr(ball.x, ball.y);
     var zpx = depthPx(ball.z);
-    var r = Math.max(4.0, W / 115) * (1 + Math.min(0.3, zpx * 0.004));
+    var r = Math.max(4.4, W / 108) * (1 + Math.min(0.3, zpx * 0.004));
     if (zpx > 0.6) {
       ctx.save();
       ctx.globalAlpha = clamp(0.36 - zpx * 0.006, 0.06, 0.36);
@@ -2509,7 +2596,7 @@
       ctx.fillStyle = gr2;
       ctx.beginPath(); ctx.arc(bp.x, byy, r * 3.4, 0, Math.PI * 2); ctx.fill();
     }
-    DS.Art.drawBall(ctx, bp.x, bp.y - zpx - r * 0.35, r);
+    drawMatchBall(bp.x, bp.y - zpx - r * 0.35, r, bp.y);
 
     if (artGateOn) {
       var ready = Math.max(0, portraitNeed - portraitLeft);
