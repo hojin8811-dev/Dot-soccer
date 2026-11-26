@@ -1409,6 +1409,8 @@
           sa = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(a.x / WORLD_W, 0, 1);
           sb = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(b.x / WORLD_W, 0, 1);
           minPx = SPR_H * 0.70 * (sa + sb) / 2;
+          /* 볼 소유자와 수비수는 실제로 붙어야 태클이 생긴다 — 이 쌍만 이격을 풀어 준다 */
+          if (a === ball.carrier || b === ball.carrier) { minPx = SPR_H * 0.26 * (sa + sb) / 2; }
           if (dpx > 0.01 && dpx < minPx) {
             push = (minPx - dpx) * 0.5 * 0.86;
             ux = sx / dpx; uy = sy / dpx;
@@ -1870,11 +1872,13 @@
 
   function tryTackle(defender, carrier, dt) {
     var d = d2(defender, carrier);
-    if (d > 3.1) { return; }
+    if (d > 5.2) { return; }
+    /* 가까울수록 성공 확률이 높다 (v10 — 분리 간격 때문에 예전 3.1로는 거의 닿지 못했다) */
+    var near = clamp(1.18 - (d - 3.2) / 9, 0.42, 1.18);
     var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 : 0);
     if (defender.side === 'home') { defSkill += mfx('def') * 1.2 + mfx('press') * 1.0; }
     var atkSkill = carrier.player.stats.spd * 0.7 + carrier.player.stats.atk * 0.3 + 12;
-    var pT = clamp(1.25 * (defSkill / (defSkill + atkSkill)) * dt * 1.9, 0, 0.5);
+    var pT = clamp(0.85 * (defSkill / (defSkill + atkSkill)) * dt * 1.9 * near, 0, 0.5);
     if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1.45; }
     if (buffOf('tiki') > 0 && carrier.side === 'home') { pT *= 0.75; }
     if (!chance(pT)) { return; }
@@ -2308,8 +2312,8 @@
       ball.y = c.y + goalDir(c.side) * 1.4;
       ball.z = 0; ball.vz = 0;
       ball.flight = 0;
-      var near = nearestOpponent(c, 4.0);
-      if (near.player && near.dist < 3.1) { tryTackle(near.player, c, dt); }
+      var near = nearestOpponent(c, 6.0);
+      if (near.player && near.dist < 5.2) { tryTackle(near.player, c, dt); }
       actionTimer -= dt;
       if (actionTimer <= 0 && ball.carrier === c) {
         actionTimer = 0.26 + Math.random() * 0.16;
