@@ -1261,3 +1261,10 @@ body.rot-off .rotate { display: none; }
 .sq-syn .row b { display: none; }
 .sq-syn .chip { font-size: 8px; height: 17px; padding: 0 6px; }
 .mgr-strip-btn { margin-left: auto; font-size: 8.5px; font-weight: 800; color: var(--lime); border: 1px solid rgba(200,241,105,.4); border-radius: 7px; padding: 2px 6px; white-space: nowrap; }
+
+/* 결과서 · 모달 — 가로에서 2단 흐름 */
+#modal[data-report="1"] .sheet { max-width: 780px; }
+#modal[data-report="1"] .sheet-body { column-count: 2; column-gap: 12px; }
+#modal[data-report="1"] .sheet-body > * { break-inside: avoid; }
+.rs-score i { font-style: normal; color: var(--ink3); font-size: 16px; }
+.sub-panel .sub-cols { grid-template-columns: 1fr 1fr; }
