@@ -75,13 +75,15 @@
   DS.posName = function (code) { return POS[code] ? POS[code].name : code; };
 
   /* 포지션 적성 배치 (미니 피치 위 좌표 %, 위 = 상대 골대) */
-  /* 적성 피치맵: 13 포지션 전부, 좌우 완전 대칭 (위 = 상대 골대) */
+  /* 적성 피치맵: 13 포지션 전부, 좌우 완전 대칭 (위 = 상대 골대)
+     중앙축 x=50 한 줄: AM → CM → DM → CB → GK (DM은 CM 뒤쪽), y 16%씩 고르게
+     좌우 날개: ST/CF · LWF/RWF · LWB/RWB · LB/RB 는 x=50 기준 정대칭 */
   var APT_LAYOUT = {
-    LWF: { x: 12, y: 22 }, ST: { x: 41, y: 11 }, CF: { x: 59, y: 11 }, RWF: { x: 88, y: 22 },
-    AM:  { x: 50, y: 36 },
-    LWB: { x: 7,  y: 42 }, RWB: { x: 93, y: 42 },
-    CM:  { x: 37, y: 55 }, DM: { x: 63, y: 55 },
-    LB:  { x: 24, y: 70 }, CB: { x: 50, y: 75 }, RB: { x: 76, y: 70 },
+    ST:  { x: 41, y: 10 }, CF: { x: 59, y: 10 },
+    LWF: { x: 11, y: 25 }, AM: { x: 50, y: 25 }, RWF: { x: 89, y: 25 },
+    LWB: { x: 7,  y: 41 }, CM: { x: 50, y: 41 }, RWB: { x: 93, y: 41 },
+    DM:  { x: 50, y: 57 },
+    LB:  { x: 23, y: 73 }, CB: { x: 50, y: 73 }, RB: { x: 77, y: 73 },
     GK:  { x: 50, y: 89 }
   };
   DS.APT_LAYOUT = APT_LAYOUT;
