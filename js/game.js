@@ -577,7 +577,8 @@
         '<div class="kpi"><b>' + pressLevel() + '</b><span>압박 강도</span></div>' +
         '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력 소모</span></div>' +
         '</div>' +
-        '<button class="btn primary wide" data-act="kickoff">공식전 킥오프</button></div>';
+        '<button class="btn primary wide" data-act="kickoff">공식전 킥오프</button></div>' +
+        scoutHTML(prepareOpp('league'));
     }
 
     var deckHTML = '';
