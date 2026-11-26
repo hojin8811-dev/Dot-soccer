@@ -2400,10 +2400,10 @@
       g.quadraticCurveTo(cx - 11.6, cy + 7, cx - 11, cy + 3);
       g.closePath(); g.fill();
     } else if (st === 'buzz' || st === 'bald') {
-      g.beginPath(); g.ellipse(cx, cy - 6.5, 12.6, 9.6, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 7.4, 11.2, 8.4, 0, 0, Math.PI * 2); g.fill();
     } else {
       /* short · slick · undercut · swoop */
-      g.beginPath(); g.ellipse(cx, cy - 5.0, 13.4, 12.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 5.6, 11.6, 10.6, 0, 0, Math.PI * 2); g.fill();
     }
   }
 
@@ -2721,7 +2721,7 @@
         var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
         var fb = headBox(p.pic || 1);
         var kx = iw / 240, ky = ih / 240;
-        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 13.4, cy - 16.4, 26.8, 27.8);
+        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 13.9, cy - 16.6, 27.8, 28.8);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
@@ -2744,8 +2744,8 @@
       hairFrontPath(g, hairSt, cx, cy, hair, hairD);
 
       /* 얼굴 테두리 */
-      g.strokeStyle = hexAlpha(ink, 0.9);
-      g.lineWidth = 1.15;
+      g.strokeStyle = hexAlpha(ink, 0.62);
+      g.lineWidth = 0.95;
       g.beginPath(); g.ellipse(cx, cy + 0.2, 12.4, 14.2, 0, 0, Math.PI * 2); g.stroke();
       /* 뺨 · 턱 */
       g.strokeStyle = hexAlpha(skinD2, 0.45);
