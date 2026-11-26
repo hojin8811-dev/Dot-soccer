@@ -274,18 +274,16 @@
       /* v21 — 리그 8팀 7라운드 → 20팀 38라운드. 팀 수가 바뀌었으면 표와 대진표를 새로 만들고
          지금까지의 성적은 진행도에 맞춰 옮긴다 (판 수가 같은 라운드까지만). */
       var needRounds = (DS.TEAMS.length + 1 - 1) * 2;
-      if (!d.table || d.table.length !== DS.TEAMS.length + 1) {
-        var oldTable = d.table || [];
-        d.table = makeTable();
-        var oldMe = null, oi;
-        for (oi = 0; oi < oldTable.length; oi++) { if (oldTable[oi].id === 'me') { oldMe = oldTable[oi]; } }
-        if (oldMe) {
-          var mr = d.table[0];
-          mr.p = oldMe.p || 0; mr.w = oldMe.w || 0; mr.d = oldMe.d || 0; mr.l = oldMe.l || 0;
-          mr.gf = oldMe.gf || 0; mr.ga = oldMe.ga || 0; mr.pts = oldMe.pts || 0;
-        }
-      }
       void needRounds;
+      if (!d.table || d.table.length !== DS.TEAMS.length + 1) {
+        /* 8팀 리그 표는 20팀 포맷으로 옮길 수 없다 — 표는 0에서 시작하고
+           누적 기록(S.totals · career)은 그대로 둔다. */
+        d.table = makeTable();
+        d.round = 0;
+        d.seasonOver = false;
+        if (!d.log) { d.log = []; }
+        d.log.push('S' + (d.season || 1) + ' 20팀 38라운드 프리미어리그로 리그 재편');
+      }
       /* v15 — 깨진 대진표(팀 중복/누락·라운드 수 오류)는 표준 라운드 로빈으로 재생성 */
       if (!d.fixtures || !d.fixtures.length) {
         d.fixtures = makeFixtures();
@@ -296,7 +294,7 @@
         d.seasonOver = false;
         d.fixtureFixed = 1;
         if (!d.log) { d.log = []; }
-        d.log.push('S' + (d.season || 1) + ' 20팀 38라운드 대진표 재생성');
+        d.log.push('S' + (d.season || 1) + ' 20팀 ' + d.fixtures.length + '라운드 대진표 재생성');
       }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
       if (!d.bench) { d.bench = autoBench(d.squad, d.lineup); }
@@ -1393,8 +1391,7 @@
       EXTRA[p.id] = p;
       var ovr = DS.ratingOf(p), rc = rarityColor(p);
       cards += '<div class="mkt">' +
-        '<button class="art" data-act="sign" data-id="' + L.id + '" title="영입">' +
-        '<img src="' + DS.Art.portraitSrc(p) + '" alt=""></button>' +
+        '<span class="art"><img src="' + DS.Art.portraitSrc(p) + '" alt="" draggable="false"></span>' +
         '<div class="mm">' +
         '<div class="nm">' + esc(p.name) + '<span class="pv">' + ovr + '</span></div>' +
         '<div class="mt">' + posBadge(p.pos) +
@@ -1403,7 +1400,7 @@
         '<div class="mt"><span class="chip">' + (DS.roleOf(p.role) ? DS.roleOf(p.role).name : '롤 없음') + '</span>' +
         '<span class="from">' + esc(L.fromName) + '</span></div>' +
         '<div class="fee"><b>' + fmt(L.fee) + '</b><span>주급 ' + fmt(L.wage) + '</span></div>' +
-        '<div class="row" style="gap:4px;margin-top:3px">' +
+        '<div class="row mkt-btns">' +
         '<button class="btn primary sm" data-act="sign" data-id="' + L.id + '" ' + (S.money < L.fee ? 'disabled' : '') + '>영입</button>' +
         '<button class="btn ghost sm" data-act="nego" data-id="' + L.id + '" ' + (L.negotiated ? 'disabled' : '') + '>' + (L.negotiated ? '협상됨' : '협상') + '</button>' +
         '</div></div></div>';

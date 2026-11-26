@@ -1614,19 +1614,21 @@ body.rot-off .rotate { display: none; }
 /* ③ 이적시장 */
 .mkt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .mkt {
-  display: flex; gap: 6px; padding: 5px 6px; border-radius: 11px;
+  display: flex; gap: 5px; padding: 4px 5px; border-radius: 10px; align-items: flex-start;
   background: var(--card2); border: 1px solid var(--line); min-width: 0;
 }
-.mkt .art { width: 44px; height: 52px; flex: 0 0 auto; border-radius: 8px; overflow: hidden; border: none; padding: 0; background: linear-gradient(160deg, #e9f3d5, #d8e6bd); }
+.mkt .art { width: 34px; height: 42px; flex: 0 0 auto; border-radius: 7px; overflow: hidden; background: linear-gradient(160deg, #e9f3d5, #d8e6bd); }
 .mkt .art img { width: 100%; height: 100%; }
 .mkt .mm { min-width: 0; flex: 1 1 auto; }
-.mkt .nm { display: flex; align-items: baseline; gap: 4px; font-size: 10px; font-weight: 900; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mkt .nm .pv { margin-left: auto; font-size: 12px; font-weight: 900; color: var(--ink); }
-.mkt .mt { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; margin-top: 2px; font-size: 7px; }
+.mkt .nm { display: flex; align-items: baseline; gap: 3px; font-size: 9.5px; font-weight: 900; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkt .nm .pv { margin-left: auto; font-size: 11px; font-weight: 900; color: var(--ink); }
+.mkt .mt { display: flex; gap: 2px; align-items: center; flex-wrap: wrap; margin-top: 1px; font-size: 7px; line-height: 1.25; }
 .mkt .from { color: var(--ink3); font-size: 7px; font-weight: 800; }
-.mkt .fee { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
-.mkt .fee b { font-size: 11px; font-weight: 900; color: #b8492f; }
-.mkt .fee span { font-size: 7px; font-weight: 700; color: var(--ink3); }
+.mkt .fee { display: flex; align-items: baseline; gap: 3px; margin-top: 1px; white-space: nowrap; }
+.mkt .fee b { font-size: 10.5px; font-weight: 900; color: #b8492f; }
+.mkt .fee span { font-size: 6.5px; font-weight: 700; color: var(--ink3); }
+.mkt-btns { gap: 3px; margin-top: 2px; flex-wrap: nowrap; }
+.mkt-btns .btn { flex: 1 1 0; min-width: 0; padding: 2px 3px; font-size: 8px; white-space: nowrap; line-height: 1.2; }
 .mkt-empty { grid-column: span 2; padding: 10px; text-align: center; font-size: 9px; font-weight: 700; color: var(--ink3); }
 .ml-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
 .ml-row b { font-size: 9.5px; font-weight: 900; }
