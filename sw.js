@@ -1,12 +1,12 @@
-/*! 도트싸커 v15 — 진짜 축구 규칙 · 오프사이드 · 세트피스 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v15a-20261126';
+/*! 도트싸커 v16 — 진짜 축구 규칙 · 오프사이드 · 세트피스 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v16a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=15&b=47', './js/data.js?v=15&b=47', './js/match.js?v=15&b=47', './js/game.js?v=15&b=47',
+        './css/style.css?v=16&b=48', './js/data.js?v=16&b=48', './js/match.js?v=16&b=48', './js/game.js?v=16&b=48',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

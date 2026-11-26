@@ -303,6 +303,18 @@
     }
     return best;
   }
+  /* 화면 픽셀 기준 가장 가까운 상대 — 토큰 크기로 재야 '붙어 있다'가 맞는다 */
+  function nearestOpponentPx(p, maxPx) {
+    var best = null, bd = maxPx || 999, i, q, d;
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q.side === p.side || q.off) { continue; }
+      d = pxDist(q.x, q.y, p.x, p.y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    return { player: best, dist: bd };
+  }
+  function tacklePx() { return 2 * SPR_H * TOKEN_R * 1.30; }
   function defLineY(side) {
     var sum = 0, n = 0, i, p;
     for (i = 0; i < players.length; i++) {
@@ -458,6 +470,43 @@
     };
   }
 
+  /* v16 — 기본 위치(포메이션 슬롯)가 미러링으로 겹치면 두 선수가 영원히 한 점에서 싸운다.
+     킥오프 직전에 기본 좌표만 한 번 떼어 놓도로 민다 (경기 중 위치는 그대로 둔다). */
+  function relaxBases() {
+    var i, j, a, b, dx, dy, rt, sx, sy, dpx, minPx, push, ux, uy, sa, sb, pass;
+    for (pass = 0; pass < 6; pass++) {
+      for (i = 0; i < players.length; i++) {
+        a = players[i];
+        for (j = i + 1; j < players.length; j++) {
+          b = players[j];
+          dx = b.baseX - a.baseX; dy = b.baseY - a.baseY;
+          rt = sepRates(clamp((a.baseX + b.baseX) / 2 / WORLD_W, 0, 1));
+          sx = -dy * rt.ky; sy = dx * rt.kx;
+          dpx = Math.hypot(sx, sy);
+          sa = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(a.baseX / WORLD_W, 0, 1);
+          sb = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(b.baseX / WORLD_W, 0, 1);
+          minPx = 2 * SPR_H * TOKEN_R * (sa + sb) / 2 * SEP_K;
+          if (dpx < 0.0001) {
+            dx = 0.45 * (i % 2 ? 1 : -1); dy = 0.7 * (j % 2 ? 1 : -1);
+            sx = -dy * rt.ky; sy = dx * rt.kx; dpx = Math.hypot(sx, sy);
+          }
+          if (dpx < minPx) {
+            push = (minPx - dpx) * 0.5;
+            ux = sx / dpx; uy = sy / dpx;
+            a.baseX = clamp(a.baseX - (uy * push) / rt.kx, 3, WORLD_W - 3);
+            a.baseY = clamp(a.baseY + (ux * push) / rt.ky, 3, WORLD_H - 3);
+            b.baseX = clamp(b.baseX + (uy * push) / rt.kx, 3, WORLD_W - 3);
+            b.baseY = clamp(b.baseY - (ux * push) / rt.ky, 3, WORLD_H - 3);
+          }
+        }
+      }
+    }
+    for (i = 0; i < players.length; i++) {
+      players[i].homeX = players[i].baseX;
+      players[i].homeY = players[i].baseY;
+    }
+  }
+
   function mkPlayer(side, player, kit, role, pos, x, y) {
     var bx = side === 'home' ? x : 100 - x;
     var by = side === 'home' ? y * 1.2 : WORLD_H - y * 1.2;
@@ -472,7 +521,7 @@
       popT: 0, popT0: 0.3,
       support: null, runTo: null, runT: 0, supportT: 0,
       mark: null, zone: zoneFor(pos, by, side), homeX: bx, homeY: by,
-      stam: 100, kind: 'keep'
+      boxSlot: null, stam: 100, kind: 'keep'
     };
   }
 
@@ -806,6 +855,7 @@
     updateScoreboard();
     clearCommentary();
     resize();
+    relaxBases();
     resetKickoff(Math.random() < 0.5 ? 'home' : 'away');
     M.running = true;
     M.phase = 'play';
@@ -1258,7 +1308,7 @@
         y: clamp(line - dir * range(3, sh.name === 'attack' ? 10 : 8), 4, 116)
       };
       best.runT = sh.name === 'attack' ? 1.9 : 1.5;
-      if (t === 0 && chance(0.5)) { bubble(best, '🏃 침투!', '#c3a6ff', 1.1); }
+      if (t === 0 && chance(0.5)) { bubbleUnique(best, '🏃 침투!', '#c3a6ff', 1.1); }
     }
   }
 
@@ -1280,6 +1330,8 @@
     var def = atk === 'home' ? 'away' : 'home';
     var carrier = ball.carrier;
     var pressers = carrier ? assignPressers(def, pressConfig(def)) : [];
+    /* v16 — 박스 슬롯 분산 (프레임당 1회, 공격 팀 전원에게 자리 배정) */
+    assignBoxSlots(atk);
     /* v14 게겐프레싱 — 볼을 잃은 직후 3명이 반경과 상관없이 즉시 달려든다 */
     if (carrier) {
       var stDef = styleOf(def);
@@ -1330,6 +1382,42 @@
     p.tx = clamp(ball.x + ball.vx * lead, 3, 97);
     p.ty = clamp(ball.y + ball.vy * lead, 3, 117);
     p.kind = 'chase';
+  }
+
+  /* ────── v16 — 박스 침투 타겟 슬롯 ──────
+     공격수들이 모두 같은 점을 향해 달려들어 GK·수비와 한 덩어리가 되던 문제를 없앤다.
+     박스에 들어가는 무명 공격수는 니어 포스트 / 페널티 스팟 / 파 포스트 / 아크 정면
+     내 자리로 나눠 서고, 공을 몬 1명만 자유롭게 슈팅 각을 잡는다. */
+  function assignBoxSlots(atkSide) {
+    var i, p, cand = [], yg = attackGoalY(atkSide), dir = goalDir(atkSide);
+    var carrier = ball.carrier;
+    for (i = 0; i < players.length; i++) { players[i].boxSlot = null; }
+    if (!carrier && play.phase !== 'play' && play.phase !== 'setpiece') { return; }
+    /* 니어/파 포스트는 공 쪽을 기준으로 — 터치라인 근처에서만 뒤집어 목표가 튀지 않게 */
+    if (ball.x < 40) { play.boxLeft = true; }
+    else if (ball.x > 60) { play.boxLeft = false; }
+    if (play.boxLeft == null) { play.boxLeft = true; }
+    var nearX = play.boxLeft ? 42 : 58, farX = 100 - nearX;
+    var slots = [
+      { name: '니어포스트', x: nearX, d: 15.0 },
+      { name: '페널티스팟', x: 50, d: 20.5 },
+      { name: '파포스트', x: farX, d: 15.0 },
+      { name: '아크정면', x: 50 + (play.boxLeft ? 4 : -4), d: 29.0 }
+    ];
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== atkSide || p.off || isGK(p) || p === carrier) { continue; }
+      if (!isFwdGroup(p) && !(isMidGroup(p) && (p.pos === 'AM' || p.pos === 'CM'))) { continue; }
+      cand.push(p);
+    }
+    /* 기본 위치(x) 순으로 고정 배정 — 프레임마다 자리가 바뀌지 않는다 */
+    cand.sort(function (a, b) {
+      if (Math.abs(a.baseX - b.baseX) > 0.01) { return a.baseX - b.baseX; }
+      return String(a.name) < String(b.name) ? -1 : 1;
+    });
+    for (i = 0; i < cand.length && i < slots.length; i++) {
+      cand[i].boxSlot = { name: slots[i].name, x: slots[i].x, y: yg - dir * slots[i].d };
+    }
   }
 
   function carrierTarget(p) {
@@ -1493,12 +1581,24 @@
 
     /* ② 스트라이커: 오프사이드 라인 끝자락을 타며 좌우로 흔들다가 뒷공간으로 침투 */
     if (isFwdGroup(p) && carrierV && (st === 'build' || st === 'mid')) {
+      var sLine0 = supportLineY(p.side);
       tx = 50 + (a.x - 50) * 0.75 + Math.sin(simTime * 0.85 + p.baseX * 0.11) * 7;
-      ty = oLine - z.dir * 1.2;
-      if (chance(0.010)) {
-        p.runTo = { x: clamp(tx + range(-9, 9), 6, 94), y: clamp(oLine - z.dir * range(7, 15), 4, 116) };
+      ty = sLine0 - z.dir * 2.0;
+      if (chance(0.008)) {
+        p.runTo = { x: clamp(tx + range(-9, 9), 6, 94), y: clamp(sLine0 - z.dir * range(7, 15), 4, 116) };
         p.runT = 1.6;
-        bubble(p, '🏃 뒷공간!', '#c3a6ff', 1.1);
+        bubbleUnique(p, '🏃 뒷공간!', '#c3a6ff', 1.1);
+      }
+    }
+
+    /* ②-b v16 — 박스 안 타겟 슬롯: 니어포스트·페널티스팟·파포스트·아크정면으로 분산
+       공을 몬 선수가 없어도(크로스·슛이 날아가는 중) 슬롯을 잠그한 자리를 지킨다. */
+    if (p.boxSlot) {
+      var carryProg2 = progressOf(p.side, ball.y);
+      if (carryProg2 > 0.50) {
+        var slotW = clamp((carryProg2 - 0.50) / 0.22, 0, 1) * 0.84;
+        tx = tx * (1 - slotW) + p.boxSlot.x * slotW;
+        ty = ty * (1 - slotW) + p.boxSlot.y * slotW;
       }
     }
 
@@ -1517,13 +1617,31 @@
       }
     }
 
-    /* ⑤ 오프사이드 라인 존중: 공이 라인 뒤에 있는 동안에는 공격수가 라인을 넘어 서지 않는다 */
-    if (!isDefGroup(p)) {
-      var ballBeyond = z.dir < 0 ? (ball.y < oLine) : (ball.y > oLine);
-      if (!ballBeyond) {
-        var lim = oLine - z.dir * 1.6;
+    /* ⑤ 오프사이드 라인 존중: 공이 라인 뒤에 있는 동안 비소유 공격수는 라인 안쪽에 머문다
+       (라인을 넘는 것은 침투 러닝이 걸린 순간에만) */
+    if (p !== carrierV && !isDefGroup(p)) {
+      var sLine = supportLineY(p.side);
+      var ballBeyond = z.dir < 0 ? (ball.y < sLine) : (ball.y > sLine);
+      if (!ballBeyond && p.runT <= 0.15) {
+        var lim = sLine - z.dir * 1.8;
         if (z.dir < 0) { if (ty < lim) { ty = lim; } }
         else if (ty > lim) { ty = lim; }
+      }
+    }
+
+    /* ⑤-b v16 — GK 보호: 공을 몬 1명 말고는 상대 골키퍼 코앞에 붙지 않는다 */
+    if (p !== carrierV) {
+      var ogk = goalkeeper(p.side === 'home' ? 'away' : 'home');
+      if (ogk) {
+        var guardPx = 1.6 * 2 * SPR_H * TOKEN_R;          /* GK 중심에서 1.6 지름 이상 */
+        var gdx = tx - ogk.x, gdy = ty - ogk.y;
+        var grt = sepRates(clamp(ogk.x / WORLD_W, 0, 1));
+        var gd = Math.hypot(gdy * grt.ky, gdx * grt.kx);
+        if (gd < guardPx) {
+          if (gd < 0.001) { gdx = 0; gdy = 1; gd = 1; }
+          tx = ogk.x + gdx * guardPx / gd;
+          ty = ogk.y + gdy * guardPx / gd;
+        }
       }
     }
 
@@ -1537,6 +1655,12 @@
     p.tx = clamp(tx, z.xMin, z.xMax);
     p.ty = clamp(ty, a.y - z.fwd - 8, a.y + z.back + 8);
     p.ty = clamp(p.ty, 3, WORLD_H - 3);
+    /* v16 — 비소유 공격수는 6야드 박스 안으로 빨려 들어가지 않는다 */
+    if (p !== carrierV && !isDefGroup(p)) {
+      var deepLim2 = attackGoalY(p.side) - z.dir * 9.5;
+      if (z.dir < 0) { if (p.ty < deepLim2) { p.ty = deepLim2; } }
+      else if (p.ty > deepLim2) { p.ty = deepLim2; }
+    }
     p.kind = 'atk';
   }
 
@@ -1587,6 +1711,25 @@
     p.tx = clamp(tx, z.xMin, z.xMax);
     p.ty = clamp(ty, Math.min(a.y - z.fwd - 8, blockY - 8), Math.max(a.y + z.back + 8, blockY + 8));
     p.ty = clamp(p.ty, 3, WORLD_H - 3);
+
+    /* ── v16: 공수 전환·수비 복귀 정상화 ──
+       볼 소유가 바뀌면 CB/DM/FB는 무조건 볼보다 자기 골문 쪽으로 내려서
+       '볼과 골문 사이'에 수비 블록을 만든다. (역습 당해 볼 뒤에 서 있던 라인을 되돌린다) */
+    if ((isDefGroup(p) || p.pos === 'DM') && p.ty > 0) {
+      var ownY = ownGoalY(p.side);
+      var tOwn = p.side === 'home' ? 1 : -1;
+      var ballOurSide = p.side === 'home' ? (ball.y > 52) : (ball.y < 68);
+      if (ballOurSide) {
+        var capY = ownY - tOwn * (isDefGroup(p) ? 4.5 : 12);   /* 6야드 박스 안까지 내려앉지는 않는다 */
+        var guardY = ball.y + tOwn * 3.2;
+        if (p.side === 'home') {
+          p.ty = Math.max(p.ty, Math.min(guardY, capY));
+        } else {
+          p.ty = Math.min(p.ty, Math.max(guardY, capY));
+        }
+        p.ty = clamp(p.ty, 3, WORLD_H - 3);
+      }
+    }
     p.kind = 'def';
   }
 
@@ -1608,6 +1751,10 @@
     var spd = 9.2 + (p.player.stats.spd / 99) * 8.2;
     if (isGK(p)) { spd = 10.4 + p.player.stats.spd / 40; }
     if (ball.carrier === p) { spd *= 0.93; }
+    /* v16 — 볼을 잃은 팀의 수비 라인은 즉시 자기 골문으로 되돌아간다 */
+    if (play.recoverT > 0 && play.recoverSide === p.side && !isGK(p) && (isDefGroup(p) || p.pos === 'DM')) {
+      spd *= 1.26;
+    }
     if (buffOf('tempo') > 0) { spd *= 1.18; }
     if (buffOf('roar') > 0) { spd *= 1.1; }
     if (p.side === 'home' && mfx('speed') > 0) { spd *= 1 + Math.min(0.12, mfx('speed') * 0.006); }
@@ -1641,7 +1788,8 @@
     }
   }
 
-  /* 화면 픽셀 → 월드 단위 환산비 (원근 투영 때문에 월드 단위 간격은 화면에서 왜곡된다) */
+  /* 화면 픽셀 → 월드 단위 환산비 (원근 투영 때문에 월드 단위 간격은 화면에서 왜곡된다)
+     v = 폭(x) 비율 — 화면 x는 공격축(y), 화면 y는 폭(x)에 대응한다. */
   function sepRates(v) {
     var l = field.x + field.w * (PROJ.farL + (PROJ.nearL - PROJ.farL) * v);
     var r = field.x + field.w * (PROJ.farR + (PROJ.nearR - PROJ.farR) * v);
@@ -1650,39 +1798,78 @@
       kx: Math.max(0.2, field.h * (PROJ.nearY - PROJ.farY) * (0.52 + 0.96 * v) / WORLD_W)
     };
   }
+  /* 두 지점의 '화면 픽셀' 거리 — 토큰 크기와 같은 기준으로 겹침을 잰다 */
+  function pxDist(ax, ay, bx, by) {
+    var rt = sepRates(clamp((ax + bx) / 2 / WORLD_W, 0, 1));
+    return Math.hypot((ay - by) * rt.ky, (ax - bx) * rt.kx);
+  }
 
-  /* v8: 화면 픽셀 기준 분리 — 22명이 한 덩어리로 뭉치지 않게 선수 크기에 맞춘 최소 이격을 강제한다 */
+  /* ─────────────────────────  v16 전 프레임 Hard Separation  ─────────────────────────
+     v8~v15는 화면 최소 간격을 토큰 지름의 0.70배로 두고, 공 소유자 쌍은 0.26배까지 풀어 줘서
+     GK·공격수·수비수가 한 점에서 한 덩어리로 보였다. v16은 예외 없이 모든 쌍을
+     '토큰 지름 × 1.18' 이상 벌리고, 3회 relaxation으로 매 틱 끝에서 강제한다. */
+  var SEP_K = 1.18;        /* 최소 중심 거리 = 토큰 지름 × 1.18 */
+  var sepMove = 0;         /* 계측: 이번 틱 분리로 밀린 총 거리(월드 단위) */
   function separate() {
-    var i, j, a, b, dx, dy, rt, sx, sy, dpx, minPx, push, ux, uy, sa, sb, pass;
-    for (pass = 0; pass < 2; pass++) {
+    var i, j, a, b, dx, dy, rt, sx, sy, dpx, minPx, push, ux, uy, sa, sb, pass, m;
+    sepMove = 0;
+    var guardOn = play.phase !== 'setpiece';
+    var gkNeed = 1.6 * 2 * SPR_H * TOKEN_R;
+    for (pass = 0; pass < 3; pass++) {
+      /* v16 — GK 보호 반경(위치 강제): 공을 몬 1명 말고는 상대 GK 코앞에 서지 못한다 */
+      if (guardOn) {
+        for (j = 0; j < 2; j++) {
+          var og = goalkeeper(j === 0 ? 'home' : 'away');
+          if (!og) { continue; }
+          var grt = sepRates(clamp(og.x / WORLD_W, 0, 1));
+          for (i = 0; i < players.length; i++) {
+            a = players[i];
+            if (a.off || a.side === og.side || isGK(a) || a === ball.carrier) { continue; }
+            var gdx = a.x - og.x, gdy = a.y - og.y;
+            var gd = Math.hypot(gdy * grt.ky, gdx * grt.kx);
+            if (gd < gkNeed) {
+              if (gd < 0.01) { gdx = 0; gdy = 1; gd = 1; }
+              a.x = clamp(og.x + gdx * gkNeed / gd, 2, WORLD_W - 2);
+              a.y = clamp(og.y + gdy * gkNeed / gd, 2, WORLD_H - 2);
+            }
+          }
+        }
+      }
       for (i = 0; i < players.length; i++) {
         a = players[i];
+        if (a.off) { continue; }
         for (j = i + 1; j < players.length; j++) {
           b = players[j];
+          if (b.off) { continue; }
           dx = b.x - a.x; dy = b.y - a.y;
-          rt = sepRates(clamp((WORLD_H - (a.y + b.y) / 2) / WORLD_H, 0, 1));
+          rt = sepRates(clamp((a.x + b.x) / 2 / WORLD_W, 0, 1));
           sx = -dy * rt.ky;              /* 화면 x 차이(px) */
           sy = dx * rt.kx;               /* 화면 y 차이(px) */
           dpx = Math.hypot(sx, sy);
           sa = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(a.x / WORLD_W, 0, 1);
           sb = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(b.x / WORLD_W, 0, 1);
-          minPx = SPR_H * 0.70 * (sa + sb) / 2;
-          /* 볼 소유자와 수비수는 실제로 붙어야 태클이 생긴다 — 이 쌍만 이격을 풀어 준다 */
-          if (a === ball.carrier || b === ball.carrier) { minPx = SPR_H * 0.26 * (sa + sb) / 2; }
-          if (dpx > 0.01 && dpx < minPx) {
-            push = (minPx - dpx) * 0.5 * 0.86;
+          minPx = 2 * SPR_H * TOKEN_R * (sa + sb) / 2 * SEP_K;
+          if (dpx < 0.0001) {              /* 완전히 같은 점 — 결정적 방향으로 갈라놓는다 */
+            dx = 0.4 * (i % 2 ? 1 : -1); dy = 0.4 * (j % 2 ? 1 : -1);
+            sx = -dy * rt.ky; sy = dx * rt.kx; dpx = Math.hypot(sx, sy);
+          }
+          if (dpx < minPx) {
+            push = (minPx - dpx) * 0.5;    /* 두 선수가 반씩 나눠 밀린다 */
             ux = sx / dpx; uy = sy / dpx;
             a.x -= (uy * push) / rt.kx;
             a.y += (ux * push) / rt.ky;
             b.x += (uy * push) / rt.kx;
             b.y -= (ux * push) / rt.ky;
+            m = clamp((minPx - dpx) / 2 / Math.min(rt.kx, rt.ky) * 0.5, 0, 2);
+            sepMove += m;
           }
         }
       }
-    }
-    for (i = 0; i < players.length; i++) {
-      players[i].x = clamp(players[i].x, 2, WORLD_W - 2);
-      players[i].y = clamp(players[i].y, 2, WORLD_H - 2);
+      for (i = 0; i < players.length; i++) {
+        if (players[i].off) { continue; }
+        players[i].x = clamp(players[i].x, 2, WORLD_W - 2);
+        players[i].y = clamp(players[i].y, 2, WORLD_H - 2);
+      }
     }
   }
 
@@ -1691,6 +1878,17 @@
     if (!p) { return; }
     p.bubble = { text: text, color: color || '#d8ff8a', t: t || 1.5, t0: t || 1.5 };
     p.skillT = Math.max(p.skillT || 0, t || 1.2);
+  }
+
+  /* v16 — 같은 문구 말풍선이 여러 명에게 동시에 뜨면 글자가 겹친다. 문구당 한 번에 1명만. */
+  function bubbleUnique(p, text, color, t) {
+    var i, q;
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q !== p && q.bubble && q.bubble.text === text && q.bubble.t > 0.3) { return false; }
+    }
+    bubble(p, text, color, t);
+    return true;
   }
 
   function giveBall(p) {
@@ -1747,7 +1945,7 @@
   function onTurnover(fromSide, toP) {
     var prog = progressOf(toP.side, toP.y);
     play.recoverSide = fromSide;
-    play.recoverT = 1.4;
+    play.recoverT = 2.1;    /* v16 — 되돌아오는 시간을 조금 더 준다 (수비 블록 재형성) */
     var sty = styleOf(toP.side);
     if (prog < 0.5 && sty.longBallAfterWin > 0 && chance(sty.longBallAfterWin)) {
       tele.longwin[toP.side] += 1;
@@ -1802,6 +2000,22 @@
     }
     if (line === null) { line = defSide === 'home' ? WORLD_H : 0; }
     return line;
+  }
+
+  /* v16 — 공격수 위치 기준선: 상대 최후방 '두 번째' 선수 (GK 포함).
+     GK가 가장 깊으면 그 앞 수비수가 라인이 되므로, 공격수가 GK 코앞까지 빨려 들어가지 않는다. */
+  function supportLineY(atkSide) {
+    var defSide = atkSide === 'home' ? 'away' : 'home';
+    var ys = [], i, p;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== defSide || p.off) { continue; }
+      ys.push(p.y);
+    }
+    if (!ys.length) { return defSide === 'home' ? WORLD_H : 0; }
+    ys.sort(function (a, b) { return a - b; });
+    if (defSide === 'away') { return ys[Math.min(1, ys.length - 1)]; }   /* away 골문 = y 0 */
+    return ys[Math.max(0, ys.length - 2)];                                /* home 골문 = y 120 */
   }
 
   function isOffsidePos(q) {
@@ -2254,8 +2468,12 @@
   }
 
   function tryTackle(defender, carrier, dt) {
-    var d = d2(defender, carrier);
-    if (d > 5.2) { return; }
+    /* v16 — 분리 최소 간격이 1.18 지름(29px)이 되면서 예전 월드 거리 5.2는 닿지 않는 거리가 됐다.
+       화면에서 '어깨를 대는' 거리(1.30 지름)까지 허용하고, 성공 확률은 세트피스가
+       마라톤이 되지 않도록 낮춘다. */
+    var dpx = pxDist(defender.x, defender.y, carrier.x, carrier.y);
+    var dLim = 2 * SPR_H * TOKEN_R * 1.30;
+    if (dpx > dLim) { return; }
     if (tele.press[defender.side] !== undefined) {
       /* v14 계측: 같은 수비수가 같은 소유자에게 붙은 '압박 이벤트'만 센다 */
       if (!defender.lastPressT || simTime - defender.lastPressT > 0.7) {
@@ -2268,12 +2486,12 @@
         defender.lastPressT = simTime;
       }
     }
-    /* 가까울수록 성공 확률이 높다 (v10 — 분리 간격 때문에 예전 3.1로는 거의 닿지 못했다) */
-    var near = clamp(1.18 - (d - 3.2) / 9, 0.42, 1.18);
+    /* 가까울수록 성공 확률이 높다 (화면 거리 기준) */
+    var near = clamp(1.18 - (dpx - dLim * 0.75) / (dLim * 0.75) * 0.80, 0.35, 1.18);
     var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 : 0);
     if (defender.side === 'home') { defSkill += mfx('def') * 1.2 + mfx('press') * 1.0; }
     var atkSkill = carrier.player.stats.spd * 0.7 + carrier.player.stats.atk * 0.3 + 12;
-    var pT = clamp(0.85 * (defSkill / (defSkill + atkSkill)) * dt * 1.9 * near, 0, 0.5);
+    var pT = clamp(0.85 * (defSkill / (defSkill + atkSkill)) * dt * 1.9 * near * 0.30, 0, 0.5);
     if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1.45; }
     if (buffOf('tiki') > 0 && carrier.side === 'home') { pT *= 0.75; }
     if (!chance(pT)) { return; }
@@ -2511,20 +2729,27 @@
     }
     atkList.sort(function (a, b) { return (isFwdGroup(b) ? 1 : 0) - (isFwdGroup(a) ? 1 : 0); });
     defList.sort(function (a, b) { return Math.abs(a.y - gy) - Math.abs(b.y - gy); });
-    var spots = [
-      { x: 44, y: gy - dir * 8 }, { x: 56, y: gy - dir * 9 },
-      { x: 38, y: gy - dir * 12 }, { x: 62, y: gy - dir * 12 },
-      { x: 50, y: gy - dir * 15 }, { x: 46, y: gy - dir * 18 }
-    ];
-    for (i = 0; i < atkList.length && i < spots.length; i++) {
-      sendTo(atkList[i], spots[i].x + range(-2, 2), spots[i].y);
+    /* v16 — 박스 인원을 3×3 격자에 앉힌다. 토큰 지름(28px) 때문에 한 줄에 3명,
+       깊이 5단위 간격이면 겹치지 않는다. (골키퍼가 서는 50·6 자리는 비워 둔다) */
+    var gxs = [36, 50, 64], gds = [6, 11, 16];
+    var atkSlots = [[36, 6], [64, 6], [50, 11], [50, 16]];
+    var defSlots = [[36, 11], [64, 11], [36, 16], [64, 16]];
+    for (i = 0; i < atkList.length && i < atkSlots.length; i++) {
+      sendTo(atkList[i], atkSlots[i][0], gy - dir * atkSlots[i][1]);
     }
-    for (i = 0; i < defList.length && i < 6; i++) {
-      var s2 = spots[i];
-      sendTo(defList[i], clamp(s2.x + (i % 2 ? 2.6 : -2.6), 26, 74), clamp(s2.y + dir * 2.0, 3, WORLD_H - 3));
+    for (i = 0; i < defList.length && i < defSlots.length; i++) {
+      sendTo(defList[i], defSlots[i][0], gy - dir * defSlots[i][1]);
     }
+    /* 나머지는 박스 바깥(아크·측면)에서 대기해 박스가 넘치지 않게 */
+    for (i = atkSlots.length; i < atkList.length; i++) {
+      sendTo(atkList[i], 50 + ((i % 2) ? 12 : -12), gy - dir * (22 + (i % 3) * 5));
+    }
+    for (i = defSlots.length; i < defList.length; i++) {
+      sendTo(defList[i], 50 + ((i % 2) ? 14 : -14), gy - dir * (21 + (i % 3) * 6));
+    }
+    void gxs; void gds;
     var gk = goalkeeper(side === 'home' ? 'away' : 'home');
-    if (gk) { sendTo(gk, left ? 46 : 54, gy - dir * 1.4); }
+    if (gk) { sendTo(gk, left ? 47 : 53, gy - dir * 2.6); }
     beginSetpiece('corner', side, 2.4);
     play.stage = 'final';
     setSit('corner', teamShort(side) + ' 코너킥', true);
@@ -2694,6 +2919,7 @@
     var originX = ball.x, originY = ball.y;
     ball.x = originX; ball.y = originY;
     if (by) { by.x = originX; by.y = originY + dir * 0.6; }
+    if (by) { separate(); }      /* v16 — 키커를 공 위치로 순간이동시킨 뒤 인접 선수와 겹치지 않게 */
     kickBall(by, tx, ty, speed, 'shot', null, 1);
     ball.dur = dur;
     var onT = 0.55 + (side === 'home' ? mfx('jump') * 0.01 : 0) - (side === 'away' ? mfx('def') * 0.006 : 0);
@@ -2976,8 +3202,8 @@
       ball.y = c.y + goalDir(c.side) * 1.4;
       ball.z = 0; ball.vz = 0;
       ball.flight = 0;
-      var near = nearestOpponent(c, 6.0);
-      if (near.player && near.dist < 5.2) { tryTackle(near.player, c, dt); }
+      var near = nearestOpponentPx(c, tacklePx());
+      if (near.player) { tryTackle(near.player, c, dt); }
       actionTimer -= dt;
       if (actionTimer <= 0 && ball.carrier === c) {
         actionTimer = 0.36 + Math.random() * 0.22;
@@ -3730,9 +3956,9 @@
       var g = scr(p.x, p.y);
       var up = 0, guard = 0, q;
       for (q = 0; q < placed.length && guard < 4; q++) {
-        if (Math.abs(placed[q].x - g.x) < 44 && Math.abs(placed[q].y - g.y) < 22) { up += 13; guard++; }
+        if (Math.abs(placed[q].x - g.x) < 62 && Math.abs(placed[q].y - g.y) < 26) { up += 16; guard++; }
       }
-      placed.push({ x: g.x, y: g.y });
+      placed.push({ x: g.x, y: g.y, up: up });
       drawBubble(p, g.x, g.y, SPR_H * g.s, up);
     }
 
@@ -3807,6 +4033,36 @@
       ctx.textAlign = 'left';
     }
   }
+
+  /* v16 계측: 프레임 단위 선수 좌표·토큰 반지름 — 겹침·GK 밀집·블록 위치를 실측한다 */
+  M.inspect = function () {
+    var i, p, out = [];
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.off) { continue; }
+      var g = scr(p.x, p.y);
+      out.push({
+        side: p.side, pos: p.pos, name: p.name, gk: isGK(p), carrier: ball.carrier === p,
+        x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100,
+        tx: Math.round(p.tx * 100) / 100, ty: Math.round(p.ty * 100) / 100,
+        sx: Math.round(g.x * 10) / 10, sy: Math.round(g.y * 10) / 10,
+        r: Math.round(Math.max(5.6, SPR_H * g.s * TOKEN_R) * 10) / 10,
+        kind: p.kind, moving: !!p.moving,
+        bubble: p.bubble ? p.bubble.text : null,
+        slot: p.boxSlot ? p.boxSlot.name : null,
+        stam: Math.round(p.stam)
+      });
+    }
+    return {
+      t: Math.round(simTime * 1000) / 1000, clock: Math.round(M.clock * 10) / 10,
+      phase: play.phase, stage: play.stage, atk: play.atkSide,
+      ball: { x: Math.round(ball.x * 10) / 10, y: Math.round(ball.y * 10) / 10, carrier: ball.carrier ? ball.carrier.name : null, kind: ball.kind },
+      view: { w: W, h: H, sprH: SPR_H, tokenR: TOKEN_R, sepK: SEP_K, field: field },
+      sepMove: Math.round(sepMove * 1000) / 1000,
+      recoverT: Math.round(play.recoverT * 100) / 100, recoverSide: play.recoverSide,
+      p: out
+    };
+  };
 
   /* 검증용 상태 조회 (포메이션·전술·카드가 실제 좌표에 반영됐는지) */
   M.probe = function () {
