@@ -1,5 +1,7 @@
-/*! 도트싸커 v16 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
-    v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀 */
+/*! 도트싸커 v17 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
+    v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀
+    v17: TV 생중계 카메라(패닝·찬스 줌인) · 골 세레모니·Net Ripple·3초 리플레이 ·
+         Web Audio 경기장 사운드 · 살아있는 관중석 · 캐스터/해설 2인 중계 */
 (function (global) {
   'use strict';
 
@@ -33,6 +35,18 @@
   var SPR_H = 28;            /* 피치 선수 스프라이트 높이(px) — v8: v7의 절반 */
   var BALL_G = 150;          /* 공 중력(월드 단위/s^2) */
   var pitchLayer = null;
+
+  /* ═════════ v17 — TV 생중계 연출 상태 ═════════ */
+  var CAM_Z0 = 1.035;                                       /* 기본 프레임 — 살짝 당겨 패닝 여유를 만든다 */
+  var cam = { x: W / 2, y: H / 2, z: CAM_Z0 };              /* 방송 카메라 (줌·패닝) */
+  var capOn = true, capAcc = 0, capBuf = [];                /* 리플레이 링 버퍼 (최근 3.6초) */
+  var replay = { on: false, frames: [], i: 0, t: 0, dur: 3.0, xg: 0, scorer: '', assist: '', min: 0 };
+  var goalStage = null, goalT = 0;                          /* 'celebrate' → 'replay' */
+  var cel = null;                                           /* 세레모니 (득점자·코너·동료) */
+  var netFx = { t: 0, t0: 1.15, side: 'home' };             /* 골망 출렁임 */
+  var crowd = { energy: 0, acc: 0, flashes: [], wave: 0 };   /* 관중석 반짝임·깃발·파도 */
+  var lastGoalXg = 0, lastGoalAssist = '';
+  var cmtQ = [], cmtT = 0;                                  /* 해설 대기열 */
 
   var players = [];
   var cfg = null;
@@ -252,6 +266,411 @@
     shake.t = Math.max(shake.t, dur || 0.24);
     shake.t0 = shake.t;
   }
+
+  /* ───────────── v17 방송 카메라 ─────────────
+     공을 따라 부드럽게 패닝하고, 찬스(박스 진입·슈팅·코너·PK·골) 순간에는 골문 쪽으로
+     1.15~1.24배 줌인했다가 상황이 끝나면 기본 프레임으로 돌아온다.
+     화면 밖으로 잘리지 않도록 초점을 항상 '보이는 사각형' 안으로 클램프한다. */
+  function goalMouthPt(side) {
+    return scr(50, side === 'home' ? 3.5 : WORLD_H - 3.5);
+  }
+  function camClampToView() {
+    if (!(cam.z > 1.0005)) { cam.z = 1.0005; }
+    var hw = W / (2 * cam.z), hh = H / (2 * cam.z);
+    cam.x = clamp(cam.x, hw, W - hw);
+    cam.y = clamp(cam.y, hh, H - hh);
+  }
+  function updateCamera(dt) {
+    var b = scr(ball.x, ball.y);
+    var fx = b.x, fy = b.y, tz = CAM_Z0, g, sh, sp;
+    if (play.phase === 'goal' && cel && cel.scorer) {
+      sp = scr(cel.scorer.x, cel.scorer.y);
+      tz = 1.24; fx = sp.x; fy = sp.y;
+    } else if (play.phase === 'setpiece' && play.setpiece) {
+      g = goalMouthPt(play.setpiece.side);
+      if (play.setpiece.type === 'pk' || play.setpiece.type === 'corner') {
+        tz = 1.22; fx = g.x * 0.58 + b.x * 0.42; fy = g.y * 0.46 + b.y * 0.54;
+      } else if (play.setpiece.type === 'fk') {
+        tz = 1.14; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.32 + b.y * 0.68;
+      } else { tz = 1.09; }
+    } else if (ball.kind === 'shot' && ball.shot) {
+      sh = ball.shot;
+      g = scr(sh.tx, sh.gy);
+      tz = 1.20; fx = g.x * 0.60 + b.x * 0.40; fy = g.y * 0.52 + b.y * 0.48;
+    } else if (play.stage === 'final') {
+      g = goalMouthPt(ball.carrier ? ball.carrier.side : play.atkSide);
+      tz = 1.17; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.36 + b.y * 0.64;
+    } else if (play.counterT > 0) {
+      tz = 1.10;
+    } else if (play.stage === 'wide') {
+      tz = 1.085;
+    }
+    var hw = W / (2 * tz), hh = H / (2 * tz);
+    fx = clamp(fx, hw, W - hw); fy = clamp(fy, hh, H - hh);
+    var k = 1 - Math.exp(-Math.max(0, dt) * 3.6);
+    cam.z += (tz - cam.z) * k;
+    cam.x += (fx - cam.x) * k;
+    cam.y += (fy - cam.y) * k;
+    camClampToView();
+  }
+  function resetCamera() {
+    cam.z = CAM_Z0; cam.x = W / 2; cam.y = H / 2;
+    camClampToView();
+  }
+
+  /* ───────────── v17 리플레이 링 버퍼 ───────────── */
+  function snapshotFrame() {
+    var i, p, f = {
+      t: simTime,
+      cam: { x: cam.x, y: cam.y, z: cam.z },
+      ball: { x: ball.x, y: ball.y, z: ball.z, kind: ball.kind },
+      ps: []
+    };
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      f.ps.push({
+        p: p, x: p.x, y: p.y, pose: p.pose, poseT: p.poseT,
+        diveT: p.diveT, diveDir: p.diveDir, facing: p.facing,
+        popT: p.popT, popT0: p.popT0, phase: p.phase
+      });
+    }
+    capBuf.push(f);
+    while (capBuf.length > 2 && simTime - capBuf[0].t > 3.6) { capBuf.shift(); }
+    while (capBuf.length > 96) { capBuf.shift(); }
+  }
+  function captureTick(dt) {
+    if (!capOn || play.phase === 'goal' || replay.on) { return; }
+    capAcc += dt;
+    var guard = 0;
+    while (capAcc >= 0.05 && guard < 6) { capAcc -= 0.05; snapshotFrame(); guard++; }
+  }
+  function replaySubText() {
+    return '⚽ ' + short(replay.scorer) + ' ' + replay.min + "'" +
+      ' · 도움 ' + (replay.assist ? short(replay.assist) : '—') +
+      ' · xG ' + (replay.xg > 0 ? replay.xg.toFixed(2) : '—');
+  }
+  function replayEl() {
+    var wrap = canvas ? canvas.parentNode : null;
+    if (!wrap) { return null; }
+    var el = document.getElementById('m-replay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'm-replay';
+      el.className = 'm-replay';
+      el.innerHTML = '<div class="rp-top"><span class="rp-badge">📺 REPLAY</span><span class="rp-speed">0.5×</span></div>' +
+        '<div class="rp-bar"><i id="m-replay-bar"></i></div>' +
+        '<div class="rp-sub" id="m-replay-sub"></div>' +
+        '<button class="rp-skip" id="m-replay-skip" type="button">건너뛰기 ›</button>';
+      wrap.appendChild(el);
+      var sk = el.querySelector('#m-replay-skip');
+      if (sk) {
+        sk.addEventListener('click', function (ev) {
+          ev.preventDefault(); ev.stopPropagation(); skipReplay();
+        });
+        sk.addEventListener('touchend', function (ev) {
+          ev.preventDefault(); ev.stopPropagation(); skipReplay();
+        });
+      }
+    }
+    return el;
+  }
+  function showReplayOverlay() {
+    var el = replayEl();
+    if (!el) { return; }
+    var sub = el.querySelector('#m-replay-sub');
+    if (sub) { sub.innerHTML = replaySubText(); }
+    var bar = el.querySelector('#m-replay-bar');
+    if (bar) { bar.style.width = '0%'; }
+    el.classList.add('on');
+  }
+  function hideReplayOverlay() {
+    var el = document.getElementById('m-replay');
+    if (el && el.parentNode) { el.parentNode.removeChild(el); }
+  }
+  function startReplay() {
+    var i, from, fr = [];
+    goalStage = 'replay';
+    clearBanner();
+    bannerT = 0;
+    flash.t = 0;
+    if (!capBuf.length) { endReplay(); return; }
+    from = capBuf[capBuf.length - 1].t - 1.6;
+    for (i = 0; i < capBuf.length; i++) { if (capBuf[i].t >= from) { fr.push(capBuf[i]); } }
+    if (fr.length < 6) { fr = capBuf.slice(Math.max(0, capBuf.length - 14)); }
+    replay.frames = fr;
+    replay.on = true; replay.t = 0; replay.i = 0; replay.dur = 3.0;
+    showReplayOverlay();
+    if (cmtQ.length) { cmtQ.length = 0; }
+  }
+  function replayTick(rdt) {
+    if (!replay.on) { return; }
+    replay.t += rdt;
+    var n = replay.frames.length;
+    var k = replay.dur > 0 ? replay.t / replay.dur : 1;
+    if (k >= 1 || !n) { endReplay(); return; }
+    replay.i = Math.min(n - 1, Math.floor(k * n));
+    var bar = document.getElementById('m-replay-bar');
+    if (bar) { bar.style.width = Math.round(clamp(k, 0, 1) * 100) + '%'; }
+  }
+  function skipReplay() {
+    if (!replay.on) { return; }
+    endReplay();
+  }
+  function endReplay() {
+    replay.on = false; replay.frames = []; replay.i = 0; replay.t = 0;
+    hideReplayOverlay();
+    capBuf = []; capAcc = 0; capOn = true;
+    goalStage = null; cel = null;
+    bannerT = 0;
+    var el = document.getElementById('m-banner');
+    if (el) { el.classList.remove('on'); }
+    resetKickoff(lastScorerSide === 'home' ? 'away' : 'home');
+    acc = 0; lastT = 0;
+  }
+
+  /* ───────────── v17 관중석 (플래시 · 깃발 · 파도) ───────────── */
+  function crowdUp(v) { crowd.energy = clamp(crowd.energy + v, 0, 1); }
+  function spawnFlash() {
+    if (crowd.flashes.length > 44) { return; }
+    var top = Math.random() < 0.62;
+    crowd.flashes.push({
+      x: Math.random() * W,
+      y: top ? 2 + Math.random() * Math.max(8, H * 0.115) : H - 2 - Math.random() * Math.max(8, H * 0.115),
+      t: 0, t0: 0.30 + Math.random() * 0.34, r: 1.1 + Math.random() * 1.7
+    });
+  }
+  function crowdTick(dt) {
+    var floor = (play.stage === 'final' || ball.kind === 'shot' || play.phase === 'setpiece') ? 0.34 : 0;
+    crowd.energy = Math.max(0, crowd.energy - dt * 0.32);
+    if (crowd.energy < floor) { crowd.energy = Math.min(floor, crowd.energy + dt * 1.9); }
+    crowd.wave += dt;
+    if (crowd.energy > 0.16) {
+      crowd.acc += dt * (2 + crowd.energy * 30);
+      while (crowd.acc >= 1) { crowd.acc -= 1; spawnFlash(); }
+    }
+    var i;
+    for (i = crowd.flashes.length - 1; i >= 0; i--) {
+      crowd.flashes[i].t += dt;
+      if (crowd.flashes[i].t >= crowd.flashes[i].t0) { crowd.flashes.splice(i, 1); }
+    }
+  }
+
+  /* ═════════ v17 경기장 사운드 (Web Audio 합성) ═════════
+     외부 mp3 없이 노이즈·필터·엔벨로프로 만든다. 삑삑거리는 순수 사인 대신
+     대역 필터를 건 노이즈와 낮은 몸통음을 섞어 실제 경기장 울림에 가깝게 설계했다.
+     모바일 자동재생 정책 때문에 AudioContext는 첫 사용자 터치(킥오프)에서 열린다. */
+  var SND = (function () {
+    var A = null, master = null, ready = false, muted = false;
+    var ambSrc = null, ambGain = null, amb2Src = null;
+    var nbuf = null, lastKick = 0, lastPass = 0, lastWhistle = 0;
+    try { muted = !!(global.localStorage && global.localStorage.getItem('dot-soccer-mute') === '1'); } catch (e) { muted = false; }
+
+    function noiseBuf() {
+      if (nbuf || !A) { return nbuf; }
+      var n = Math.floor(A.sampleRate * 2),
+        i, w, last = 0;
+      nbuf = A.createBuffer(1, n, A.sampleRate);
+      var d = nbuf.getChannelData(0);
+      for (i = 0; i < n; i++) {
+        w = Math.random() * 2 - 1;
+        last = last * 0.86 + w * 0.14;          /* 한 극 저역통과 — 갈색 잡음에 가까운 관중 웅성거림 */
+        d[i] = last * 2.4 + w * 0.16;
+      }
+      return nbuf;
+    }
+    function init() {
+      if (A) { resume(); return A; }
+      var AC = global.AudioContext || global.webkitAudioContext;
+      if (!AC) { return null; }
+      try { A = new AC(); } catch (e1) { A = null; return null; }
+      master = A.createGain();
+      master.gain.value = muted ? 0 : 0.85;
+      master.connect(A.destination);
+      ready = true;
+      resume();
+      return A;
+    }
+    function resume() {
+      if (!A) { return; }
+      if (A.state === 'suspended' && A.resume) {
+        try { var pr = A.resume(); if (pr && pr['catch']) { pr['catch'](function () {}); } } catch (e) { /* 무시 */ }
+      }
+    }
+    function ambientOn() {
+      if (!ready || ambSrc) { return; }
+      try {
+        ambSrc = A.createBufferSource();
+        ambSrc.buffer = noiseBuf(); ambSrc.loop = true;
+        var lp = A.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520; lp.Q.value = 0.6;
+        ambGain = A.createGain(); ambGain.gain.value = 0.0;
+        ambSrc.connect(lp); lp.connect(ambGain); ambGain.connect(master);
+        ambSrc.start(0);
+        ambGain.gain.setValueAtTime(0.0, A.currentTime);
+        ambGain.gain.linearRampToValueAtTime(0.30, A.currentTime + 2.2);
+        /* 아주 느린 숨쉬기 — 관중석이 살아 있게 */
+        var lfo = A.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.09;
+        var lg = A.createGain(); lg.gain.value = 0.07;
+        lfo.connect(lg); lg.connect(ambGain.gain); lfo.start(0);
+        amb2Src = A.createBufferSource();
+        amb2Src.buffer = noiseBuf(); amb2Src.loop = true;
+        var hp = A.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2400;
+        var g2 = A.createGain(); g2.gain.value = 0.05;
+        amb2Src.connect(hp); hp.connect(g2); g2.connect(master);
+        amb2Src.start(0, 0.6);
+      } catch (e) { /* 오디오 미지원 */ }
+    }
+    function ambientOff() {
+      try {
+        if (ambSrc) { ambSrc.stop(0); ambSrc.disconnect(); ambSrc = null; }
+        if (amb2Src) { amb2Src.stop(0); amb2Src.disconnect(); amb2Src = null; }
+        if (ambGain) { ambGain.disconnect(); ambGain = null; }
+      } catch (e) { /* 무시 */ }
+    }
+    function g2(dest) { var n = A.createGain(); n.connect(dest || master); return n; }
+
+    /* 주심 휘슬 — 두 사인 + 비브라토 + 노이즈 퍼프 */
+    function whistle(kind) {
+      if (!ready || muted) { return; }
+      var now = A.currentTime;
+      if (now - lastWhistle < 0.18) { return; }
+      lastWhistle = now;
+      var blasts = kind === 'long' ? 3 : 1;
+      var dur = kind === 'long' ? 0.24 : 0.34;
+      for (var n = 0; n < blasts; n++) {
+        var t = now + n * (dur + 0.10);
+        var out = g2(), bp = A.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 2500; bp.Q.value = 1.1;
+        bp.connect(out);
+        var o1 = A.createOscillator(), o2 = A.createOscillator();
+        o1.type = 'sine'; o1.frequency.value = 2080;
+        o2.type = 'triangle'; o2.frequency.value = 2860;
+        var lfo = A.createOscillator(), lg = A.createGain();
+        lfo.type = 'sine'; lfo.frequency.value = 27; lg.gain.value = 105;
+        lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency);
+        var ns = A.createBufferSource(); ns.buffer = noiseBuf();
+        var nf = A.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 3000; nf.Q.value = 0.8;
+        var ng = A.createGain(); ng.gain.value = 0.10;
+        ns.connect(nf); nf.connect(ng); ng.connect(out);
+        out.gain.setValueAtTime(0.0001, t);
+        out.gain.exponentialRampToValueAtTime(0.20, t + 0.02);
+        out.gain.setValueAtTime(0.20, t + dur * 0.72);
+        out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o1.connect(bp); o2.connect(bp);
+        o1.start(t); o2.start(t); lfo.start(t); ns.start(t);
+        o1.stop(t + dur + 0.02); o2.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02); ns.stop(t + dur + 0.02);
+      }
+    }
+    /* 공 차기 — 낮은 몸통음 + 필터드 노이즈 (강도별) */
+    function kick(strength) {
+      if (!ready || muted) { return; }
+      var now = A.currentTime;
+      var s = clamp(strength === undefined ? 0.6 : strength, 0, 1.2);
+      if (now - lastKick < 0.05) { return; }
+      lastKick = now;
+      var o = A.createOscillator(), g = g2();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(118 - s * 34, now);
+      o.frequency.exponentialRampToValueAtTime(58, now + 0.13);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.34 + s * 0.30, now + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16 + s * 0.10);
+      o.connect(g); o.start(now); o.stop(now + 0.42);
+      var ns = A.createBufferSource(); ns.buffer = noiseBuf();
+      var nf = A.createBiquadFilter(); nf.type = 'bandpass';
+      nf.frequency.value = 1150 + s * 950; nf.Q.value = 0.9;
+      var ng = g2();
+      ng.gain.setValueAtTime(0.0001, now);
+      ng.gain.exponentialRampToValueAtTime(0.12 + s * 0.22, now + 0.004);
+      ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.085);
+      ns.connect(nf); nf.connect(ng);
+      ns.start(now); ns.stop(now + 0.13);
+    }
+    function pass() {
+      if (!ready || muted || !A) { return; }
+      var now = A.currentTime;
+      if (now - lastPass < 0.10) { return; }
+      lastPass = now;
+      kick(0.22);
+    }
+    /* 골포스트·크로스바 팅 */
+    function post() {
+      if (!ready || muted) { return; }
+      var now = A.currentTime, i, fr = [1046, 1568, 2093];
+      for (i = 0; i < fr.length; i++) {
+        var o = A.createOscillator(), g = g2();
+        o.type = 'sine'; o.frequency.value = fr[i];
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.16 / (i + 1), now + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55 - i * 0.12);
+        o.connect(g); o.start(now); o.stop(now + 0.6);
+      }
+    }
+    /* 관중 함성 — 대역 필터를 위로 쓸어 올리는 노이즈 */
+    function cheer(level, dur) {
+      if (!ready || muted) { return; }
+      var now = A.currentTime;
+      var s = clamp(level === undefined ? 0.6 : level, 0, 1);
+      var d = dur || (0.8 + s * 1.4);
+      var ns = A.createBufferSource(); ns.buffer = noiseBuf();
+      var bp = A.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(380 + s * 180, now);
+      bp.frequency.exponentialRampToValueAtTime(900 + s * 900, now + d * 0.55);
+      bp.Q.value = 0.55;
+      var g = g2();
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.10 + s * 0.34, now + 0.12 + s * 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + d);
+      ns.connect(bp); bp.connect(g);
+      ns.start(now); ns.stop(now + d + 0.05);
+      /* 낮은 웅장한 층 */
+      var ns2 = A.createBufferSource(); ns2.buffer = noiseBuf();
+      var lp = A.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+      var g3 = g2(); g3.gain.setValueAtTime(0.0001, now);
+      g3.gain.exponentialRampToValueAtTime(0.12 + s * 0.26, now + 0.14);
+      g3.gain.exponentialRampToValueAtTime(0.0001, now + d * 0.95);
+      ns2.connect(lp); lp.connect(g3);
+      ns2.start(now, 0.3); ns2.stop(now + d + 0.05);
+    }
+    /* 아쉬운 탄식 — 내려가는 노이즈 + 낮은 목소리 */
+    function groan() {
+      if (!ready || muted) { return; }
+      var now = A.currentTime;
+      var ns = A.createBufferSource(); ns.buffer = noiseBuf();
+      var lp = A.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(760, now);
+      lp.frequency.exponentialRampToValueAtTime(240, now + 0.85);
+      var g = g2();
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.20, now + 0.10);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+      ns.connect(lp); lp.connect(g);
+      ns.start(now); ns.stop(now + 1.0);
+      var o = A.createOscillator(), og = g2();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(168, now);
+      o.frequency.exponentialRampToValueAtTime(96, now + 0.80);
+      var of = A.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 420;
+      og.gain.setValueAtTime(0.0001, now);
+      og.gain.exponentialRampToValueAtTime(0.055, now + 0.12);
+      og.gain.exponentialRampToValueAtTime(0.0001, now + 0.90);
+      o.connect(of); of.connect(og); o.start(now); o.stop(now + 0.95);
+    }
+    function tackle() { kick(0.34); }
+    function setMuted(v) {
+      muted = !!v;
+      try { global.localStorage.setItem('dot-soccer-mute', muted ? '1' : '0'); } catch (e) { /* 무시 */ }
+      if (master) { master.gain.value = muted ? 0 : 0.85; }
+      if (!muted) { init(); ambientOn(); }
+      return muted;
+    }
+    return {
+      init: init, resume: resume, ambientOn: ambientOn, ambientOff: ambientOff,
+      whistle: whistle, kick: kick, pass: pass, post: post, cheer: cheer, groan: groan,
+      tackle: tackle, setMuted: setMuted,
+      isMuted: function () { return muted; },
+      isReady: function () { return ready; }
+    };
+  })();
 
   function goalDir(side) { return side === 'home' ? -1 : 1; }        /* 공격 방향 y */
   function ownGoalY(side) { return side === 'home' ? WORLD_H : 0; }
@@ -805,6 +1224,9 @@
     canvas = document.getElementById('m-pitch');
     if (!canvas) { return; }
     ctx = canvas.getContext('2d');
+    /* v17 — 첫 사용자 터치(킥오프)에서 오디오 문을 연다 (모바일 자동재생 정책) */
+    SND.init();
+    SND.ambientOn();
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
     var pi;
@@ -819,6 +1241,7 @@
     M.subsLeft = MAX_SUBS;
     M.paused = false;
     M.halftime = false;
+    M.speed = 1;                  /* v17 — 새 경기는 항상 ×1로 시작 (이전 경기 배속이 남지 않게) */
     simTime = 0; acc = 0;
     goalStats = { homeShots: 0, awayShots: 0 };
     homeXg = 0; awayXg = 0;
@@ -840,6 +1263,15 @@
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
     spriteCache = {};
     ripples = [];
+    /* v17 연출 상태 초기화 */
+    capOn = true; capAcc = 0; capBuf = [];
+    replay = { on: false, frames: [], i: 0, t: 0, dur: 3.0, xg: 0, scorer: '', assist: '', min: 0 };
+    goalStage = null; goalT = 0; cel = null;
+    netFx = { t: 0, t0: 1.15, side: 'home' };
+    crowd = { energy: 0, acc: 0, flashes: [], wave: 0 };
+    lastGoalXg = 0; lastGoalAssist = '';
+    cmtQ = []; cmtT = 0;
+    hideReplayOverlay();
     setupDeck(cfg.deck);
     cutinHold = 0;
     play = {
@@ -856,6 +1288,7 @@
     updateScoreboard();
     clearCommentary();
     resize();
+    resetCamera();
     relaxBases();
     resetKickoff(Math.random() < 0.5 ? 'home' : 'away');
     M.running = true;
@@ -948,6 +1381,30 @@
   M.stop = function () {
     M.running = false;
     cancelAnimationFrame(rafId);
+    SND.ambientOff();
+    replay.on = false;
+    hideReplayOverlay();
+  };
+  /* v17 — 음소거 토글 (localStorage 저장) */
+  M.toggleMute = function () {
+    var m = SND.setMuted(!SND.isMuted());
+    return m;
+  };
+  M.isMuted = function () { return SND.isMuted(); };
+  M.audioUnlock = function () { SND.init(); SND.resume(); };
+  /* v17 QA — 방송 연출 상태 스냅샷 */
+  M.broadcast = function () {
+    return {
+      cam: { x: Math.round(cam.x * 10) / 10, y: Math.round(cam.y * 10) / 10, z: Math.round(cam.z * 1000) / 1000 },
+      view: { w: W, h: H },
+      replay: { on: replay.on, i: replay.i, n: replay.frames.length, t: Math.round(replay.t * 100) / 100, dur: replay.dur, sub: replay.on ? replaySubText() : null },
+      goal: { stage: goalStage, t: Math.round(goalT * 100) / 100, cel: cel ? { scorer: cel.scorer.name, corner: cel.corner, joins: cel.joins.length } : null },
+      net: Math.round(netFx.t * 100) / 100,
+      crowd: { energy: Math.round(crowd.energy * 100) / 100, flashes: crowd.flashes.length },
+      sound: { muted: SND.isMuted(), ready: SND.isReady() },
+      cap: { n: capBuf.length, on: capOn },
+      cmt: { q: cmtQ.length }
+    };
   };
   M.stats = function () {
     return {
@@ -1050,6 +1507,8 @@
     /* 가로 피치 — 스타디움 이미지가 캔버스를 꽉 채운다 */
     field = { x: 0, y: 0, w: W, h: H };
     SPR_H = Math.round(clamp(H * 0.084, 20, 42));   /* v8: v7(0.168)의 정확히 절반 크기 */
+    if (!(cam.z > 1.0005)) { cam.z = CAM_Z0; }
+    camClampToView();
     loadPitchImage();
     buildPitchLayer();
   }
@@ -1097,15 +1556,42 @@
   }
 
   /* ─────────────────────────  중계 · 상황 배너  ───────────────────────── */
-  function say(text, kind) {
+  var EXP_GEN = [
+    '지금 두 팀 다 라인 간격이 잘 유지되고 있습니다. 서로 물러주지 않아요.',
+    '여기서 무리한 패스 한 번이 경기 흐름을 통째로 넘겨줄 수 있습니다.',
+    '중원에서 첫 터치가 반박자 늦으면 곧바로 압박이 들어옵니다.',
+    '풀백이 올라갈 때 반대쪽 윙어가 안쪽으로 접어주는 게 중요합니다.',
+    '세컨드볼을 누가 잡느냐가 이 시간대의 관전 포인트입니다.',
+    '체력이 떨어지기 시작하면 패스 길이가 길어집니다. 그때가 위험합니다.',
+    '벤치에서 계속 라인을 올리라는 신호가 나오고 있습니다.',
+    '골키퍼의 발밑이 좋습니다. 빌드업 첫 패스가 아주 안정적이에요.',
+    '수비수들이 몸을 반쯤 돌려 서 있습니다. 배후 공간을 노려볼 만합니다.',
+    '템포가 조금 처졌습니다. 한 번 크게 돌려서 숨을 고를 필요가 있습니다.',
+    '지금은 소유보다 위치가 중요한 시간입니다. 서두를 필요 없어요.'
+  ];
+  function say(text, kind, who) {
     var body = document.getElementById('m-comm-body');
     if (!body) { return; }
+    var exp = who === 'exp';
     var line = document.createElement('div');
-    line.className = 'cmt-line ' + (kind || '');
-    line.innerHTML = '<span class="cmt-min">' + minute() + "'</span>" + text;
+    line.className = 'cmt-line ' + (kind || '') + (exp ? ' exp' : '');
+    line.innerHTML = '<span class="cmt-who' + (exp ? ' exp' : '') + '">' + (exp ? '🎧' : '🎙') + '</span>' +
+      '<span class="cmt-min">' + minute() + "'</span>" + text;
     body.appendChild(line);
     while (body.children.length > 4) { body.removeChild(body.firstChild); }
     body.scrollTop = body.scrollHeight;
+    /* 2인 중계 — 지금 말하는 쪽 라벨을 밝힌다 */
+    var lc = document.getElementById('m-tk-cast');
+    var le = document.getElementById('m-tk-exp');
+    if (lc) { lc.classList.toggle('on', !exp); }
+    if (le) { le.classList.toggle('on', exp); }
+  }
+  /* 해설위원 한마디 — 캐스터 라인 뒤에 박자 를 두고 들어간다 */
+  function sayExp(text, kind) {
+    if (!text) { return; }
+    cmtQ.push({ text: text, kind: kind || 'exp' });
+    while (cmtQ.length > 2) { cmtQ.shift(); }
+    if (cmtQ.length === 1) { cmtT = 0.95; }
   }
   function clearCommentary() {
     var body = document.getElementById('m-comm-body');
@@ -1966,6 +2452,8 @@
     var dx = tx - ball.x, dy = ty - ball.y;
     var d = Math.max(1.2, Math.hypot(dx, dy));
     if (from) { ball.lastTouch = from.side; }
+    if (kind === 'pass') { SND.pass(); }
+    else if (kind !== 'shot') { SND.kick(0.5); }
     ball.carrier = null;
     ball.from = from || null;
     ball.receiver = receiver || null;
@@ -2061,6 +2549,12 @@
     bannerT = 1.9;
     say('🚩 오프사이드! ' + U.josa(short(p.name), '이/가') + ' 패스 순간 수비 라인보다 앞서 있었습니다 — ' +
       teamShort(defSide) + ' 간접 프리킥.', 'tackle');
+    SND.whistle();
+    sayExp(pick([
+      '라인이 정말 칼같았습니다. 발끝 하나 차이로 오프사이드가 됩니다.',
+      '공격수의 스타트 타이밍이 조금 빨랐습니다. 반 박자만 참았어야 했어요.',
+      '수비가 라인을 아주 잘 올려 잡았습니다. 훈련이 잘 된 팀입니다.'
+    ]));
     ball.offside = null;
     ball.carrier = null;
     ball.kind = 'idle';
@@ -2318,6 +2812,9 @@
     fxRing(p, longshot ? '#ffb066' : '#ffe28a', 0.95);
     kickCam(longshot ? 1.4 : 1.0, 0.16);
     fxPop(p, 0.34);
+    SND.kick(1);
+    SND.cheer(0.30, 0.85);
+    crowdUp(0.34);
     bubble(p, longshot ? '🔥 중거리 슛!' : '🎯 슛!', longshot ? '#ffb066' : '#ffe28a', 1.3);
     say(U.josa(short(p.name), '이/가') + ' ' + (longshot ? '중거리에서 대포알을 때립니다!' : '과감하게 슛!') + ' ' +
       pick(['발끝에서 불꽃이 튑니다!', '골문을 향해 낮게 깔아 찹니다!', '수비수 머리 위로 감아 찹니다!', '있는 힘껏 때렸습니다!']), 'shot');
@@ -2337,13 +2834,35 @@
     ball.trail = [];
     if (gk) { gk.diveT = 0.7; gk.diveDir = (s.tx - gk.x) >= 0 ? 1 : -1; }
     if (s.isGoal) {
+      lastGoalXg = s.xg;
       goal(p, p.side);
       return;
     }
     if (!s.onTarget) {
+      /* v17 — 골대·크로스바를 맞는 순간: '팅!' 소리와 관중 탄식 */
+      if (chance(0.32)) {
+        say('😱 ' + U.josa(short(p.name), '의') + ' 슛이 골대를 강타합니다! ' + pick([
+          '크로스바가 울렸습니다!', '골포스트를 맞고 나옵니다!', '몇 cm 차이였습니다!'
+        ]), 'miss');
+        bubble(p, '😱 골대!', '#9fe8ff', 1.4);
+        SND.post();
+        SND.groan();
+        kickCam(2.6, 0.34);
+        fxRing(p, '#c8f169', 1.2);
+        crowdUp(0.3);
+        addRating(p, -0.01);
+        goalKick(defSide);
+        return;
+      }
       say('아쉽습니다! ' + U.josa(short(p.name), '의') + ' 슛이 골대를 벗어납니다.', 'miss');
       kickCam(0.7, 0.12);
+      SND.groan();
       addRating(p, -0.04);
+      sayExp(pick([
+        '각도가 없었습니다. 저 위치에서는 골키퍼가 편하게 막을 수밖에 없어요.',
+        '조금 힘이 들어갔습니다. 살짝 감아 칠 필요가 있었습니다.',
+        '발뿐 아니라 시선까지 골대를 향해야 합니다. 아쉬워요.'
+      ]));
       goalKick(defSide);
       return;
     }
@@ -2360,16 +2879,26 @@
     fxRing(gk, '#9fe8ff', 1.15);
     kickCam(2.0, 0.26);
     fxPop(gk, 0.42);
+    SND.groan();
+    SND.cheer(0.34, 1.0);
+    crowdUp(0.42);
     setSit('save', short(gk.name) + ' 선방', true);
     say('🧤 ' + U.josa(short(gk.name), '이/가') + ' 슈퍼 세이브! ' + pick([
       '새끼손가락으로 쳐냅니다!', '몸을 날려 막아냅니다!', '반사 신경이 미쳤습니다!', '골문을 닫아버립니다!'
     ]), 'save');
+    sayExp(pick([
+      '반사 신경보다 위치 선정이 좋았습니다. 미리 각을 줄여 놓았어요.',
+      '손끝 하나로 골을 막았습니다. 저게 클래스입니다.',
+      '몸을 던질 준비가 되어 있었습니다. 수비 조직이 도와준 장면이죠.'
+    ]));
   }
 
   function goal(scorer, side) {
     var i;
     var mn = minute();
     var half = mn < 45 ? 0 : 1;
+    /* v17 — 리플레이 마지막 프레임: 골이 들어가는 순간의 공 위치를 남긴다 */
+    snapshotFrame();
     if (side === 'home') {
       M.homeScore++;
       halfScore[half][0]++;
@@ -2408,17 +2937,72 @@
     bannerT = 3.4;
     dead(1.5);
     setSit('goal', short(scorer.name) + ' 득점', true);
+    /* ── v17 골 연출: 골망 출렁임 · 관중 폭발 · 사운드 ── */
+    netFx = { t: 1.15, t0: 1.15, side: side };
+    crowdUp(1);
+    for (i = 0; i < 26; i++) { spawnFlash(); }
+    SND.cheer(1, 2.6);
+    SND.kick(0.85);
     if (isHome) { goalCutin(scorer); }
     say((isHome ? '⚽ GOAL!! ' : '😱 실점... ') + U.josa(short(scorer.name), '이/가') + ' 골망을 흔듭니다! ' + pick([
       '관중석이 들썩입니다!', '완벽한 마무리였습니다!', '골키퍼가 손을 쓸 수 없었습니다!', '중계석도 목이 쉬겠습니다!'
     ]), 'goal');
     say(M.homeScore + ' : ' + M.awayScore + ' — ' + pick(['경기의 흐름이 바뀝니다!', '집중력이 필요합니다!', '아직 경기는 끝나지 않았습니다!']), 'normal');
+    sayExp(pick([
+      '골키퍼 입장에서는 각을 다 내준 상황입니다. 니어포스트를 먼저 막았어야 했어요.',
+      '패스 한 번에 수비 라인이 통째로 무너졌습니다. 전술이 만든 골입니다.',
+      '볼을 받기 전에 이미 슈팅 자리를 만들어 뒀습니다. 움직임이 정말 좋았어요.',
+      '수비가 볼만 보고 있습니다. 사람을 놓치면 저런 장면이 나옵니다.',
+      '이 골로 벤치 분위기가 완전히 달라질 겁니다. 흐름을 잡았어요.'
+    ]));
     play.phase = 'goal';
-    play.timer = 3.0;
+    play.timer = 0;
     ball.carrier = null;
     ball.kind = 'idle';
     ball.vx = 0; ball.vy = 0;
     ball.x = 50; ball.y = WORLD_H / 2;
+    /* ── v17 세레모니 준비: 득점자가 코너로 달려가고 동료 2~3명이 따라본다 ── */
+    var cgy = attackGoalY(side);
+    var ccx = scorer.x < 50 ? 6.5 : WORLD_W - 6.5;
+    cel = { scorer: scorer, corner: { x: ccx, y: cgy - goalDir(side) * 5.5 }, joins: [], off: [] };
+    var near = [], qi, qq;
+    for (qi = 0; qi < players.length; qi++) {
+      qq = players[qi];
+      if (qq === scorer || qq.off || qq.side !== side || isGK(qq)) { continue; }
+      near.push({ p: qq, d: d2(qq, scorer) });
+    }
+    near.sort(function (a, b) { return a.d - b.d; });
+    for (qi = 0; qi < near.length && qi < 3; qi++) {
+      cel.joins.push(near[qi].p);
+      cel.off.push([
+        (qi === 0 ? -4.6 : (qi === 1 ? 4.6 : 0)),
+        -goalDir(side) * (qi === 2 ? 4.2 : 2.6)
+      ]);
+    }
+    goalStage = 'celebrate';
+    goalT = 1.8;
+    capOn = false;
+    replay.scorer = scorer.name;
+    replay.assist = assistName || '';
+    replay.min = mn;
+    replay.xg = lastGoalXg;
+  }
+
+  /* v17 — 세레모니 목표 좌표 (득점자 코너 · 동료 추종) */
+  function applyCelebration() {
+    if (!cel) { return; }
+    var i, j, sc = cel.scorer;
+    if (sc && !sc.off) {
+      sc.tx = cel.corner.x; sc.ty = cel.corner.y;
+      if (d2(sc, cel.corner) < 9) { setPose(sc, 'celebrate', 1.2); }
+    }
+    for (i = 0; i < cel.joins.length; i++) {
+      j = cel.joins[i];
+      if (!j || j.off) { continue; }
+      j.tx = cel.corner.x + cel.off[i][0];
+      j.ty = cel.corner.y + cel.off[i][1];
+      if (d2(j, { x: j.tx, y: j.ty }) < 2.4) { setPose(j, 'celebrate', 0.9); }
+    }
   }
 
   function goalKick(side) {
@@ -2521,6 +3105,7 @@
     say('🦵 ' + U.josa(short(defender.name), '의') + ' 태클! ' + pick([
       '깔끔하게 공을 빼앗습니다!', '몸을 던져 길을 막습니다!', '주머니에 손 넣듯 빼앗아 갑니다!'
     ]), 'tackle');
+    SND.tackle();
   }
 
   function foul(defender, carrier) {
@@ -2529,6 +3114,7 @@
     /* v15 — 페널티 박스 안 반칙이면 PK */
     var inBox = prog > 0.80 && Math.abs(carrier.x - 50) < 26;
     say('🦵 ' + U.josa(short(defender.name), '의') + ' 파울! 휘슬이 울립니다.', 'tackle');
+    SND.whistle();
     /* v15 — 다이렉트 레드 · 경고 누적: 위험 지역 반칙일수록 퇴장 확률이 높다 */
     var redP = inBox ? 0.10 : (prog > 0.70 ? 0.07 : 0.03);
     if (chance(redP)) { redCard(defender, inBox ? '박스 안 거친 반칙' : '위험한 반칙'); }
@@ -2583,6 +3169,9 @@
     setSit('red', short(p.name) + ' 퇴장 · ' + (p.side === 'home' ? '우리 10명' : '상대 10명'), true);
     say('🟥 ' + U.josa(short(p.name), '이/가') + ' 퇴장! ' + reason + ' — ' +
       (p.side === 'home' ? cfg.homeShort : cfg.awayShort) + '가 10명으로 뛰어야 합니다.', 'tackle');
+    SND.whistle();
+    sayExp(p.side === 'home' ? '우리가 10명입니다. 이제 미드필드 간격을 좁혀야 합니다.' :
+      '상대가 10명입니다. 이제 측면을 넓게 쓰면 공간이 나옵니다.');
     if (secondYellow) { say('경고 2장이 쌓였습니다.', 'normal'); }
     dead(1.6);
   }
@@ -2753,7 +3342,13 @@
     beginSetpiece('corner', side, 2.4);
     play.stage = 'final';
     setSit('corner', teamShort(side) + ' 코너킥', true);
+    crowdUp(0.34);
     say('🚩 코너킥! ' + teamShort(side) + ' — 박스 안에 양 팀 선수들이 헤더 경합 대형으로 모입니다.', 'tactic');
+    sayExp(pick([
+      '코너는 결국 첫 번째 공이 전부입니다. 니어포스트를 누가 먼저 치고 나가느냐죠.',
+      '박스 안에 4명을 앉혔습니다. 짧은 코너로 흔들어 볼 만도 합니다.',
+      '골키퍼가 나올지, 남을지가 이 장면의 핵심입니다.'
+    ]));
   }
 
   function freeKick(side, spotX, spotY, indirect) {
@@ -2816,6 +3411,8 @@
       k++;
     }
     beginSetpiece('pk', side, 2.9);
+    SND.whistle();
+    crowdUp(0.5);
     setSit('pk', teamShort(side) + ' 페널티킥', true);
     banner('페널티킥', (taker ? short(taker.name) : '') + (gk ? ' vs ' + short(gk.name) : ''));
     bannerT = 1.6;
@@ -2946,7 +3543,7 @@
       p = players[i];
       p.x = p.baseX; p.y = p.baseY; p.tx = p.baseX; p.ty = p.baseY;
       p.stun = 0; p.diveT = 0; p.bubble = null; p.throughRun = null;
-      p.mark = null; p.dribbleT = 0; p.setPos = null;
+      p.mark = null; p.dribbleT = 0; p.setPos = null; p.pose = null; p.poseT = 0;
     }
     ball.x = 50; ball.y = WORLD_H / 2; ball.vx = 0; ball.vy = 0;
     ball.carrier = null; ball.from = null; ball.receiver = null;
@@ -2972,6 +3569,11 @@
     play.counterT = 0;
     play.recoverT = 0;
     M.phase = 'play';
+    goalStage = null;
+    cel = null;
+    netFx.t = 0;
+    if (!replay.on) { resetCamera(); }
+    if (simTime > 0) { SND.whistle(); }
   }
 
   /* ─────────────────────────  메인 루프  ───────────────────────── */
@@ -2990,10 +3592,16 @@
       }
     }
     if (!M.paused) {
-      var dt = realDt * M.speed;
-      acc += dt;
-      var stepDt = 1 / 60, guard = 0;
-      while (acc >= stepDt && guard < 14) { step(stepDt); acc -= stepDt; guard++; }
+      if (replay.on) {
+        /* v17 — 리플레이는 실제 시간으로 3초 (0.5배속), 배속과 무관하게 흘러간다 */
+        replayTick(realDt);
+        crowdTick(realDt);
+      } else {
+        var dt = realDt * M.speed;
+        acc += dt;
+        var stepDt = 1 / 60, guard = 0;
+        while (acc >= stepDt && guard < 14) { step(stepDt); acc -= stepDt; guard++; }
+      }
     }
     draw();
     if (M.running) { rafId = requestAnimationFrame(loop); }
@@ -3035,6 +3643,7 @@
     }
     if (shake.t > 0) { shake.t -= dt; if (shake.t < 0) { shake.t = 0; } }
     if (flash.t > 0) { flash.t -= dt; if (flash.t < 0) { flash.t = 0; } }
+    if (netFx.t > 0) { netFx.t -= dt; if (netFx.t < 0) { netFx.t = 0; } }
     if (flagShow.t > 0) { flagShow.t -= dt; if (flagShow.t < 0) { flagShow.t = 0; } }
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) { bannerT = 0; clearBanner(); } }
     for (i = 0; i < players.length; i++) {
@@ -3051,19 +3660,28 @@
       if (pp.runT > 0) { pp.runT -= dt; }
     }
 
-    /* 골 세리머니 */
+    /* 골 세리머니 → 리플레이 */
     if (play.phase === 'goal') {
       play.timer -= dt;
       updateTargets(dt);
+      if (goalStage === 'celebrate' && cel) { applyCelebration(); }
       for (i = 0; i < players.length; i++) { movePlayer(players[i], dt); }
       separate();
-      if (play.timer <= 0) {
-        var el = document.getElementById('m-banner');
-        if (el) { el.classList.remove('on'); }
-        resetKickoff(lastScorerSide === 'home' ? 'away' : 'home');
+      crowdTick(dt);
+      updateCamera(dt);
+      if (goalStage === 'celebrate') {
+        goalT -= dt;
+        if (goalT <= 0) { startReplay(); }
       }
       return;
     }
+
+    /* v17 — 해설(2인 중계) 대기열 */
+    if (cmtQ.length) {
+      cmtT -= dt;
+      if (cmtT <= 0) { cmtT = 1.05; var ce = cmtQ.shift(); say(ce.text, ce.kind, 'exp'); }
+    }
+    crowdTick(dt);
 
     simTime += dt;
     M.clock = Math.min(90, simTime / PER_MIN);
@@ -3093,6 +3711,11 @@
       hudDirty = true;
       say('전반 종료! ' + M.homeScore + ' : ' + M.awayScore, 'big');
       say('선수들이 물을 들이킵니다. 하프타임에 교체를 준비하세요.', 'normal');
+      SND.whistle('long');
+      sayExp('전반 슈팅 ' + (goalStats.homeShots + goalStats.awayShots) + '개, 점유율은 ' +
+        Math.round(possession.home / (possession.home + possession.away) * 100) + '대 ' +
+        (100 - Math.round(possession.home / (possession.home + possession.away) * 100)) +
+        '입니다. 후반에는 ' + (goalStats.homeShots < goalStats.awayShots ? '슈팅 숫자를 끌어올려야 합니다.' : '이 흐름을 유지하면 됩니다.'));
       if (cfg.onHalftime) { cfg.onHalftime(); }
       return;
     }
@@ -3121,6 +3744,9 @@
       updateTargets(dt);
       for (i = 0; i < players.length; i++) { movePlayer(players[i], dt); }
       separate();
+      updateCamera(dt);
+      crowdTick(dt);
+      captureTick(dt);
       if (sp) {
         sp.t -= dt;
         if (sp.t <= 0) { executeSetpiece(sp); }
@@ -3151,6 +3777,8 @@
     for (i = 0; i < players.length; i++) { movePlayer(players[i], dt); }
     separate();
     updateBall(dt);
+    updateCamera(dt);
+    captureTick(dt);
 
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
@@ -3167,6 +3795,8 @@
       } else if (!ball.carrier && chance(0.4)) {
         say('공이 공중에 뜹니다! 모두 머리를 향해 달려갑니다!', 'normal');
       }
+      /* v17 — 캐스터·해설 티키타카: 잠잠한 시간에도 해설위원이 전술을 읽어 준다 */
+      if (chance(0.5) && !cmtQ.length) { sayExp(pick(EXP_GEN)); }
     }
 
     lastHud += dt;
@@ -3293,6 +3923,9 @@
     M.clock = 90;
     updateScoreboard();
     say('경기 종료! 스코어 ' + M.homeScore + ' : ' + M.awayScore, 'big');
+    SND.whistle('long');
+    SND.cheer(M.homeScore >= M.awayScore ? 0.9 : 0.45, 2.4);
+    global.setTimeout(function () { SND.ambientOff(); }, 2600);
 
     var i;
     var best = null;
@@ -3917,11 +4550,183 @@
     ctx.restore();
   }
 
+  /* v17 — 골망 출렁임: 공이 그물을 때린 순간 그물이 밀려 들어갔다 돌아온다 */
+  function drawNetRipple() {
+    if (netFx.t <= 0) { return; }
+    var k = 1 - netFx.t / netFx.t0;              /* 0 → 1 */
+    var a = (1 - k) * (1 - k);
+    if (a <= 0.015) { return; }
+    var c = goalMouthPt(netFx.side);
+    var dir = netFx.side === 'home' ? 1 : -1;    /* 홈은 화면 오른쪽 골대를 공격 */
+    var hw = Math.min(W * 0.06, H * 0.13), hh = hw * 1.55;
+    var bulge = Math.sin(k * Math.PI) * hw * 0.42 * dir;
+    var i, j;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = 'rgba(244,255,250,0.72)';
+    ctx.lineWidth = Math.max(0.8, W / 560);
+    for (i = -3; i <= 3; i++) {
+      var off = (i / 3) * hw * 0.94;
+      var bl = bulge * (1 - Math.abs(i) / 4.2);
+      ctx.beginPath();
+      ctx.moveTo(off, -hh);
+      ctx.quadraticCurveTo(off + bl * 1.7, 0, off, hh);
+      ctx.stroke();
+    }
+    for (j = -2; j <= 2; j++) {
+      var yy = (j / 2) * hh;
+      ctx.beginPath();
+      ctx.moveTo(-hw * 0.94, yy);
+      ctx.quadraticCurveTo(bulge * 1.2, yy + bulge * 0.10, hw * 0.94, yy);
+      ctx.stroke();
+    }
+    /* 충격 링 */
+    ctx.beginPath();
+    ctx.ellipse(0, 0, hw * (0.55 + 1.45 * k), hh * (0.55 + 1.15 * k), 0, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(214,255,244,' + (0.85 * a) + ')';
+    ctx.lineWidth = 2.4 * a + 0.6;
+    ctx.stroke();
+    var gr = ctx.createRadialGradient(bulge, 0, 1, bulge, 0, hw * 2.1);
+    gr.addColorStop(0, 'rgba(255,255,255,' + (0.55 * a) + ')');
+    gr.addColorStop(1, 'rgba(180,255,230,0)');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(bulge, 0, hw * 2.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /* v17 — 살아있는 관중석: 카메라 플래시 · 응원 깃발 · 사람 파도 (화면 고정) */
+  var flashSprite = null;
+  function buildFlashSprite() {
+    if (flashSprite) { return flashSprite; }
+    var S = 48, c = global.document.createElement('canvas');
+    c.width = S; c.height = S;
+    var g = c.getContext('2d');
+    if (!g) { return null; }
+    var gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.28, 'rgba(228,248,255,0.72)');
+    gr.addColorStop(0.6, 'rgba(180,226,255,0.20)');
+    gr.addColorStop(1, 'rgba(160,215,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, S, S);
+    g.strokeStyle = 'rgba(255,255,255,0.85)';
+    g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(2, S / 2); g.lineTo(S - 2, S / 2);
+    g.moveTo(S / 2, 2); g.lineTo(S / 2, S - 2);
+    g.stroke();
+    flashSprite = c;
+    return c;
+  }
+  function drawCrowdFx() {
+    var i, f, a, band = Math.max(9, H * 0.115);
+    if (crowd.energy > 0.22) {
+      var ea = clamp((crowd.energy - 0.2) * 1.7, 0, 0.92);
+      ctx.save();
+      ctx.globalAlpha = ea;
+      var cols = ['#7fe3b0', '#f2d06b', '#5fa8e8', '#ef7f6b', '#c9a6f0'];
+      for (i = 0; i < 16; i++) {
+        var fx2 = (i + 0.5) / 16 * W + Math.sin(crowd.wave * 1.7 + i * 0.9) * 2.6;
+        var top = i % 2 === 0;
+        var fy = top ? band * 0.62 : H - band * 0.62;
+        var sway = Math.sin(crowd.wave * 3.1 + i * 1.6) * 3.4;
+        ctx.fillStyle = cols[i % cols.length];
+        ctx.beginPath();
+        ctx.moveTo(fx2, fy - 4.6);
+        ctx.lineTo(fx2 + 1.1, fy + 4.2);
+        ctx.lineTo(fx2 + sway + 4.4, fy + 1.4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    var spr = crowd.flashes.length ? buildFlashSprite() : null;
+    for (i = 0; i < crowd.flashes.length; i++) {
+      f = crowd.flashes[i];
+      a = 1 - f.t / f.t0;
+      if (a <= 0) { continue; }
+      var rr = f.r * (1.6 + (1 - a) * 3.4);
+      ctx.save();
+      ctx.globalAlpha = a * 0.85;
+      if (spr) {
+        ctx.drawImage(spr, f.x - rr * 2.2, f.y - rr * 2.2, rr * 4.4, rr * 4.4);
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,' + (a * 0.9) + ')';
+        ctx.beginPath(); ctx.arc(f.x, f.y, rr * 0.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    /* 사람 파도 — 흔들리는 빛 띠가 관중석을 가로지른다 */
+    if (crowd.energy > 0.42) {
+      var wk = (crowd.wave * 0.42) % 1;
+      var wx = wk * W;
+      ctx.save();
+      ctx.globalAlpha = clamp((crowd.energy - 0.4) * 1.2, 0, 0.5) * (1 - Math.abs(wk - 0.5) * 1.4);
+      var wg = ctx.createLinearGradient(wx - W * 0.09, 0, wx + W * 0.09, 0);
+      wg.addColorStop(0, 'rgba(200,241,105,0)');
+      wg.addColorStop(0.5, 'rgba(220,255,170,0.85)');
+      wg.addColorStop(1, 'rgba(200,241,105,0)');
+      ctx.fillStyle = wg;
+      ctx.fillRect(wx - W * 0.09, 0, W * 0.18, band);
+      ctx.fillRect(wx - W * 0.09, H - band, W * 0.18, band);
+      ctx.restore();
+    }
+  }
+
+  /* v17 — 리플레이 프레임 (기록된 좌표로 다시 그린다. 화면 캡처 없이 선명하다) */
+  function drawReplayFrame() {
+    var fr = replay.frames[replay.i] || replay.frames[replay.frames.length - 1];
+    if (!fr) { return; }
+    var cz = fr.cam.z || CAM_Z0, cx = fr.cam.x, cy = fr.cam.y, i, s, p;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(cz, cz);
+    ctx.translate(-cx, -cy);
+    ctx.fillStyle = '#071a13';
+    ctx.fillRect(cx - W / (2 * cz) - 4, cy - H / (2 * cz) - 4, W / cz + 8, H / cz + 8);
+    if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
+    else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
+    var arr = [];
+    for (i = 0; i < fr.ps.length; i++) { if (!fr.ps[i].p.off) { arr.push(fr.ps[i]); } }
+    arr.sort(function (a, b) {
+      if (Math.abs(a.x - b.x) > 0.6) { return a.x - b.x; }
+      return b.y - a.y;
+    });
+    for (i = 0; i < arr.length; i++) {
+      s = arr[i]; p = s.p;
+      var bx = p.x, by = p.y, bpo = p.pose, bpt = p.poseT, bdi = p.diveT,
+        bdd = p.diveDir, bfa = p.facing, bpp = p.popT, bp0 = p.popT0, bph = p.phase;
+      p.x = s.x; p.y = s.y; p.pose = s.pose; p.poseT = s.poseT;
+      p.diveT = s.diveT; p.diveDir = s.diveDir; p.facing = s.facing;
+      p.popT = s.popT; p.popT0 = s.popT0; p.phase = s.phase;
+      drawPlayer(p);
+      p.x = bx; p.y = by; p.pose = bpo; p.poseT = bpt; p.diveT = bdi;
+      p.diveDir = bdd; p.facing = bfa; p.popT = bpp; p.popT0 = bp0; p.phase = bph;
+    }
+    var bfp = scr(fr.ball.x, fr.ball.y);
+    var zpx = depthPx(fr.ball.z || 0);
+    var r = Math.max(4.4, W / 108) * (1 + Math.min(0.3, zpx * 0.004));
+    drawMatchBall(bfp.x, bfp.y - zpx - r * 0.35, r, bfp.y);
+    ctx.restore();
+    /* 방송 리플레이 룩 — 비네트 + 살짝 바랜 색 (슬로모션 느낌) */
+    var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.24, W / 2, H / 2, Math.max(W, H) * 0.72);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(2,14,11,0.52)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.fillStyle = '#bfe6ff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
   function draw() {
     if (!ctx) { return; }
     ctx.clearRect(0, 0, W, H);
-    if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
-    else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
+    /* v17 — 리플레이 재생 중에는 저장된 프레임을 그린다 */
+    if (replay.on) { drawReplayFrame(); return; }
 
     /* 카메라 흔들림 — 슛·골·선방 순간 경기장이 짧게 울린다 */
     var shk = 0;
@@ -3929,10 +4734,19 @@
       shk = clamp(shake.t / Math.max(0.01, shake.t0), 0, 1);
     }
     ctx.save();
+    /* v17 방송 카메라 — 줌·패닝·흔들림을 하나의 변환으로 */
+    ctx.translate(W / 2, H / 2);
     if (shk > 0) {
       var amp = shake.mag * shk;
       ctx.translate(Math.sin(simTime * 61) * amp, Math.cos(simTime * 47) * amp * 0.7);
     }
+    ctx.scale(cam.z, cam.z);
+    ctx.translate(-cam.x, -cam.y);
+    /* 클램프로 생기는 가장자리 빈틈을 배경색으로 막는다 */
+    ctx.fillStyle = '#071a13';
+    ctx.fillRect(cam.x - W / (2 * cam.z) - 4, cam.y - H / (2 * cam.z) - 4, W / cam.z + 8, H / cam.z + 8);
+    if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
+    else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
 
     drawPressZone();
     drawPassLine();
@@ -3986,7 +4800,11 @@
       ctx.beginPath(); ctx.arc(bp.x, byy, r * 3.4, 0, Math.PI * 2); ctx.fill();
     }
     drawMatchBall(bp.x, bp.y - zpx - r * 0.35, r, bp.y);
+    drawNetRipple();
     ctx.restore();
+
+    /* v17 — 관중석 반짝임·깃발 (화면 고정 레이어) */
+    drawCrowdFx();
 
     /* 골 전광판 — 짧게 슬라이드 인/아웃 */
     if (flash.t > 0) { drawScoreboard(); }

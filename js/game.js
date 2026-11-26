@@ -1454,6 +1454,8 @@
 
   function startMatch(kind, opt) {
     opt = opt || {};
+    /* v17 — 경기 시작 클릭(사용자 제스처)에서 오디오 컨텍스트를 연다 */
+    if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
     var oppTeam = null, oppId = null, i, venueHome = true;
     if (kind === 'smatch') {
       oppId = opt.teamId;
@@ -1716,6 +1718,8 @@
       '<div class="mt-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="20" height="24"></canvas>' +
       '<span class="mt-name">' + esc(oppTeam.short) + '</span></div>' +
       '<div class="mt-tools">' +
+      '<button class="tbtn ico" data-act="mute" id="m-mute" title="음소거">' +
+      ((DS.Match && DS.Match.isMuted && DS.Match.isMuted()) ? '🔇' : '🔊') + '</button>' +
       '<button class="tbtn" data-act="auto" id="m-auto" title="자동 개입">자동</button>' +
       '<div class="seg mini" id="m-speeds">' +
       '<button data-act="speed" data-v="1" class="on">×1</button>' +
@@ -1753,7 +1757,8 @@
       '</aside></div>' +
 
       '<div class="m-ticker">' +
-      '<span class="tk-lbl">🎙 캐스터</span>' +
+      '<span class="tk-lbl on" id="m-tk-cast">🎙 캐스터</span>' +
+      '<span class="tk-lbl exp" id="m-tk-exp">🎧 해설</span>' +
       '<div class="cmt-body" id="m-comm-body"></div>' +
       '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · <b class="tk-style">' + esc(DS.tacticStyle(mgr().tacticStyle).name) + '</b> · ' + esc(S.formation) + '</span>' +
       '</div>';
@@ -2231,7 +2236,11 @@
       return;
     }
 
-    if (act === 'kickoff') { startMatch('league'); return; }
+    if (act === 'kickoff') {
+      /* v17 — 첫 사용자 터치에서 오디오 문을 연다 (모바일 자동재생 정책) */
+      if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
+      startMatch('league'); return;
+    }
     if (act === 'challenge') { startMatch('challenge'); return; }
     if (act === 'smatch') {
       var key2 = t.getAttribute('data-k'), list = smatchList(), i2;
@@ -2274,6 +2283,13 @@
       var autoOn = (DS.Match && DS.Match.setAuto) ? DS.Match.setAuto(!(DS.Match.isAuto && DS.Match.isAuto())) : false;
       var ab = document.getElementById('m-auto');
       if (ab) { ab.classList.toggle('on', !!autoOn); }
+      return;
+    }
+    if (act === 'mute') {
+      if (!DS.Match || !DS.Match.toggleMute) { return; }
+      var mm = DS.Match.toggleMute();
+      t.textContent = mm ? '🔇' : '🔊';
+      t.classList.toggle('off', !!mm);
       return;
     }
     if (act === 'pause') {
