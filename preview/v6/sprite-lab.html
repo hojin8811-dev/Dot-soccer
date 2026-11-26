@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>도트싸커 v6 · SD 스프라이트 랩</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0b2f28; color: #dff3d0; font: 12px system-ui, -apple-system, sans-serif; }
+  .wrap { padding: 12px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; color: #c8f169; letter-spacing: .4px; }
+  .grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 4px; }
+  .cell { text-align: center; }
+  .cell canvas { display: block; width: 66px; height: 92px; margin: 0 auto; background: radial-gradient(60% 50% at 50% 88%, rgba(0,0,0,.32), transparent 70%); }
+  .cell span { font-size: 8px; color: #9fb9a8; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="wrap" id="lab"></div>
+<script src="../../js/data.js?v=6&b=22"></script>
+<script>
+(function () {
+  var DS = window.DS, Art = DS.Art;
+  var poses = [
+    { key: 'idle', label: '대기' },
+    { key: 'run', frame: 0, label: '달리기1' },
+    { key: 'run', frame: 1, label: '달리기2' },
+    { key: 'run', frame: 2, label: '달리기3' },
+    { key: 'run', frame: 3, label: '달리기4' },
+    { key: 'dribble', frame: 1, label: '드리블' },
+    { key: 'kick', label: '슛' },
+    { key: 'pass', label: '패스' },
+    { key: 'tackle', label: '태클' },
+    { key: 'dive', label: 'GK 다이빙' },
+    { key: 'celebrate', label: '세리머니' }
+  ];
+  var homeKit = { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' };
+  var awayKit = { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' };
+  var gkKitA = { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' };
+  var gkKitB = { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' };
+  var squad = DS.makeInitialSquad();
+  DS.assignUniquePics(squad);
+  var out = DS.makeInitialSquad();
+  DS.assignUniquePics(out);
+
+  var host = document.getElementById('lab');
+  var html = '';
+
+  function row(title, list, kit, gkKit, startGK) {
+    html += '<h2>' + title + '</h2><div class="grid">';
+    for (var i = 0; i < 11; i++) {
+      var p = list[i];
+      var isGK = (startGK && i === 0);
+      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + (isGK ? [gkKit.shirt, gkKit.shorts, gkKit.trim] : [kit.shirt, kit.shorts, kit.trim]).join('|') +
+        '" data-gk="' + (isGK ? 1 : 0) + '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '"></canvas>' +
+        '<span>' + p.pos + ' #' + (p.number || (i + 1)) + '</span></div>';
+    }
+    html += '</div>';
+  }
+
+  function poseRow(title, list, kit, pose, gkKit) {
+    html += '<h2>' + title + '</h2><div class="grid">';
+    for (var i = 0; i < 11; i++) {
+      var p = list[i];
+      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
+        '" data-gk="0" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '" data-pose="' + pose + '"></canvas></div>';
+    }
+    html += '</div>';
+  }
+
+  row('홈 · 도트 유나이티드 (11명)', squad, homeKit, gkKitA, false);
+  row('원정 · 한강 FC (11명)', out, awayKit, gkKitB, false);
+  poseRow('포즈 · 달리기 1', squad, homeKit, 'run');
+  poseRow('포즈 · 슛', squad, homeKit, 'kick');
+  poseRow('포즈 · 태클', squad, homeKit, 'tackle');
+  poseRow('포즈 · 다이빙', squad, gkKitA, 'dive');
+  host.innerHTML = html;
+
+  var cvs = host.querySelectorAll('canvas');
+  var S = 2.2;
+  for (var k = 0; k < cvs.length; k++) {
+    (function (cv) {
+      var pic = parseInt(cv.getAttribute('data-pic'), 10);
+      var bits = cv.getAttribute('data-kit').split('|');
+      var kit = { shirt: bits[0], shorts: bits[1], trim: bits[2] };
+      var fake = { id: cv.getAttribute('data-id'), pic: pic, number: parseInt(cv.getAttribute('data-num'), 10), pos: 'CM', name: 'x' };
+      var pose = cv.getAttribute('data-pose') || 'idle';
+      var frame = 0;
+      function paint() {
+        var spr = Art.sdSprite(fake, kit, { pose: pose, frame: frame, gk: cv.getAttribute('data-gk') === '1', t: 0.4 });
+        var w = Math.round(Art.SD_SIZE.w * S), h = Math.round(Art.SD_SIZE.h * S);
+        cv.width = w; cv.height = h;
+        var g = cv.getContext('2d');
+        g.clearRect(0, 0, w, h);
+        g.imageSmoothingEnabled = true;
+        g.drawImage(spr, 0, 0, w, h);
+      }
+      var img = Art.headImage(fake);
+      if (img && !img.complete) { img.onload = paint; }
+      paint();
+    })(cvs[k]);
+  }
+})();
+</script>
+</body>
+</html>

@@ -2299,8 +2299,8 @@
     return cv;
   };
 
-  /* ───────── 피치용 2.5등신 SD — 일러스트 얼굴 + 벡터 유니폼 바디 ───────── */
-  var SD_W = 44, SD_H = 62, SD_S = 3;
+  /* ───────── 피치용 2.5등신 SD v6 — 일러스트 얼굴 + 유니폼 디테일 + 포즈 애니메이션 ───────── */
+  var SD_W = 60, SD_H = 84, SD_S = 2.6;
   var sdCache = {};
   var headImgCache = {};
 
@@ -2318,13 +2318,183 @@
     var img = Art.headImage(p);
     return !!(img && img.complete && (img.naturalWidth || img.width) > 0);
   };
+  /* 경기 전 얼굴 이미지 프리로드 — 첫 프레임부터 얼굴이 뜨도록 */
+  Art.preloadHeads = function (list) {
+    var i;
+    for (i = 0; i < (list || []).length; i++) { Art.headImage(list[i] && list[i].player ? list[i].player : list[i]); }
+  };
 
-  Art.sdSprite = function (p, kit, frame, facing) {
-    frame = ((frame || 0) % 4 + 4) % 4;
-    facing = facing >= 0 ? 1 : -1;
-    var pic = p.pic || 0;
-    var ready = Art.headReady(p);
-    var key = p.id + '|' + kit.shirt + '|' + kit.shorts + '|' + kit.trim + '|' + frame + '|' + facing + '|' + pic + '|' + (p.number || 0) + '|' + (ready ? 1 : 0);
+  /* 유니폼 패턴 — 같은 유니폼은 항상 같은 디자인 (0 단색 · 1 세로줄 · 2 가로밴드 · 3 새시 · 4 어깨배색) */
+  var KIT_STYLE = {};
+  function kitStyleOf(kit) {
+    var k = (kit && kit.shirt ? kit.shirt : '#888888') + '|' + (kit && kit.trim ? kit.trim : '#ffffff') + '|' + (kit && kit.shorts ? kit.shorts : '#222222');
+    if (KIT_STYLE[k] != null) { return KIT_STYLE[k]; }
+    var h = 7, i;
+    for (i = 0; i < k.length; i++) { h = (h * 37 + k.charCodeAt(i)) % 99991; }
+    KIT_STYLE[k] = h % 5;
+    return KIT_STYLE[k];
+  }
+
+  /* 헤어 실루엣 — 일러스트 얼굴 뒤로 삐져나오는 머리카락 (스타일별로 모양이 다르다) */
+  function hairBackPath(g, st, cx, cy, hair) {
+    g.fillStyle = hair;
+    if (st === 'afro') {
+      g.beginPath(); g.ellipse(cx, cy - 2.5, 16.4, 16.0, 0, 0, Math.PI * 2); g.fill();
+    } else if (st === 'mohawk') {
+      g.beginPath();
+      g.moveTo(cx - 12, cy - 3);
+      g.quadraticCurveTo(cx - 4, cy - 20, cx + 1, cy - 19);
+      g.quadraticCurveTo(cx + 8, cy - 18, cx + 12, cy - 3);
+      g.closePath(); g.fill();
+    } else if (st === 'spiky') {
+      g.beginPath();
+      g.moveTo(cx - 13.6, cy - 1);
+      g.lineTo(cx - 16.5, cy - 12);
+      g.lineTo(cx - 9.5, cy - 11.5);
+      g.lineTo(cx - 9.5, cy - 20.5);
+      g.lineTo(cx - 2.5, cy - 14.5);
+      g.lineTo(cx + 1.5, cy - 22);
+      g.lineTo(cx + 6.5, cy - 14);
+      g.lineTo(cx + 12.5, cy - 18.5);
+      g.lineTo(cx + 12.5, cy - 9.5);
+      g.lineTo(cx + 16.6, cy - 11);
+      g.lineTo(cx + 13.8, cy - 1);
+      g.closePath(); g.fill();
+    } else if (st === 'ponytail' || st === 'braids') {
+      g.beginPath(); g.ellipse(cx, cy - 3, 14.6, 15.4, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.moveTo(cx - 12.6, cy + 1);
+      g.quadraticCurveTo(cx - 20, cy + 6, cx - 17.4, cy + 15);
+      g.quadraticCurveTo(cx - 13.4, cy + 8, cx - 10.6, cy + 4);
+      g.closePath(); g.fill();
+      if (st === 'braids') {
+        g.beginPath();
+        g.moveTo(cx + 12.4, cy + 2);
+        g.quadraticCurveTo(cx + 18.6, cy + 9, cx + 15.6, cy + 17);
+        g.quadraticCurveTo(cx + 12.4, cy + 9, cx + 10.4, cy + 5);
+        g.closePath(); g.fill();
+      }
+    } else if (st === 'wavy' || st === 'long') {
+      g.beginPath(); g.ellipse(cx, cy - 1.5, 15.4, 16.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.moveTo(cx - 14.4, cy + 1);
+      g.quadraticCurveTo(cx - 17.6, cy + 9, cx - 12.6, cy + 14);
+      g.quadraticCurveTo(cx - 11.6, cy + 7, cx - 11, cy + 3);
+      g.closePath(); g.fill();
+    } else if (st === 'buzz' || st === 'bald') {
+      g.beginPath(); g.ellipse(cx, cy - 6.5, 12.6, 9.6, 0, 0, Math.PI * 2); g.fill();
+    } else {
+      /* short · slick · undercut · swoop */
+      g.beginPath(); g.ellipse(cx, cy - 5.5, 14.0, 12.6, 0, 0, Math.PI * 2); g.fill();
+    }
+  }
+
+  function hairFrontPath(g, st, cx, cy, hair, hairD) {
+    if (st === 'bald') {
+      g.fillStyle = hexAlpha(hairD, 0.55);
+      g.beginPath(); g.ellipse(cx, cy - 8.4, 9.6, 3.0, 0, 0, Math.PI * 2); g.fill();
+      return;
+    }
+    g.fillStyle = hair;
+    g.beginPath();
+    g.moveTo(cx - 12.6, cy - 4.4);
+    g.quadraticCurveTo(cx - 11.6, cy - 14.6, cx - 1.0, cy - 15.0);
+    g.quadraticCurveTo(cx + 10.6, cy - 15.0, cx + 12.4, cy - 5.2);
+    g.quadraticCurveTo(cx + 6.6, cy - 9.6, cx + 1.2, cy - 9.0);
+    g.quadraticCurveTo(cx - 5.4, cy - 8.4, cx - 8.4, cy - 4.6);
+    g.quadraticCurveTo(cx - 10.6, cy - 2.6, cx - 12.6, cy - 4.4);
+    g.closePath(); g.fill();
+    /* 머리카락 하이라이트 */
+    g.strokeStyle = hexAlpha('#ffffff', 0.22);
+    g.lineWidth = 1.1;
+    g.beginPath();
+    g.moveTo(cx - 6.6, cy - 12.2);
+    g.quadraticCurveTo(cx + 0.6, cy - 14.6, cx + 6.8, cy - 10.8);
+    g.stroke();
+    if (st === 'mohawk') {
+      g.fillStyle = hairD;
+      g.beginPath();
+      g.moveTo(cx - 3.4, cy - 13.6);
+      g.quadraticCurveTo(cx, cy - 19.6, cx + 3.6, cy - 13.4);
+      g.closePath(); g.fill();
+    }
+  }
+
+  /* 포즈별 관절 각도 (라디안, 0 = 아래로 수직) */
+  function poseRig(pose, frame, tSec) {
+    var f = ((frame || 0) % 4 + 4) % 4;
+    var r = {
+      lean: 0.06, bob: 0, hop: 0,
+      legA: { a: 0.16, k: 0.10 }, legB: { a: -0.16, k: 0.10 },
+      armA: { a: -0.30, e: 0.42 }, armB: { a: 0.30, e: 0.42 },
+      headTilt: 0, headDy: 0
+    };
+    var t = tSec || 0;
+    if (pose === 'run' || pose === 'dribble') {
+      var thr = [[0.78, -0.66], [0.24, -0.16], [-0.66, 0.78], [-0.16, 0.24]][f];
+      var kne = [[0.28, 0.98], [0.92, 0.22], [0.98, 0.28], [0.20, 0.94]][f];
+      r.legA = { a: thr[0], k: kne[0] };
+      r.legB = { a: thr[1], k: kne[1] };
+      r.armA = { a: -thr[0] * 0.78, e: 0.55 + (f % 2 ? 0.2 : -0.1) };
+      r.armB = { a: -thr[1] * 0.78, e: 0.55 + (f % 2 ? -0.1 : 0.2) };
+      r.lean = pose === 'dribble' ? 0.22 : 0.15;
+      r.bob = f % 2 ? 0.9 : 0;
+      r.headDy = f % 2 ? 0.4 : 0;
+      r.headTilt = 0.04;
+    } else if (pose === 'kick') {
+      r.legA = { a: 1.22, k: -0.42 };        /* 슈팅 다리 — 앞으로 뻗는다 */
+      r.legB = { a: 0.02, k: 0.06 };         /* 디딤발 */
+      r.armA = { a: -1.05, e: 0.30 };
+      r.armB = { a: 0.95, e: 0.45 };
+      r.lean = -0.10;
+      r.headTilt = -0.06;
+    } else if (pose === 'pass') {
+      r.legA = { a: 0.86, k: -0.20 };
+      r.legB = { a: -0.06, k: 0.10 };
+      r.armA = { a: -0.62, e: 0.48 };
+      r.armB = { a: 0.66, e: 0.50 };
+      r.lean = 0.04;
+    } else if (pose === 'tackle') {
+      r.legA = { a: 1.32, k: 0.10 };
+      r.legB = { a: 0.42, k: 0.85 };
+      r.armA = { a: -1.55, e: 0.24 };
+      r.armB = { a: 1.30, e: 0.30 };
+      r.lean = -0.30;
+      r.headTilt = -0.10;
+    } else if (pose === 'dive') {
+      r.legA = { a: 0.30, k: 0.55 };
+      r.legB = { a: -0.34, k: 0.35 };
+      r.armA = { a: -2.30, e: -0.16 };
+      r.armB = { a: -2.05, e: -0.10 };
+      r.lean = 0.10;
+      r.headTilt = 0.10;
+    } else if (pose === 'celebrate') {
+      r.legA = { a: 0.26, k: 0.34 };
+      r.legB = { a: -0.30, k: 0.30 };
+      r.armA = { a: -2.60, e: 0.22 };
+      r.armB = { a: 2.60, e: -0.22 };
+      r.lean = -0.06;
+      r.hop = Math.abs(Math.sin(t * 7)) * 2.2;
+    } else {
+      /* idle — 가슴이 오르내리는 호흡 */
+      r.legA = { a: 0.13, k: 0.06 };
+      r.legB = { a: -0.13, k: 0.06 };
+      r.armA = { a: -0.24, e: 0.34 };
+      r.armB = { a: 0.24, e: 0.34 };
+      r.lean = 0.05;
+      r.bob = Math.sin(t * 2.6) * 0.4;
+    }
+    return r;
+  }
+
+  Art.sdSprite = function (p, kit, optOrFrame, facingArg) {
+    var opt = (optOrFrame && typeof optOrFrame === 'object') ? optOrFrame : { frame: optOrFrame, facing: facingArg };
+    var pose = opt.pose || 'idle';
+    var frame = ((opt.frame || 0) % 4 + 4) % 4;
+    var gk = opt.gk != null ? !!opt.gk : (p.pos === 'GK');
+    var ready = Art.headReady(p) ? 1 : 0;
+    var key = p.id + '|' + kit.shirt + '|' + kit.shorts + '|' + kit.trim + '|' + pose + '|' +
+      (pose === 'idle' || pose === 'celebrate' ? '' : frame) + '|' + (gk ? 'g' : 'f') + '|' + (p.pic || 0) + '|' + (p.number || 0) + '|' + ready;
     if (sdCache[key]) { return sdCache[key]; }
     var meta = DS.picMeta(p);
     var cv = makeCanvas(SD_W * SD_S, SD_H * SD_S);
@@ -2336,155 +2506,265 @@
     var shorts = kit.shorts || '#16241f';
     var trim = kit.trim || '#f1e7cf';
     var skin = meta.skin || '#f2c9a2';
-    var skinD = shade(skin, -30);
+    var skinD = shade(skin, -26);
+    var skinD2 = shade(skin, -44);
     var hair = meta.color || '#3a2a1a';
-    var ink = '#111c17';
-    var s = facing;                      /* 달리는 방향 */
-    var swing = [1, 0.15, -1, -0.15][frame];
-    var lift = frame % 2 === 1 ? 1.1 : 0;
-    var bob = frame % 2 === 1 ? 0.6 : 0;
-    g.translate(0, bob);
-    var OL = function (w) { g.lineWidth = w || 1.1; g.strokeStyle = ink; };
+    var hairD = shade(hair, -36);
+    var ink = '#101a16';
+    var sock = opt.sock || trim;
+    var glove = gk ? '#f4fbff' : skin;
+    var gkKit = gk ? shade(shirt, -8) : shirt;
+    var style = opt.style != null ? opt.style : kitStyleOf(kit);
 
-    function boot(x, y, dir) {
+    var rig = poseRig(pose, frame, opt.t || 0);
+    var hipX = 30, hipY = 62;
+    var hairSt = meta.hair || 'short';
+    var OL = function (w) { g.lineWidth = w || 1.0; g.strokeStyle = ink; };
+
+    /* ── 다리 ── */
+    function boot(x, y, ang, front) {
       g.save();
       g.translate(x, y);
-      if (dir < 0) { g.scale(-1, 1); }
-      g.fillStyle = '#1b2327';
+      g.rotate(-ang * 0.55);
+      g.fillStyle = front ? '#1a2226' : '#12181c';
       g.beginPath();
-      g.moveTo(-2.6, 0);
-      g.lineTo(1.9, -0.4);
-      g.quadraticCurveTo(4.4, 0.2, 4.2, 2.0);
-      g.lineTo(-2.8, 2.0);
+      g.moveTo(-3.6, 0.2);
+      g.lineTo(2.8, -0.6);
+      g.quadraticCurveTo(6.6, 0.2, 5.8, 2.9);
+      g.lineTo(-3.8, 2.9);
       g.closePath(); g.fill();
       OL(0.85); g.stroke();
       g.fillStyle = trim;
-      g.fillRect(-2.4, 0.5, 5.6, 0.9);
+      g.fillRect(-3.6, 1.0, 8.8, 0.95);
+      g.fillStyle = 'rgba(240,248,255,0.82)';
+      g.fillRect(-3.6, 2.5, 9.0, 0.7);
       g.restore();
     }
 
-    function leg(hipX, dir, phase, back) {
-      var footX = hipX + dir * (1.4 + phase * 2.9);
-      var footY = 59.4 - (phase > 0 ? 3.0 : 0) - lift * 0.4;
-      var kneeX = hipX + dir * (0.8 + phase * 1.5);
-      var kneeY = (44 + footY) / 2 + 0.4;
-      g.strokeStyle = back ? shade(skin, -16) : skin;
-      g.lineWidth = 3.4;
-      g.beginPath(); g.moveTo(hipX, 43.4); g.lineTo(kneeX, kneeY); g.lineTo(footX, footY - 1.4); g.stroke();
+    function leg(hx, hy, a, k, front) {
+      var kx = hx + Math.sin(a) * 9.6, ky = hy + Math.cos(a) * 9.6;
+      var ax = kx + Math.sin(a + k) * 8.4, ay = ky + Math.cos(a + k) * 8.4;
+      g.strokeStyle = front ? skin : skinD;
+      g.lineWidth = 6.4;
+      g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
       /* 스타킹 */
-      g.strokeStyle = back ? shade(trim, -14) : trim;
-      g.lineWidth = 3.5;
-      g.beginPath(); g.moveTo(kneeX, kneeY); g.lineTo(footX, footY - 1.5); g.stroke();
-      g.strokeStyle = back ? shade(shirt, -20) : shirt;
-      g.lineWidth = 3.5;
+      g.strokeStyle = front ? sock : shade(sock, -18);
+      g.lineWidth = 5.8;
+      g.beginPath(); g.moveTo(kx, ky); g.lineTo(ax, ay); g.stroke();
+      /* 스타킹 밴드 */
+      g.strokeStyle = front ? shirt : shade(shirt, -24);
+      g.lineWidth = 5.9;
       g.beginPath();
-      g.moveTo(kneeX + (footX - kneeX) * 0.30, kneeY + (footY - 1.5 - kneeY) * 0.30);
-      g.lineTo(footX - (footX - kneeX) * 0.18, footY - 1.8);
+      g.moveTo(kx + (ax - kx) * 0.10, ky + (ay - ky) * 0.10);
+      g.lineTo(kx + (ax - kx) * 0.20, ky + (ay - ky) * 0.20);
       g.stroke();
-      boot(footX, footY - 1.5, dir);
+      boot(ax, ay, a + k, front);
     }
 
-    function arm(shX, shY, dir, phase, back) {
-      var handX = shX + dir * (1.4 + phase * 1.9);
-      var handY = shY + 8.2 - phase * 2.0;
-      g.strokeStyle = back ? shade(skin, -18) : skin;
-      g.lineWidth = 2.9;
-      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.2, shY + 4.2); g.lineTo(handX, handY); g.stroke();
-      g.strokeStyle = back ? shade(shirt, -20) : shirt;
-      g.lineWidth = 3.3;
-      g.beginPath(); g.moveTo(shX, shY); g.lineTo(shX + dir * 1.4, shY + 3.4); g.stroke();
-      g.fillStyle = back ? shade(skin, -18) : skin;
-      g.beginPath(); g.arc(handX, handY, 1.5, 0, Math.PI * 2); g.fill();
+    /* ── 팔 ── */
+    function arm(sx, sy, a, e, front) {
+      var ex = sx + Math.sin(a) * 7.6, ey = sy + Math.cos(a) * 7.6;
+      var hx = ex + Math.sin(a + e) * 6.8, hy = ey + Math.cos(a + e) * 6.8;
+      g.strokeStyle = front ? gkKit : shade(gkKit, -22);
+      g.lineWidth = 6.2;
+      g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex, ey); g.stroke();
+      /* 소매 트림 */
+      g.strokeStyle = front ? trim : shade(trim, -22);
+      g.lineWidth = 6.3;
+      g.beginPath();
+      g.moveTo(ex - (ex - sx) * 0.18, ey - (ey - sy) * 0.18);
+      g.lineTo(ex, ey);
+      g.stroke();
+      g.strokeStyle = front ? (gk ? gkKit : skin) : shade(gk ? gkKit : skin, -20);
+      g.lineWidth = 4.8;
+      g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
+      g.fillStyle = front ? glove : shade(glove, -14);
+      g.beginPath(); g.arc(hx, hy, gk ? 2.7 : 2.0, 0, Math.PI * 2); g.fill();
+      OL(0.8); g.stroke();
     }
 
-    /* 뒤쪽 팔 · 다리 */
-    arm(15.6, 29.4, -s, -swing, true);
-    leg(19.2, -s, -swing * 0.85, true);
-
-    /* 몸통 (유니폼) */
-    var bodyG = g.createLinearGradient(13, 25, 31, 43);
-    bodyG.addColorStop(0, shade(shirt, 20));
-    bodyG.addColorStop(0.5, shirt);
-    bodyG.addColorStop(1, shade(shirt, -28));
-    g.fillStyle = bodyG;
-    g.beginPath();
-    g.moveTo(14.4, 26.6);
-    g.quadraticCurveTo(22, 24.6, 29.6, 26.6);
-    g.quadraticCurveTo(32.2, 32, 31.0, 42.2);
-    g.quadraticCurveTo(22, 44.4, 13.0, 42.2);
-    g.quadraticCurveTo(11.8, 32, 14.4, 26.6);
-    g.closePath(); g.fill();
-    OL(1.05); g.stroke();
-    /* 어깨 · 소매 트림 */
-    g.fillStyle = trim;
-    g.beginPath();
-    g.moveTo(14.7, 26.4); g.quadraticCurveTo(12.0, 28.8, 12.6, 31.6);
-    g.lineTo(16.2, 31.0); g.quadraticCurveTo(16.4, 28.4, 17.4, 26.2);
-    g.closePath(); g.fill();
-    g.beginPath();
-    g.moveTo(29.3, 26.4); g.quadraticCurveTo(32.0, 28.8, 31.4, 31.6);
-    g.lineTo(27.8, 31.0); g.quadraticCurveTo(27.6, 28.4, 26.6, 26.2);
-    g.closePath(); g.fill();
-    /* 칼라 */
-    g.strokeStyle = trim; g.lineWidth = 1.15;
-    g.beginPath(); g.moveTo(19.2, 25.8); g.quadraticCurveTo(22, 28.6, 24.8, 25.8); g.stroke();
-    /* 사이드 라인 */
-    g.strokeStyle = hexAlpha('#ffffff', 0.22); g.lineWidth = 0.7;
-    g.beginPath(); g.moveTo(15.6, 30); g.quadraticCurveTo(14.6, 36, 14.6, 41.4); g.stroke();
-    g.beginPath(); g.moveTo(28.4, 30); g.quadraticCurveTo(29.4, 36, 29.4, 41.4); g.stroke();
-    /* 등번호(가슴) */
-    if (p.number) {
-      g.fillStyle = 'rgba(255,255,255,0.92)';
-      g.font = '800 5.6px system-ui, sans-serif';
-      g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(String(p.number), 22, 34.6);
+    /* ── 몸통 · 유니폼 ── */
+    function torsoPath() {
+      g.beginPath();
+      g.moveTo(21.2, 41.4);
+      g.quadraticCurveTo(17.2, 45.2, 17.8, 52.0);
+      g.quadraticCurveTo(18.3, 58.6, 20.4, 61.8);
+      g.lineTo(39.6, 61.8);
+      g.quadraticCurveTo(41.7, 58.6, 42.2, 52.0);
+      g.quadraticCurveTo(42.8, 45.2, 38.8, 41.4);
+      g.quadraticCurveTo(30.0, 38.2, 21.2, 41.4);
+      g.closePath();
     }
-    /* 반바지 */
-    g.fillStyle = shorts;
-    g.beginPath();
-    g.moveTo(13.4, 41.6); g.quadraticCurveTo(22, 43.8, 30.6, 41.6);
-    g.lineTo(30.0, 46.8); g.quadraticCurveTo(26, 48.0, 22.6, 46.6);
-    g.quadraticCurveTo(18, 48.0, 14.0, 46.8);
-    g.closePath(); g.fill();
-    OL(0.95); g.stroke();
-    g.strokeStyle = trim; g.lineWidth = 0.85;
-    g.beginPath(); g.moveTo(14.4, 43.2); g.lineTo(29.6, 43.2); g.stroke();
+
+    function drawTorso() {
+      var bodyG = g.createLinearGradient(18, 40, 42, 62);
+      bodyG.addColorStop(0, shade(shirt, 16));
+      bodyG.addColorStop(0.55, shirt);
+      bodyG.addColorStop(1, shade(shirt, -26));
+      g.fillStyle = bodyG;
+      torsoPath(); g.fill(); OL(1.05); g.stroke();
+
+      g.save();
+      torsoPath(); g.clip();
+      var i;
+      if (style === 1) {                      /* 세로 줄무늬 */
+        g.fillStyle = hexAlpha(trim, 0.85);
+        for (i = 0; i < 7; i++) { g.fillRect(19 + i * 3.4, 38, 1.7, 25); }
+      } else if (style === 2) {               /* 가로 밴드 */
+        g.fillStyle = hexAlpha(trim, 0.8);
+        g.fillRect(16, 47.2, 28, 3.4);
+        g.fillRect(16, 55.6, 28, 2.2);
+      } else if (style === 3) {               /* 사선 새시 */
+        g.strokeStyle = hexAlpha(trim, 0.75);
+        g.lineWidth = 4.2;
+        g.beginPath(); g.moveTo(17, 45); g.lineTo(43, 59); g.stroke();
+      } else if (style === 4) {               /* 어깨 배색 */
+        g.fillStyle = hexAlpha(trim, 0.72);
+        g.beginPath();
+        g.moveTo(16, 38); g.lineTo(44, 38); g.lineTo(44, 45.4);
+        g.quadraticCurveTo(30, 49.6, 16, 45.4);
+        g.closePath(); g.fill();
+      }
+      /* 유니폼 결 */
+      g.strokeStyle = hexAlpha('#ffffff', 0.10);
+      g.lineWidth = 0.7;
+      for (i = 0; i < 3; i++) { g.beginPath(); g.moveTo(20 + i * 7, 40); g.lineTo(20 + i * 7, 62); g.stroke(); }
+      g.restore();
+
+      /* 칼라 */
+      g.fillStyle = trim;
+      g.beginPath();
+      g.moveTo(25.4, 40.4);
+      g.quadraticCurveTo(30, 45.0, 34.6, 40.4);
+      g.quadraticCurveTo(30, 43.2, 25.4, 40.4);
+      g.closePath(); g.fill();
+      g.strokeStyle = shade(trim, -30); g.lineWidth = 0.7; g.stroke();
+      /* 어깨 라인 */
+      g.strokeStyle = hexAlpha('#000000', 0.18); g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(21.4, 41.6); g.quadraticCurveTo(30, 38.6, 38.6, 41.6); g.stroke();
+
+      /* 등번호 */
+      if (p.number) {
+        g.fillStyle = hexAlpha('#ffffff', 0.94);
+        g.font = '800 6.3px system-ui, -apple-system, sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(p.number), 30, 50.2);
+        g.strokeStyle = hexAlpha('#000000', 0.20); g.lineWidth = 0.6;
+        g.strokeText(String(p.number), 30, 50.2);
+      }
+    }
+
+    function drawShorts() {
+      g.fillStyle = shorts;
+      g.beginPath();
+      g.moveTo(20.2, 60.2);
+      g.lineTo(39.8, 60.2);
+      g.lineTo(40.8, 68.6);
+      g.quadraticCurveTo(35.4, 69.8, 33.4, 67.4);
+      g.quadraticCurveTo(30, 69.8, 26.6, 67.4);
+      g.quadraticCurveTo(24.6, 69.8, 19.2, 68.6);
+      g.closePath(); g.fill();
+      OL(0.95); g.stroke();
+      g.strokeStyle = trim; g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(20.6, 62.4); g.lineTo(39.4, 62.4); g.stroke();
+    }
+
+    /* ── 머리 ── */
+    function drawHead(cx, cy) {
+      /* 목 */
+      g.fillStyle = skinD;
+      g.beginPath();
+      g.moveTo(cx - 3.6, cy + 9);
+      g.lineTo(cx + 3.6, cy + 9);
+      g.lineTo(cx + 3.4, cy + 18.6);
+      g.lineTo(cx - 3.4, cy + 18.6);
+      g.closePath(); g.fill();
+
+      hairBackPath(g, hairSt, cx, cy, hair);
+
+      /* 귀 */
+      g.fillStyle = skin;
+      g.beginPath(); g.ellipse(cx - 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx + 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
+
+      /* 얼굴 — 일러스트 크롭 */
+      var img = Art.headImage(p);
+      g.save();
+      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
+      if (img && img.complete && (img.naturalWidth || img.width) > 0) {
+        g.drawImage(img, cx - 15.4, cy - 16.0, 30.8, 32.0);
+      } else {
+        g.fillStyle = skin;
+        g.fillRect(cx - 15, cy - 16, 30, 32);
+        g.fillStyle = hair;
+        g.beginPath(); g.ellipse(cx, cy - 5, 12.6, 10.6, 0, Math.PI, Math.PI * 2); g.fill();
+        g.fillStyle = '#20262c';
+        g.beginPath(); g.ellipse(cx - 4.4, cy + 1.4, 1.7, 2.5, 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(cx + 4.4, cy + 1.4, 1.7, 2.5, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = '#8a4a3c'; g.lineWidth = 0.9;
+        g.beginPath(); g.arc(cx, cy + 5.4, 2.2, 0.3, Math.PI - 0.3); g.stroke();
+      }
+      /* 얼굴 아래쪽 음영 (턱 브이) */
+      var sh = g.createLinearGradient(0, cy + 6, 0, cy + 15);
+      sh.addColorStop(0, 'rgba(0,0,0,0)');
+      sh.addColorStop(1, 'rgba(0,0,0,0.16)');
+      g.fillStyle = sh;
+      g.fillRect(cx - 14, cy + 6, 28, 10);
+      g.restore();
+
+      hairFrontPath(g, hairSt, cx, cy, hair, hairD);
+
+      /* 얼굴 테두리 */
+      g.strokeStyle = hexAlpha(ink, 0.9);
+      g.lineWidth = 1.15;
+      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.stroke();
+      /* 뺨 · 턱 */
+      g.strokeStyle = hexAlpha(skinD2, 0.45);
+      g.lineWidth = 0.8;
+      g.beginPath(); g.ellipse(cx, cy + 4.2, 10.4, 9.4, 0, 0.55, Math.PI - 0.55); g.stroke();
+    }
+
+    /* ── 조립 ── */
+    g.save();
+    g.translate(0, -(rig.hop || 0) - (rig.bob || 0));
+
+    /* 뒤쪽 다리 · 팔 */
+    leg(hipX - 3.4, hipY + 1.0, rig.legB.a, rig.legB.k, false);
+    g.save();
+    g.translate(hipX, hipY);
+    g.rotate(rig.lean * 0.5);
+    g.translate(-hipX, -hipY);
+    arm(22.0, 43.4, rig.armB.a, rig.armB.e, false);
+    g.restore();
+
+    /* 몸통 + 머리 (허리를 축으로 상체 기울기) */
+    g.save();
+    g.translate(hipX, hipY);
+    g.rotate(rig.lean);
+    g.translate(-hipX, -hipY);
+    drawTorso();
+    g.save();
+    g.translate(30, 34);
+    g.rotate(rig.headTilt || 0);
+    g.translate(-30, -34);
+    drawHead(30, 20 + (rig.headDy || 0));
+    g.restore();
+    g.restore();
+
+    drawShorts();
 
     /* 앞쪽 다리 · 팔 */
-    leg(24.8, s, swing, false);
-    arm(28.4, 29.4, s, swing, false);
+    leg(hipX + 3.4, hipY + 1.0, rig.legA.a, rig.legA.k, true);
+    g.save();
+    g.translate(hipX, hipY);
+    g.rotate(rig.lean);
+    g.translate(-hipX, -hipY);
+    arm(38.0, 43.4, rig.armA.a, rig.armA.e, true);
+    g.restore();
 
-    /* 목 */
-    g.fillStyle = skinD;
-    g.fillRect(19.6, 22.4, 4.8, 4.2);
-    OL(0.8); g.strokeRect(19.6, 22.4, 4.8, 4.2);
+    g.restore();
 
-    /* 머리 — 일러스트 얼굴 이미지 */
-    var img = Art.headImage(p);
-    /* 뒤 실루엣 (배경 분리) */
-    g.fillStyle = hexAlpha(hair, 0.35);
-    g.beginPath(); g.ellipse(22, 11.6, 12.6, 12.4, 0, 0, Math.PI * 2); g.fill();
-    if (img && img.complete && (img.naturalWidth || img.width) > 0) {
-      g.save();
-      g.beginPath();
-      g.ellipse(22, 11.0, 13.8, 13.2, 0, 0, Math.PI * 2);
-      g.clip();
-      g.drawImage(img, 6.6, -3.6, 30.8, 30.8);
-      g.restore();
-    } else {
-      /* 이미지 로딩 전 임시 얼굴 */
-      g.fillStyle = skin;
-      g.beginPath(); g.ellipse(22, 11.6, 10.2, 10.6, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = hair;
-      g.beginPath(); g.ellipse(22, 6.6, 10.6, 7.0, 0, Math.PI, Math.PI * 2); g.fill();
-      g.fillStyle = '#20262c';
-      g.beginPath(); g.arc(18, 12.4, 1.6, 0, Math.PI * 2); g.fill();
-      g.beginPath(); g.arc(26, 12.4, 1.6, 0, Math.PI * 2); g.fill();
-    }
-    /* 턱 밑 그림자 */
-    g.strokeStyle = hexAlpha('#000000', 0.18); g.lineWidth = 1.4;
-    g.beginPath(); g.ellipse(22, 23.4, 7.2, 2.2, 0, 0.15, Math.PI - 0.15); g.stroke();
-
+    if (Object.keys(sdCache).length > 320) { sdCache = {}; }
     sdCache[key] = cv;
     return cv;
   };
