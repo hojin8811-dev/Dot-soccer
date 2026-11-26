@@ -787,7 +787,7 @@
 
   var pitchTries = 0;
   function loadPitchImage() {
-    if (pitchImg || pitchTries >= 2) { return; }
+    if (pitchImg || pitchTries >= 4) { return; }
     pitchTries++;
     var img = new global.Image();
     img.onload = function () {
@@ -797,7 +797,7 @@
     };
     img.onerror = function () {
       pitchImg = null;
-      if (pitchTries < 2) { global.setTimeout(loadPitchImage, 1500); }
+      if (pitchTries < 4) { global.setTimeout(loadPitchImage, 3000); }
     };
     img.src = 'assets/stadium-pitch.png';
   }
@@ -2534,7 +2534,7 @@
       ctx.fillText('HALF TIME', W / 2, H / 2 + 6);
       ctx.textAlign = 'left';
     }
-    if (M.paused && M.running && !M.halftime) {
+    if (M.paused && M.running && !M.halftime && !artGateOn) {
       ctx.fillStyle = 'rgba(4,20,16,0.45)';
       ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = '#eaffd0';
