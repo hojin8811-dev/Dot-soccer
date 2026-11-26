@@ -2548,14 +2548,19 @@
     var n = (p && p.pic) ? p.pic : 1;
     return Art.assetPrefix + 'assets/portraits/p' + pad3(n) + '.png';
   };
-  /* 감독 일러스트 (assets/managers/m01~m32) */
+  /* 감독 일러스트 (assets/managers/m01~m32) — v21 아트가 들어오기 전에는
+     m33~m50도 기존 32장의 얼굴을 돌려 쓴다(깨진 이미지 방지). 아트 배포 시 MGR_ART_MAX 를 50으로. */
+  var MGR_ART_MAX = 32;
+  function mgrArtNo(mgr) {
+    var n = parseInt((mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '1', 10) || 1;
+    if (n > MGR_ART_MAX) { n = ((n - MGR_ART_MAX - 1) % MGR_ART_MAX) + 1; }
+    return (n < 10 ? '0' : '') + n;
+  }
   Art.managerPortrait = function (mgr) {
-    var n = (mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '01';
-    return 'assets/managers/m' + (n.length < 2 ? '0' + n : n) + '.png';
+    return 'assets/managers/m' + mgrArtNo(mgr) + '.png';
   };
   Art.managerHead = function (mgr) {
-    var n = (mgr && mgr.id) ? String(mgr.id).replace(/[^0-9]/g, '') : '01';
-    return 'assets/managers/head/m' + (n.length < 2 ? '0' + n : n) + '.png';
+    return 'assets/managers/head/m' + mgrArtNo(mgr) + '.png';
   };
   Art.headSrc = function (p) {
     var n = (p && p.pic) ? p.pic : 1;
