@@ -1,12 +1,12 @@
-/*! 도트싸커 v17 — TV 생중계 연출(카메라 · 리플레이 · 사운드 · 2인 중계) 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v17a-20261126';
+/*! 도트싸커 v18 — 전술 엔진(3줄 블록 · GK 배급 · 오프사이드 트랩 · 스로인) 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v18a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=17&b=49', './js/data.js?v=17&b=49', './js/match.js?v=17&b=49', './js/game.js?v=17&b=49',
+        './css/style.css?v=18&b=50', './js/data.js?v=18&b=50', './js/match.js?v=18&b=50', './js/game.js?v=18&b=50',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
