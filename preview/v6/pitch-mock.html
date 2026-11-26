@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>도트싸커 v6 · 피치 목업</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #061a16; }
+  #phone { width: 390px; height: 844px; position: relative; overflow: hidden; background: #08231e; font-family: system-ui, -apple-system, sans-serif; }
+  .bar { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: #eaf6dd; font-size: 11px; font-weight: 800; background: linear-gradient(160deg,#143a31,#0a2620); border-bottom: 1px solid rgba(200,241,105,.16); }
+  .wrap { margin: 8px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(200,241,105,.14); position: relative; }
+  canvas { display: block; }
+  .hint { color: #7f9b8b; font-size: 10px; padding: 6px 10px; }
+</style>
+</head>
+<body>
+<div id="phone">
+  <div class="bar"><span>도트 유나이티드</span><span>0 : 0 · 34'</span><span>한강 FC</span></div>
+  <div class="wrap"><canvas id="c" width="374" height="470"></canvas></div>
+  <div class="hint" id="info">실제 경기 크기(피치 374×470, 선수 58px)에서의 모습</div>
+</div>
+<script src="../../js/data.js?v=6&b=22"></script>
+<script src="faces-embed.js?v=6"></script>
+<script>
+(function () {
+  var DS = window.DS, Art = DS.Art;
+  var EMB = window.__FACES || {};
+  Art.headImage = function (p) {
+    var n = (p && p.pic) ? p.pic : 1;
+    if (!EMB[n]) { return null; }
+    Art.__e = Art.__e || {};
+    if (!Art.__e[n]) { var im = new Image(); im.src = EMB[n]; Art.__e[n] = im; }
+    return Art.__e[n];
+  };
+  var cv = document.getElementById('c');
+  var g = cv.getContext('2d');
+  var W = cv.width, H = cv.height;
+  var homeKit = { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' };
+  var awayKit = { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' };
+  var gkA = { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' };
+  var gkB = { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' };
+  var homePics = [3, 7, 15, 22, 40, 88, 120, 200, 294, 310, 3];
+  var awayPics = [22, 40, 88, 120, 200, 294, 310, 3, 7, 15, 22];
+  var field = { x: 10, y: 34, w: W - 20, h: H - 60 };
+  var SPR = 58;
+
+  function sx(x) { return field.x + x / 100 * field.w; }
+  function sy(y) { return field.y + y / 120 * field.h; }
+
+  function draw() {
+    g.clearRect(0, 0, W, H);
+    Art.drawPitch(g, W, H, { margin: 8, crowd: true });
+    /* 홈 4-2-3-1 / 원정 4-4-2 대략 배치 */
+    var home = [
+      [50, 112, 'GK', 294], [16, 92, 'LB', 3], [38, 96, 'CB', 7], [62, 96, 'CB', 15], [84, 92, 'RB', 22],
+      [38, 74, 'DM', 40], [62, 74, 'CM', 88], [14, 50, 'LWF', 120], [50, 46, 'AM', 200], [86, 50, 'RWF', 3],
+      [50, 22, 'ST', 7]
+    ];
+    var away = [
+      [50, 8, 'GK', 310], [16, 28, 'LB', 22], [38, 24, 'CB', 40], [62, 24, 'CB', 88], [84, 28, 'RB', 120],
+      [14, 52, 'LM', 200], [38, 48, 'CM', 294], [62, 48, 'CM', 3], [86, 52, 'RM', 7],
+      [42, 74, 'ST', 15], [58, 76, 'ST', 22]
+    ];
+    var list = [];
+    var i;
+    for (i = 0; i < 11; i++) {
+      var a = home[i];
+      list.push({ x: a[0], y: a[1], pic: a[3], kit: a[2] === 'GK' ? gkA : homeKit, num: i + 1, pos: a[2],
+        pose: i === 0 ? 'idle' : (i % 4 === 0 ? 'run' : (i % 4 === 1 ? 'dribble' : (i % 4 === 2 ? 'kick' : 'idle'))), frame: i % 4 });
+    }
+    for (i = 0; i < 11; i++) {
+      var b = away[i];
+      list.push({ x: b[0], y: b[1], pic: b[3], kit: b[2] === 'GK' ? gkB : awayKit, num: i + 1, pos: b[2],
+        pose: i === 0 ? 'idle' : (i % 3 === 0 ? 'run' : (i % 3 === 1 ? 'tackle' : 'idle')), frame: i % 4 });
+    }
+    list.sort(function (p, q) { return p.y - q.y; });
+    for (i = 0; i < list.length; i++) {
+      var p = list[i];
+      var px = sx(p.x), py = sy(p.y);
+      g.fillStyle = 'rgba(4,20,16,0.34)';
+      g.beginPath(); g.ellipse(px, py - 0.5, SPR * 0.28, SPR * 0.09, 0, 0, Math.PI * 2); g.fill();
+      var fake = { id: 'm' + i, pic: p.pic, number: p.num, pos: p.pos, name: 'x' };
+      var spr = Art.sdSprite(fake, p.kit, { pose: p.pose, frame: p.frame, gk: p.pos === 'GK', t: 0.4 });
+      var h = SPR, w = SPR * Art.SD_SIZE.w / Art.SD_SIZE.h;
+      g.drawImage(spr, Math.round(px - w / 2), Math.round(py - h + 4), Math.round(w), Math.round(h));
+    }
+    /* 볼 */
+    Art.drawBall(g, sx(50) + 6, sy(64), Math.max(3.4, W / 105));
+  }
+  draw();
+  var ticks = 0;
+  var t = setInterval(function () { draw(); ticks++; if (ticks > 24) { clearInterval(t); } }, 300);
+})();
+</script>
+</body>
+</html>
