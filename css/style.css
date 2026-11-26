@@ -1268,3 +1268,11 @@ body.rot-off .rotate { display: none; }
 #modal[data-report="1"] .sheet-body > * { break-inside: avoid; }
 .rs-score i { font-style: normal; color: var(--ink3); font-size: 16px; }
 .sub-panel .sub-cols { grid-template-columns: 1fr 1fr; }
+
+/* 상점 · 스카우트 후보 2×2 (가로) */
+.scout-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.scout-grid .scout { margin: 0; padding: 5px 6px; gap: 6px; }
+.scout-grid .scout .art { width: 42px; height: 50px; border-radius: 8px; }
+.scout-grid .scout .nm { font-size: 11px; }
+.scout-grid .scout .mt { font-size: 7.5px; gap: 3px; margin-top: 1px; }
+.scout-grid .scout .ov { font-size: 15px; }

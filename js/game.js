@@ -945,7 +945,7 @@
       '<div class="card dark">' +
       '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">스페셜 스카우트</b><span class="meta">4인 후보</span></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.62);margin-bottom:7px">영입 비용 ' + fmt(CAND_COST) + ' · 방출할 선수를 고르면 바로 교환됩니다.</div>' +
-      cards +
+      '<div class="scout-grid">' + cards + '</div>' +
       '<div class="row between" style="margin-top:6px">' +
       '<button class="btn ghost sm" data-act="reroll" ' + (S.money < REROLL_COST ? 'disabled' : '') + '>리스트 갱신 · ' + fmt(REROLL_COST) + '</button>' +
       '<button class="btn primary sm" data-act="normalScout" ' + (S.money < 600 ? 'disabled' : '') + '>일반 스카우트 · 600</button>' +
