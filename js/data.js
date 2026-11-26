@@ -942,23 +942,41 @@
   var ID_SEQ = 1;
   function newId() { return 'p' + (Date.now() % 1000000) + '_' + (ID_SEQ++); }
 
+  /* v15 — 스카우트 확률 피라미드 (수석QA 개편안): 위 등급일수록 급격히 좁아지는 상용 모델 */
+  var SCOUT_RATES = {
+    normal: { dong: 0.75, eun: 0.22, geum: 0.03, legend: 0.00 },
+    special: { eun: 0.79, geum: 0.20, legend: 0.01 }
+  };
+  DS.SCOUT_RATES = SCOUT_RATES;
+  function scoutRateText(kind) {
+    var t = SCOUT_RATES[kind] || SCOUT_RATES.normal;
+    var keys = kind === 'normal' ? ['dong', 'eun', 'geum', 'legend'] : ['eun', 'geum', 'legend'];
+    var icon = { dong: '🥉', eun: '🥈', geum: '🥇', legend: '👑' };
+    var out = [], i;
+    for (i = 0; i < keys.length; i++) {
+      out.push(icon[keys[i]] + ' ' + RARITY[keys[i]].name + ' ' + (Math.round((t[keys[i]] || 0) * 1000) / 10) + '%');
+    }
+    return out.join(' · ');
+  }
+  DS.scoutRateText = scoutRateText;
+
   function pickRarity(kind) {
-    if (kind === 'normal') {
-      var r = Math.random();
-      return r < 0.52 ? 'dong' : (r < 0.84 ? 'eun' : 'geum');
+    if (kind === 'normal' || kind === 'special') {
+      var t = SCOUT_RATES[kind];
+      var keys = kind === 'normal' ? ['dong', 'eun', 'geum', 'legend'] : ['eun', 'geum', 'legend'];
+      var r = Math.random(), acc = 0, i;
+      for (i = 0; i < keys.length; i++) {
+        acc += (t[keys[i]] || 0);
+        if (r < acc) { return keys[i]; }
+      }
+      return kind === 'normal' ? 'dong' : 'eun';
     }
-    if (kind === 'special') {
-      var q = Math.random();
-      if (q < 0.34) { return 'eun'; }
-      if (q < 0.84) { return 'geum'; }
-      return 'legend';
-    }
-    var total = 0, i;
-    for (i = 0; i < RARITY_ORDER.length; i++) { total += (5 - i) * 10; }
+    var total = 0, k;
+    for (k = 0; k < RARITY_ORDER.length; k++) { total += (5 - k) * 10; }
     var x = Math.random() * total;
-    for (i = 0; i < RARITY_ORDER.length; i++) {
-      x -= (5 - i) * 10;
-      if (x <= 0) { return RARITY_ORDER[i]; }
+    for (k = 0; k < RARITY_ORDER.length; k++) {
+      x -= (5 - k) * 10;
+      if (x <= 0) { return RARITY_ORDER[k]; }
     }
     return 'dong';
   }

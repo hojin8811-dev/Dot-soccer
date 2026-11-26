@@ -12,7 +12,7 @@
   var SAVE_KEY = 'dot-soccer-v3-save';
   var MAX_SQUAD = 20;
   var BENCH_SIZE = 5;
-  var CAND_COST = 2400;
+  var CAND_COST = 2200;
   var REROLL_COST = 300;
   var EVO_COST = 900;
 
@@ -75,17 +75,61 @@
     return rows;
   }
 
+  /* ═════════════════  리그 대진표 (v15: 표준 라운드 로빈) ═════════════════
+     8팀 7라운드 × 4경기 = 28경기. Circle Method — 매 라운드 모든 팀이 정확히 1경기,
+     홈/원정은 3~4회로 갈린다. (v14까지는 회전 배열 페어링이 index 하나를 빼먹어
+     특정 팀이 한 라운드에 2경기, 다른 팀이 0경기가 되고 플레이어가 늘 홈이었다.) */
   function makeFixtures() {
     var ids = ['me'], i;
     for (i = 0; i < DS.TEAMS.length; i++) { ids.push(DS.TEAMS[i].id); }
-    var n = ids.length, arr = ids.slice(1), rounds = [], r, j;
+    var n = ids.length;
+    if (n % 2 !== 0) { ids.push('__bye'); n++; }
+    var arr = ids.slice(), rounds = [], r, j, homeCount = {};
+    for (i = 0; i < ids.length; i++) { homeCount[ids[i]] = 0; }
     for (r = 0; r < n - 1; r++) {
-      var pairs = [[ids[0], arr[arr.length - 1]]];
-      for (j = 0; j < (n - 2) / 2; j++) { pairs.push([arr[j], arr[n - 2 - j]]); }
+      var pairs = [];
+      for (j = 0; j < n / 2; j++) {
+        var a = arr[j], b = arr[n - 1 - j];
+        if (a === '__bye' || b === '__bye') { continue; }
+        /* 홈/원정: 지금까지 홈을 덜 치른 팀에 홈을 준다 → 7라운드에 3~4회로 균형 */
+        var ha = homeCount[a], hb = homeCount[b], aHome;
+        if (ha < hb) { aHome = true; }
+        else if (ha > hb) { aHome = false; }
+        else { aHome = ((r + j) % 2 === 0); }
+        homeCount[aHome ? a : b] += 1;
+        pairs.push(aHome ? [a, b] : [b, a]);
+      }
       rounds.push(pairs);
-      arr.unshift(arr.pop());
+      arr.splice(1, 0, arr.pop());               /* 첫 팀 고정 · 나머지는 한 칸씩 회전 */
     }
     return rounds;
+  }
+
+  /* 대진표가 올바른 라운드 로빈인지 검사 — 예전 세이브의 망가진 schedule을 걸러낸다 */
+  function fixturesValid(fx) {
+    if (!fx || !fx.length) { return false; }
+    var teamCount = DS.TEAMS.length + 1;
+    var seenPair = {}, r, i;
+    for (r = 0; r < fx.length; r++) {
+      var round = fx[r], used = {}, cnt = 0;
+      if (!round || !round.length) { return false; }
+      for (i = 0; i < round.length; i++) {
+        var a = round[i][0], b = round[i][1];
+        if (!a || !b || a === b) { return false; }
+        if (used[a] || used[b]) { return false; }
+        used[a] = 1; used[b] = 1;
+        cnt++;
+        var key = a < b ? a + '|' + b : b + '|' + a;
+        if (seenPair[key]) { return false; }
+        seenPair[key] = 1;
+      }
+      if (cnt !== teamCount / 2) { return false; }
+      if (Object.keys(used).length !== teamCount) { return false; }
+      var hasMe = false;
+      for (var k in used) { if (k === 'me') { hasMe = true; } }
+      if (!hasMe) { return false; }
+    }
+    return fx.length === teamCount - 1;
   }
 
   function autoLineup(squad, formation) {
@@ -180,6 +224,7 @@
       lastResult: null,
       lastReport: null,
       scoutCandidates: [],
+      scoutPity: 0,
       managers: ['m01'],
       manager: 'm01',
       mgrCand: [],
@@ -212,7 +257,17 @@
       var d = JSON.parse(raw);
       if (!d || (d.v !== 3 && d.v !== 4 && d.v !== 5) || !d.squad || !d.lineup || !d.club) { return null; }
       if (!d.table || !d.table.length) { d.table = makeTable(); }
-      if (!d.fixtures || !d.fixtures.length) { d.fixtures = makeFixtures(); }
+      /* v15 — 깨진 대진표(팀 중복/누락·라운드 수 오류)는 표준 라운드 로빈으로 재생성 */
+      if (!d.fixtures || !d.fixtures.length) {
+        d.fixtures = makeFixtures();
+      } else if (!fixturesValid(d.fixtures)) {
+        d.fixtures = makeFixtures();
+        if (typeof d.round !== 'number' || d.round < 0) { d.round = 0; }
+        if (d.round > d.fixtures.length) { d.round = d.fixtures.length; }
+        d.fixtureFixed = 1;
+        if (!d.log) { d.log = []; }
+        d.log.push('S' + (d.season || 1) + ' 대진표 재생성 (라운드 로빈 수정)');
+      }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
       if (!d.bench) { d.bench = autoBench(d.squad, d.lineup); }
       if (!d.roles) { d.roles = {}; }
@@ -229,6 +284,7 @@
       if (typeof d.morale !== 'number') { d.morale = 66; }
       if (!d.sponsor) { d.sponsor = 'kimbap'; }
       if (!d.scoutCandidates) { d.scoutCandidates = []; }
+      if (typeof d.scoutPity !== 'number') { d.scoutPity = 0; }
       /* v5: 감독(매니저) — 기본 감독 1명 지급 */
       if (!d.managers || !d.managers.length) { d.managers = ['m01']; }
       if (!d.manager || d.managers.indexOf(d.manager) < 0) { d.manager = d.managers[0]; }
@@ -926,8 +982,14 @@
     S.scoutCandidates = [];
     var i;
     var taken = S.squad.slice();
+    /* v15 — 30회 천장: 마일리지가 30에 도달하면 다음 스페셜 후보 1장은 레전드 100% 확정 */
+    var pity = S.scoutPity || 0;
+    var guaranteed = pity >= 30;
     for (i = 0; i < 4; i++) {
-      var p = DS.makePlayer({ rarity: DS.pickRarity('special') });
+      var rarity = DS.pickRarity('special');
+      if (i === 0 && guaranteed) { rarity = 'legend'; }
+      var p = DS.makePlayer({ rarity: rarity });
+      if (i === 0 && guaranteed) { p.guaranteed = true; }
       p.pic = DS.nextFreePic(taken, p.pos);
       taken.push(p);
       S.scoutCandidates.push(p);
@@ -948,7 +1010,8 @@
         '<span class="main"><span class="nm">' + esc(p.name) + '</span>' +
         '<span class="mt">' + posBadge(p.pos) + '<span class="chip" style="background:' + rarityColor(p) + '22;color:' + rarityColor(p) + '">' + DS.RARITY[p.rarity].name + '</span>' +
         '<span>' + p.tenure + '기수</span></span>' +
-        '<span class="mt"><span class="chip">' + DS.lockOf(p.lock).name + '</span><span class="chip">' + p.playType + '</span></span></span>' +
+        '<span class="mt"><span class="chip">' + DS.lockOf(p.lock).name + '</span><span class="chip">' + p.playType + '</span>' +
+        (p.guaranteed ? '<span class="chip" style="background:#8248bf33;color:#c9a6ff">👑 천장 확정</span>' : '') + '</span></span>' +
         '<span class="ov">' + DS.ratingOf(p) + '<small>OVR</small></span>' +
         '</button>';
     }
@@ -958,6 +1021,13 @@
     var pctP = Math.min(100, Math.round(dexP / 40 * 100));
     var pctE = Math.round(dexE / DS.EMBLEMS.length * 100);
     var pctK = Math.round(dexK / DS.KIT_COLORS.length * 100);
+    var pity = S.scoutPity || 0;
+    var oddsHTML =
+      '<div class="scout-odds">' +
+      '<div class="so-line"><b>일반 ' + fmt(600) + '</b><span>' + DS.scoutRateText('normal') + '</span></div>' +
+      '<div class="so-line"><b>스페셜 ' + fmt(CAND_COST) + '</b><span>' + DS.scoutRateText('special') + '</span></div>' +
+      '<div class="so-pity' + (pity >= 30 ? ' full' : '') + '">👑 천장 <b>' + pity + '/30</b> · 30회 도달 시 다음 스페셜 영입은 <b>레전드 100% 확정</b></div>' +
+      '</div>';
 
     var eCells = '', em;
     for (i = 0; i < DS.EMBLEMS.length; i++) {
@@ -975,13 +1045,13 @@
 
     box.innerHTML =
       '<div class="card dark">' +
-      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">스페셜 스카우트</b><span class="meta">4인 후보</span></div>' +
+      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">스페셜 스카우트</b><span class="meta">4인 후보 · 천장 ' + pity + '/30</span></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.62);margin-bottom:7px">영입 비용 ' + fmt(CAND_COST) + ' · 방출할 선수를 고르면 바로 교환됩니다.</div>' +
       '<div class="scout-grid">' + cards + '</div>' +
       '<div class="row between" style="margin-top:6px">' +
       '<button class="btn ghost sm" data-act="reroll" ' + (S.money < REROLL_COST ? 'disabled' : '') + '>리스트 갱신 · ' + fmt(REROLL_COST) + '</button>' +
       '<button class="btn primary sm" data-act="normalScout" ' + (S.money < 600 ? 'disabled' : '') + '>일반 스카우트 · 600</button>' +
-      '</div></div>' +
+      '</div>' + oddsHTML + '</div>' +
       '<div class="card">' +
       '<div class="card-head"><b>컬렉션 도감</b><span class="meta">수집률</span></div>' +
       '<div class="row between"><span class="tiny muted">선수 ' + dexP + '/40</span><b class="tiny">' + pctP + '%</b></div>' +
@@ -1324,9 +1394,9 @@
     }
 
     return '<div class="rs">' +
-      '<div class="rs-team"><canvas data-emblem="' + r.homeEmblem + '" data-kit="' + r.homeKit.shirt + '|' + r.homeKit.trim + '" width="30" height="34"></canvas><b>' + esc(r.homeShort) + '</b><span>HOME</span></div>' +
+      '<div class="rs-team"><canvas data-emblem="' + r.homeEmblem + '" data-kit="' + r.homeKit.shirt + '|' + r.homeKit.trim + '" width="30" height="34"></canvas><b>' + esc(r.homeShort) + '</b><span>' + (r.venueHome === false ? 'AWAY' : 'HOME') + '</span></div>' +
       '<div class="rs-score"><b>' + r.homeScore + '</b><i>:</i><b>' + r.awayScore + '</b></div>' +
-      '<div class="rs-team"><canvas data-emblem="' + r.awayEmblem + '" data-kit="' + r.awayKit.shirt + '|' + r.awayKit.trim + '" width="30" height="34"></canvas><b>' + esc(r.awayShort) + '</b><span>AWAY</span></div>' +
+      '<div class="rs-team"><canvas data-emblem="' + r.awayEmblem + '" data-kit="' + r.awayKit.shirt + '|' + r.awayKit.trim + '" width="30" height="34"></canvas><b>' + esc(r.awayShort) + '</b><span>' + (r.venueHome === false ? 'HOME' : 'AWAY') + '</span></div>' +
       '</div>' +
       '<div class="kpis" style="margin-bottom:9px">' +
       '<div class="kpi"><b>' + r.xg[0].toFixed(1) + ' : ' + r.xg[1].toFixed(1) + '</b><span>xG</span></div>' +
@@ -1384,7 +1454,7 @@
 
   function startMatch(kind, opt) {
     opt = opt || {};
-    var oppTeam = null, oppId = null, i;
+    var oppTeam = null, oppId = null, i, venueHome = true;
     if (kind === 'smatch') {
       oppId = opt.teamId;
       oppTeam = opponentTeam(oppId);
@@ -1400,6 +1470,7 @@
       if (!o) { toast('이번 시즌 일정이 끝났습니다.'); return; }
       oppTeam = opponentTeam(o.id);
       oppId = o.id;
+      venueHome = !!o.home;
     }
 
     var f = DS.FORMATIONS[S.formation], lineup = [], k, p;
@@ -1452,12 +1523,12 @@
       kind: kind,
       onHalftime: function () { openSubs(true); },
       onHud: function (st) { updateHud(st); },
-      onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind); }
+      onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind, venueHome); }
     };
     global.setTimeout(function () { if (DS.Match) { DS.Match.start(cfg); } }, 60);
   }
 
-  function finishMatch(res, oppTeam, oppId, kind) {
+  function finishMatch(res, oppTeam, oppId, kind, venueHome) {
     var gf = res.homeScore, ga = res.awayScore;
     var win = gf > ga, draw = gf === ga;
     var base = win ? (420 + gf * 60 + (gf - ga) * 40) : (draw ? 210 : 110 + gf * 30);
@@ -1529,7 +1600,8 @@
       },
       reward: reward,
       points: points,
-      kind: kind
+      kind: kind,
+      venueHome: venueHome !== false
     };
 
     S.lastReport = report;
@@ -1974,6 +2046,15 @@
     S.dex.players[cand.name] = 1;
     if (S.roles.cap === outP.id || S.roles.fk === outP.id || S.roles.ck === outP.id || S.roles.pk === outP.id) { autoRoles(); }
     S.scoutCandidates = S.scoutCandidates.filter(function (x) { return x.id !== cand.id; });
+    /* v15 — 천장(마일리지): 스페셜 영입 1회당 +1, 30 도달 시 다음 영입은 레전드 확정 */
+    if (cand.guaranteed) {
+      S.scoutPity = 0;
+    } else {
+      S.scoutPity = Math.min(30, (S.scoutPity || 0) + 1);
+    }
+    if (!S.scoutCandidates.length || (S.scoutPity >= 30 && !S.scoutCandidates.some(function (x) { return x.guaranteed; }))) {
+      rollScout();
+    }
     save();
     closeModal();
     renderAll();

@@ -1340,3 +1340,13 @@ body.rot-off .rotate { display: none; }
 /* 상점: 스페셜 스카우트 카드가 2칼럼을 차지해 후보 2×2가 잘리지 않는다 */
 #screen-shop > .card.dark { grid-column: span 2; }
 @media (max-width: 700px) { #screen-shop > .card.dark { grid-column: auto; } .scout-grid { grid-template-columns: 1fr; } }
+
+/* v15 — 스카우트 확률 · 천장 표기 (구글 플레이 심사 대응) */
+.scout-odds { margin-top: 7px; padding: 6px 8px; border-radius: 10px; background: rgba(0,0,0,.24); border: 1px solid rgba(255,255,255,.10); }
+.scout-odds .so-line { display: flex; gap: 6px; align-items: baseline; font-size: 9px; line-height: 1.5; color: rgba(233,244,221,.72); }
+.scout-odds .so-line b { flex: 0 0 auto; color: #c8f169; font-size: 9px; font-weight: 900; }
+.scout-odds .so-line span { color: rgba(233,244,221,.66); font-weight: 700; }
+.scout-odds .so-pity { margin-top: 3px; padding-top: 4px; border-top: 1px dashed rgba(255,255,255,.14); font-size: 9px; font-weight: 700; color: rgba(233,244,221,.72); }
+.scout-odds .so-pity b { color: #ffd98a; font-weight: 900; }
+.scout-odds .so-pity.full { color: #ffd98a; }
+.scout-odds .so-pity.full b { color: #c9a6ff; }
