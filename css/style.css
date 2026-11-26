@@ -1277,3 +1277,7 @@ body.rot-off .rotate { display: none; }
 .scout-grid .scout .nm { font-size: 11px; }
 .scout-grid .scout .mt { font-size: 7.5px; gap: 3px; margin-top: 1px; }
 .scout-grid .scout .ov { font-size: 15px; }
+
+/* 상점: 스페셜 스카우트 카드가 2칼럼을 차지해 후보 2×2가 잘리지 않는다 */
+#screen-shop > .card.dark { grid-column: span 2; }
+@media (max-width: 700px) { #screen-shop > .card.dark { grid-column: auto; } .scout-grid { grid-template-columns: 1fr; } }

@@ -1,12 +1,12 @@
 /*! 도트싸커 v7 — 가로 16:9 스타디움 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v7c-20261126';
+var CACHE = 'dot-soccer-v7d-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=7&b=25', './js/data.js?v=7&b=25', './js/match.js?v=7&b=25', './js/game.js?v=7&b=25',
+        './css/style.css?v=7&b=26', './js/data.js?v=7&b=26', './js/match.js?v=7&b=26', './js/game.js?v=7&b=26',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
