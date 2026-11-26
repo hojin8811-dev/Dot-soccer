@@ -2721,8 +2721,8 @@
         var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
         var bb = headBox(p.pic || 1);
         var kx = iw / 240, ky = ih / 240;
-        var bs = Math.max(bb.w, bb.h) * 0.96;
-        var bx = bb.x + bb.w / 2 - bs / 2, by = bb.y + bb.h / 2 - bs / 2;
+        var bs = Math.max(bb.w, bb.h * 0.88);
+        var bx = bb.x + bb.w / 2 - bs / 2, by = bb.y + bb.h * 0.03;
         g.drawImage(img, bx * kx, by * ky, bs * kx, bs * ky, cx - 20.0, cy - 22.0, 40.0, 39.0);
       } else {
         g.fillStyle = skin;
