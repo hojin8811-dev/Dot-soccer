@@ -141,6 +141,22 @@
   }
   DS.footAdjust = footAdjust;
 
+  /* 좌우 같은 줄 쌍 — 주발이 왼발이면 왼쪽 값이 오른쪽보다 항상 크거나 같게, 오른발이면 그 반대.
+     어울리지 않는 반대쪽만 내리고, 주 포지션·같은 쪽 값은 건드리지 않는다. */
+  var SIDE_PAIRS = [['LB', 'RB'], ['LWB', 'RWB'], ['LWF', 'RWF']];
+  function enforceFootOrder(apt, foot) {
+    if (!apt) { return apt; }
+    var i, a, b, va, vb;
+    for (i = 0; i < SIDE_PAIRS.length; i++) {
+      a = SIDE_PAIRS[i][0]; b = SIDE_PAIRS[i][1];
+      va = apt[a] || 1; vb = apt[b] || 1;
+      if (foot === '왼발' && va < vb) { apt[b] = va; }
+      else if (foot === '오른발' && vb < va) { apt[a] = vb; }
+    }
+    return apt;
+  }
+  DS.enforceFootOrder = enforceFootOrder;
+
   /* 새 선수 — 주 포지션에 맞춰 왼발/오른발을 뽑는다 (중앙·GK는 현실 비율 68/22/10) */
   function pickFoot(pos) {
     var r = Math.random();
@@ -174,6 +190,7 @@
         if (!FOOT_SIDE[code]) { continue; }
         p.apt[code] = clamp((p.apt[code] || 1) + footAdjust(foot, code), 1, 9);
       }
+      enforceFootOrder(p.apt, foot);
     }
     return foot;
   };
@@ -712,6 +729,7 @@
       if (code === 'GK' && gp !== 'GK') { base = irange(1, 2); }
       apt[code] = clamp(base + footAdjust(foot, code), 1, 9);
     }
+    enforceFootOrder(apt, foot);
     return apt;
   }
 
