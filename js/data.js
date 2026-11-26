@@ -2355,6 +2355,10 @@
 
   /* 헤어 실루엣 — 일러스트 얼굴 뒤로 삐져나오는 머리카락 (스타일별로 모양이 다르다) */
   function hairBackPath(g, st, cx, cy, hair) {
+    g.save();
+    g.beginPath();
+    g.rect(cx - 17, cy - 24, 34, 24.6);   /* 머리 위쪽(정수리)만 노출 */
+    g.clip();
     g.fillStyle = hair;
     if (st === 'afro') {
       g.beginPath(); g.ellipse(cx, cy - 2.0, 14.8, 14.6, 0, 0, Math.PI * 2); g.fill();
@@ -2405,6 +2409,7 @@
       /* short · slick · undercut · swoop */
       g.beginPath(); g.ellipse(cx, cy - 5.6, 11.6, 10.6, 0, 0, Math.PI * 2); g.fill();
     }
+    g.restore()
   }
 
   function hairFrontPath(g, st, cx, cy, hair, hairD) {
@@ -2721,7 +2726,7 @@
         var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
         var fb = headBox(p.pic || 1);
         var kx = iw / 240, ky = ih / 240;
-        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 13.9, cy - 16.6, 27.8, 28.8);
+        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 13.9, cy - 17.8, 27.8, 28.8);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
