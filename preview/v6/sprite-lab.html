@@ -9,41 +9,51 @@
   h2 { font-size: 12px; margin: 12px 0 5px; color: #c8f169; letter-spacing: .4px; }
   .hero { display: flex; gap: 6px; }
   .hero .cell { background: radial-gradient(60% 46% at 50% 90%, rgba(0,0,0,.34), transparent 72%); }
-  .hero canvas { display: block; width: 300px; height: 420px; }
+  .hero canvas { display: block; width: 250px; height: 350px; }
   .hero span { font-size: 10px; color: #9fb9a8; }
   .grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
   .cell { text-align: center; }
-  .grid canvas { display: block; width: 120px; height: 168px; margin: 0 auto; background: radial-gradient(60% 48% at 50% 90%, rgba(0,0,0,.30), transparent 72%); }
+  .grid canvas { display: block; width: 118px; height: 165px; margin: 0 auto; background: radial-gradient(60% 48% at 50% 90%, rgba(0,0,0,.30), transparent 72%); }
   .grid span { font-size: 8px; color: #9fb9a8; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
 <div class="wrap" id="lab"></div>
 <script src="../../js/data.js?v=6&b=22"></script>
+<script src="faces-embed.js?v=6"></script>
 <script>
 (function () {
   var DS = window.DS, Art = DS.Art;
-  try { var q = new URLSearchParams(location.search); Art.assetPrefix = q.get("asset") || "../../"; } catch (e) { Art.assetPrefix = "../../"; }
+  /* 랩 전용: 임베드된 얼굴(데이터 URL)로 즉시 렌더 — 네트워크 이미지 로딩 없이 확인 */
+  var EMB = window.__FACES || {};
+  Art.headImage = function (p) {
+    var n = (p && p.pic) ? p.pic : 1;
+    if (!EMB[n]) { return null; }
+    if (Art.__embCache && Art.__embCache[n]) { return Art.__embCache[n]; }
+    var img = new Image();
+    img.src = EMB[n];
+    Art.__embCache = Art.__embCache || {};
+    Art.__embCache[n] = img;
+    return img;
+  };
   var homeKit = { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' };
   var awayKit = { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' };
   var gkKitA = { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' };
   var gkKitB = { shirt: '#e0be36', shorts: '#1b2327', trim: '#f7f0cf' };
-  var squad = DS.makeInitialSquad();
-  DS.assignUniquePics(squad);
-  var out = DS.makeInitialSquad();
-  DS.assignUniquePics(out);
+  function mk(pic, num, pos) { return { id: 'p' + pic + '_' + pos, pic: pic, number: num, pos: pos, name: 'x' }; }
+  var homePics = [3, 7, 15, 22, 40, 88, 120, 200, 3, 7, 15];
+  var awayPics = [22, 40, 88, 120, 200, 294, 310, 3, 7, 15, 22];
 
   var host = document.getElementById('lab');
   var html = '';
 
-  /* 큰 컷: 홈 GK / 홈 필드 / 원정 필드 / 원정 GK */
   html += '<h2>큰 컷</h2><div class="hero">';
   var heroes = [
-    { p: squad[0], kit: gkKitA, pose: 'dive', gk: 1, label: '홈 GK 다이빙' },
-    { p: squad[8], kit: homeKit, pose: 'run', frame: 0, label: '홈 필드 달리기' },
-    { p: out[8], kit: awayKit, pose: 'run', frame: 2, label: '원정 필드 달리기' },
-    { p: out[0], kit: gkKitB, pose: 'idle', gk: 1, label: '원정 GK 대기' },
-    { p: squad[9], kit: homeKit, pose: 'kick', label: '홈 슛' }
+    { p: mk(294, 1, 'GK'), kit: gkKitA, pose: 'dive', gk: 1, label: 'GK 다이빙' },
+    { p: mk(7, 9, 'ST'), kit: homeKit, pose: 'run', frame: 0, label: '달리기 1' },
+    { p: mk(40, 11, 'LWF'), kit: awayKit, pose: 'run', frame: 2, label: '달리기 2' },
+    { p: mk(88, 5, 'CB'), kit: homeKit, pose: 'kick', label: '슛' },
+    { p: mk(120, 4, 'CB'), kit: awayKit, pose: 'idle', label: '대기' }
   ];
   var i;
   for (i = 0; i < heroes.length; i++) {
@@ -51,37 +61,26 @@
   }
   html += '</div>';
 
-  function row(title, list, kit) {
+  function row(title, pics, kit, pose, gk) {
     html += '<h2>' + title + '</h2><div class="grid">';
-    for (var i = 0; i < 11; i++) {
-      var p = list[i];
-      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
-        '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '"></canvas><span>' + p.pos + ' #' + (p.number || (i + 1)) + '</span></div>';
+    for (var i = 0; i < pics.length; i++) {
+      html += '<div class="cell"><canvas data-pic="' + pics[i] + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
+        '" data-num="' + (i + 2) + '" data-pos="' + (gk && i === 0 ? 'GK' : 'CM') + '" data-pose="' + pose + '" data-gk="' + (gk && i === 0 ? 1 : 0) + '"></canvas></div>';
     }
     html += '</div>';
   }
-  function poseRow(title, list, kit, pose, gk) {
-    html += '<h2>' + title + '</h2><div class="grid">';
-    for (var i = 0; i < 11; i++) {
-      var p = list[i];
-      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
-        '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '" data-pose="' + pose + '" data-gk="' + (gk ? 1 : 0) + '"></canvas></div>';
-    }
-    html += '</div>';
-  }
-  row('홈 · 도트 유나이티드 (11명)', squad, homeKit);
-  row('원정 · 한강 FC (11명)', out, awayKit);
-  poseRow('포즈 · 달리기', squad, homeKit, 'run');
-  poseRow('포즈 · 슛', squad, homeKit, 'kick');
-  poseRow('포즈 · 태클', squad, homeKit, 'tackle');
-  poseRow('포즈 · GK 다이빙', squad, gkKitA, 'dive', 1);
+  row('홈 · 도트 유나이티드 (빨강)', homePics, homeKit, 'idle');
+  row('원정 · 한강 FC (초록)', awayPics, awayKit, 'idle');
+  row('포즈 · 달리기', homePics, homeKit, 'run');
+  row('포즈 · 슛', homePics, homeKit, 'kick');
+  row('포즈 · 태클', homePics, homeKit, 'tackle');
+  row('포즈 · GK 다이빙', homePics, gkKitA, 'dive', true);
   host.innerHTML = html;
 
   function paintCell(cv) {
-    var fake = cv.__fake, kit = cv.__kit, S = cv.__scale;
     var pose = cv.getAttribute('data-pose') || 'idle';
-    var spr = Art.sdSprite(fake, kit, { pose: pose, frame: cv.__frame || 0, gk: !!cv.__gk, t: 0.4 });
-    var w = Math.round(Art.SD_SIZE.w * S), h = Math.round(Art.SD_SIZE.h * S);
+    var spr = Art.sdSprite(cv.__fake, cv.__kit, { pose: pose, frame: cv.__frame || 0, gk: !!cv.__gk, t: 0.4 });
+    var w = Math.round(Art.SD_SIZE.w * cv.__scale), h = Math.round(Art.SD_SIZE.h * cv.__scale);
     cv.width = w; cv.height = h;
     var g = cv.getContext('2d');
     g.clearRect(0, 0, w, h);
@@ -92,35 +91,22 @@
   var hc = host.querySelectorAll('.hero canvas');
   for (i = 0; i < hc.length; i++) {
     (function (cv, h) {
-      cv.__fake = h.p; cv.__kit = h.kit; cv.__scale = 5; cv.__gk = !!h.gk; cv.__frame = h.frame || 0;
+      cv.__fake = h.p; cv.__kit = h.kit; cv.__scale = 4.4; cv.__gk = !!h.gk; cv.__frame = h.frame || 0;
       cv.setAttribute('data-pose', h.pose);
       paintCell(cv);
-      var img = Art.headImage(h.p);
-      if (img && !(img.naturalWidth > 0)) { img.onload = function () { paintCell(cv); }; }
     })(hc[i], heroes[i]);
   }
-
   var cvs = host.querySelectorAll('.grid canvas');
   for (i = 0; i < cvs.length; i++) {
     (function (cv) {
       var bits = cv.getAttribute('data-kit').split('|');
-      cv.__fake = { id: cv.getAttribute('data-id'), pic: parseInt(cv.getAttribute('data-pic'), 10), number: parseInt(cv.getAttribute('data-num'), 10), pos: 'CM', name: 'x' };
+      cv.__fake = { id: 'g' + i, pic: parseInt(cv.getAttribute('data-pic'), 10), number: parseInt(cv.getAttribute('data-num'), 10), pos: cv.getAttribute('data-pos'), name: 'x' };
       cv.__kit = { shirt: bits[0], shorts: bits[1], trim: bits[2] };
-      cv.__scale = 2.4;
+      cv.__scale = 2.2;
       cv.__gk = cv.getAttribute('data-gk') === '1';
       paintCell(cv);
-      var img = Art.headImage(cv.__fake);
-      if (img && !(img.naturalWidth > 0)) { img.onload = function () { paintCell(cv); }; }
     })(cvs[i]);
   }
-  /* 이미지가 늦게 디코드되는 환경 — 준비될 때까지 주기적으로 다시 그린다 */
-  var ticks = 0;
-  var timer = setInterval(function () {
-    var all = host.querySelectorAll('canvas');
-    for (var k = 0; k < all.length; k++) { paintCell(all[k]); }
-    ticks++;
-    if (ticks > 24) { clearInterval(timer); }
-  }, 700);
 })();
 </script>
 </body>
