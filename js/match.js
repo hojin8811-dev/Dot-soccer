@@ -2288,6 +2288,20 @@
     /* 하이라이트 */
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.beginPath(); ctx.arc(x - r * 0.30, y - r * 0.36, r * 0.20, 0, Math.PI * 2); ctx.fill();
+    /* 공 위치 표식 — 일러스트에 그려진 공과 헷갈리지 않게 살짝 떠 있는 표식 */
+    if (!hot) {
+      var my = y - r * 2.0 - 2 - Math.sin(simTime * 4.2) * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.58, my - r * 0.62);
+      ctx.lineTo(x + r * 0.58, my - r * 0.62);
+      ctx.lineTo(x, my);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(8,18,13,0.9)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 
   function drawPressZone() {
