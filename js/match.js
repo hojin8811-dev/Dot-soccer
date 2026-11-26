@@ -2592,8 +2592,8 @@
     setSit('pk', teamShort(side) + ' 페널티킥', true);
     banner('페널티킥', (taker ? short(taker.name) : '') + (gk ? ' vs ' + short(gk.name) : ''));
     bannerT = 1.6;
-    say('⚽ 페널티킥 선언! ' + (taker ? short(taker.name) : '키커') + '가 공을 세팅하고 ' +
-      (gk ? short(gk.name) : '골키퍼') + '와 1:1로 맞섭니다.', 'tactic');
+    say('⚽ 페널티킥 선언! ' + (taker ? U.josa(short(taker.name), '이/가') : '키커가') + ' 공을 세팅하고 ' +
+      (gk ? short(gk.name) : '골키퍼') + ' 골키퍼와 1:1로 맞섭니다.', 'tactic');
     dead(2.0);
   }
 
@@ -2629,7 +2629,7 @@
         bubble(passer, sp.type === 'goalkick' ? '🥾 골킥!' : '🙌 스로인!', '#bfe8ff', 1.2);
         say(sp.type === 'goalkick'
           ? short(passer.name) + '의 골킥이 ' + short(target.name) + '에게 연결됩니다.'
-          : short(passer.name) + '의 스로인 — ' + short(target.name) + '이 받습니다.', 'normal');
+          : U.josa(short(passer.name), '의') + ' 스로인 — ' + U.josa(short(target.name), '이/가') + ' 받습니다.', 'normal');
       } else {
         var fallback = target || nearestToBall(side, 999);
         if (fallback) { giveBall(fallback); }
@@ -2654,7 +2654,7 @@
         ball.x = taker.x; ball.y = taker.y;
         kickPass(taker, opt, 'progressive');
         bubble(taker, '↔ 간접 프리킥', '#bfe8ff', 1.2);
-        say('간접 프리킥 — ' + short(taker.name) + '이 ' + short(opt.name) + '에게 내줍니다.', 'normal');
+        say('간접 프리킥 — ' + U.josa(short(taker.name), '이/가') + ' ' + short(opt.name) + '에게 내줍니다.', 'normal');
       } else if (opt) { giveBall(opt); }
       return;
     }
