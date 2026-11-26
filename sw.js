@@ -1,12 +1,12 @@
-/*! 도트싸커 v18 — 전술 엔진(3줄 블록 · GK 배급 · 오프사이드 트랩 · 스로인) 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v18a-20261126';
+/*! 도트싸커 v19 — 전술 패턴 · 5초 전환 · AI 맞대응 · 세컨볼 · xG 리포트 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v19a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=18&b=50', './js/data.js?v=18&b=50', './js/match.js?v=18&b=50', './js/game.js?v=18&b=50',
+        './css/style.css?v=19&b=51', './js/data.js?v=19&b=51', './js/match.js?v=19&b=51', './js/game.js?v=19&b=51',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

@@ -1388,3 +1388,26 @@ body.rot-off .rotate { display: none; }
 .scout-odds .so-pity b { color: #ffd98a; font-weight: 900; }
 .scout-odds .so-pity.full { color: #ffd98a; }
 .scout-odds .so-pity.full b { color: #c9a6ff; }
+
+/* ── v19 ④ — 상세 결과서 2D 미니피치 (슈팅 xG맵 · 평균 포지션/패스 연결망) ── */
+.rmap { padding: 6px 7px 5px; margin: 0 0 8px; }
+.rmap-tabs { display: flex; gap: 4px; margin-bottom: 5px; }
+.rmap-tab {
+  flex: 1 1 0; min-width: 0; height: 22px; border-radius: 7px;
+  border: 1px solid var(--line); background: #f1ecdd; color: var(--ink2);
+  font-size: 9px; font-weight: 800; letter-spacing: -.2px;
+  font-family: inherit;
+}
+.rmap-tab.on { background: linear-gradient(170deg, #d6fb8a, #a8da4e); border-color: #a8da4e; color: #1d3b07; }
+.rmap-cv { display: block; width: 100%; height: auto; border-radius: 9px; background: #0c3229; }
+.rmap-foot { display: flex; align-items: center; gap: 6px; margin-top: 4px; min-height: 17px; }
+.rmap-sides { display: flex; gap: 3px; }
+.rmap-side {
+  height: 17px; padding: 0 7px; border-radius: 6px;
+  border: 1px solid var(--line); background: #f1ecdd; color: var(--ink3);
+  font-size: 8px; font-weight: 900; letter-spacing: .4px;
+  font-family: inherit;
+}
+.rmap-side.on { background: #143a31; color: #d6fb8a; border-color: #143a31; }
+.rmap-note { margin-left: auto; font-size: 8px; font-weight: 700; color: var(--ink3); text-align: right; }
+.rmap[data-mapmode="xg"] .rmap-sides { display: none; }

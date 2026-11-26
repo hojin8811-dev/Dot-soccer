@@ -1363,6 +1363,165 @@
   }
 
   /* ═════════════════  결과서 ═════════════════ */
+  /* ── v19 ④ — 2D 미니피치 (슈팅 xG맵 · 평균 포지션/패스 연결망) ──
+     가로 피치·공격축을 화면 x로 투영한다 (월드 y=0 이 화면 왼쪽).
+     홈은 왼쪽 골문을, 원정은 오른쪽 골문을 공격하는 실제 경기 화면과 같다. */
+  function paintShotMaps(root) {
+    var r = shownReport;
+    if (!root || !r || !r.tele) { return; }
+    var cv = root.querySelector('canvas[data-mapcv]');
+    if (!cv) { return; }
+    var card = cv.parentNode;
+    while (card && (!card.getAttribute || card.getAttribute('data-rmap') !== '1')) { card = card.parentNode; }
+    var mode = (card && card.getAttribute('data-mapmode')) || 'xg';
+    var side = (card && card.getAttribute('data-mapside')) || 'home';
+    var rect = cv.getBoundingClientRect ? cv.getBoundingClientRect() : null;
+    var w = Math.max(220, Math.round((rect && rect.width) || 320));
+    var h = Math.round(w * 0.62);
+    var dpr = Math.min(2, (global.devicePixelRatio || 1));
+    cv.style.width = '100%';
+    cv.style.height = h + 'px';
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    var c = cv.getContext('2d');
+    if (!c) { return; }
+    if (c.setTransform) { c.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    drawMiniPitch(c, w, h, r, mode, side);
+  }
+
+  function drawMiniPitch(c, w, h, r, mode, side) {
+    var pad = 7;
+    var pw = w - pad * 2, ph = h - pad * 2 - 10;
+    var X = function (wy) { return pad + (clamp(wy, 0, 120) / 120) * pw; };
+    var Y = function (wx) { return pad + (clamp(wx, 0, 100) / 100) * ph; };
+    var i, sh, xg, rad, col;
+    c.clearRect(0, 0, w, h);
+    /* 잔디 */
+    c.fillStyle = '#0c3229';
+    c.fillRect(pad, pad, pw, ph);
+    for (i = 0; i < 6; i++) {
+      if (i % 2 === 0) { continue; }
+      c.fillStyle = 'rgba(255,255,255,.035)';
+      c.fillRect(pad + pw * (i / 6), pad, pw / 6, ph);
+    }
+    /* 라인 */
+    c.strokeStyle = 'rgba(210,240,220,.42)';
+    c.lineWidth = 1;
+    c.strokeRect(pad + 0.5, pad + 0.5, pw - 1, ph - 1);
+    c.beginPath(); c.moveTo(X(60), pad); c.lineTo(X(60), pad + ph); c.stroke();
+    c.beginPath(); c.arc(X(60), Y(50), Math.min(pw, ph) * 0.14, 0, Math.PI * 2); c.stroke();
+    /* 페널티 박스 (양쪽) */
+    c.strokeRect(X(0), Y(21), X(16.5) - X(0), Y(79) - Y(21));
+    c.strokeRect(X(120) - (X(16.5) - X(0)), Y(21), X(16.5) - X(0), Y(79) - Y(21));
+    /* 골문 */
+    c.strokeStyle = 'rgba(200,241,105,.65)';
+    c.lineWidth = 2;
+    c.beginPath(); c.moveTo(pad, Y(43)); c.lineTo(pad, Y(57));
+    c.moveTo(pad + pw, Y(43)); c.lineTo(pad + pw, Y(57)); c.stroke();
+    var TEAM = { home: '#63b3ff', away: '#ff6b5c' };
+
+    if (mode === 'xg') {
+      var shots = (r.tele.shots || []);
+      var maxXg = 0.35;
+      for (i = 0; i < shots.length; i++) {
+        xg = shots[i].xg || 0;
+        if (xg > maxXg) { maxXg = xg; }
+      }
+      for (i = 0; i < shots.length; i++) {
+        sh = shots[i];
+        var cx = X(sh.y), cy = Y(sh.x);
+        xg = sh.xg || 0;
+        rad = 2.2 + Math.sqrt(xg / maxXg) * 9.5;
+        col = TEAM[sh.side] || '#ddd';
+        c.beginPath();
+        c.arc(cx, cy, rad, 0, Math.PI * 2);
+        if (sh.isGoal) {
+          c.fillStyle = col; c.globalAlpha = 0.95; c.fill(); c.globalAlpha = 1;
+          c.strokeStyle = '#ffe98a'; c.lineWidth = 2; c.stroke();
+        } else if (sh.onTarget) {
+          c.fillStyle = col; c.globalAlpha = 0.34; c.fill(); c.globalAlpha = 1;
+          c.strokeStyle = col; c.lineWidth = 1.2; c.stroke();
+        } else {
+          c.globalAlpha = 0.55; c.strokeStyle = col; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
+        }
+        if (sh.set) {
+          c.beginPath(); c.arc(cx, cy, 1.4, 0, Math.PI * 2); c.fillStyle = '#ffe98a'; c.fill();
+        }
+      }
+      var txt = '홈 ' + (r.tele.shots || []).filter(function (s) { return s.side === 'home'; }).length +
+        '슛 · 원정 ' + (r.tele.shots || []).filter(function (s) { return s.side === 'away'; }).length + '슛 (원 크기 = xG)';
+      c.fillStyle = 'rgba(233,244,221,.62)';
+      c.font = '600 7px system-ui, sans-serif';
+      c.textAlign = 'left';
+      c.fillText(txt, pad + 1, h - 2);
+      return;
+    }
+
+    /* 평균 포지션 · 패스 연결망 */
+    var avg = (r.tele.avg && r.tele.avg[side]) || [];
+    var net = (r.tele.net && r.tele.net[side]) || [];
+    var col2 = TEAM[side] || '#ddd';
+    var byName = {};
+    for (i = 0; i < avg.length; i++) { byName[avg[i].sn] = avg[i]; }
+    var maxN = 1;
+    for (i = 0; i < net.length; i++) { if (net[i].n > maxN) { maxN = net[i].n; } }
+    for (i = 0; i < net.length; i++) {
+      var l = net[i];
+      var a1 = byName[l.from], a2 = byName[l.to];
+      if (!a1 || !a2) { continue; }
+      c.beginPath();
+      c.moveTo(X(a1.y), Y(a1.x));
+      c.lineTo(X(a2.y), Y(a2.x));
+      c.strokeStyle = col2;
+      c.globalAlpha = 0.14 + (l.n / maxN) * 0.5;
+      c.lineWidth = 0.6 + (l.n / maxN) * 2.4;
+      c.stroke();
+      c.globalAlpha = 1;
+    }
+    for (i = 0; i < avg.length; i++) {
+      var q = avg[i];
+      var px = X(q.y), py = Y(q.x);
+      c.beginPath(); c.arc(px, py, 6.2, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(9,33,27,.9)'; c.fill();
+      c.strokeStyle = col2; c.lineWidth = 1.4; c.stroke();
+      c.fillStyle = '#eaf6dd';
+      c.font = '800 6.5px system-ui, sans-serif';
+      c.textAlign = 'center';
+      c.fillText(q.sn || '', px, py + 2.2);
+      c.fillStyle = 'rgba(233,244,221,.55)';
+      c.font = '700 5.5px system-ui, sans-serif';
+      c.fillText(q.pos || '', px, py - 8.5);
+    }
+    var label = (side === 'home' ? 'HOME' : 'AWAY') + ' 평균 포지션 · 패스 ' + net.length + '쌍';
+    c.fillStyle = 'rgba(233,244,221,.62)';
+    c.font = '600 7px system-ui, sans-serif';
+    c.textAlign = 'left';
+    c.fillText(label, pad + 1, h - 2);
+  }
+
+  function mapCardHTML(r) {
+    var t = r.tele;
+    if (!t) { return ''; }
+    var nShots = (t.shots || []).length;
+    var nAvg = ((t.avg && t.avg.home) ? t.avg.home.length : 0) + ((t.avg && t.avg.away) ? t.avg.away.length : 0);
+    if (!nShots && !nAvg) { return ''; }
+    return '<div class="band">TACTICAL MAP <span>슈팅 xG · 평균 포지션</span></div>' +
+      '<div class="card tight rmap" data-rmap="1" data-mapmode="xg" data-mapside="home">' +
+      '<div class="rmap-tabs">' +
+      '<button class="rmap-tab on" data-act="maptab" data-map="xg">슈팅 xG맵</button>' +
+      '<button class="rmap-tab" data-act="maptab" data-map="pos">평균 포지션 · 패스</button>' +
+      '</div>' +
+      '<canvas class="rmap-cv" data-mapcv="1" width="320" height="198"></canvas>' +
+      '<div class="rmap-foot">' +
+      '<span class="rmap-sides">' +
+      '<button class="rmap-side on" data-act="mapside" data-side="home">HOME</button>' +
+      '<button class="rmap-side" data-act="mapside" data-side="away">AWAY</button>' +
+      '</span>' +
+      '<span class="rmap-note">' + (r.v19 && r.v19.aiShifts && r.v19.aiShifts.length
+        ? '상대 감독 전술 변경 ' + r.v19.aiShifts.length + '회' : '') + '</span>' +
+      '</div></div>';
+  }
+
   function reportHTML(r) {
     var i, goals = '', caut = '', pts = '', car = '';
     if (!r.goals.length) { goals = '<div class="rline empty">득점 없음</div>'; }
@@ -1410,6 +1569,7 @@
       '<div class="rline"><span>슛</span><b style="margin-left:auto">' + r.shots.home + ' : ' + r.shots.away + '</b></div>' +
       '<div class="rline"><span>패스 · 태클 · 선방</span><b style="margin-left:auto">' + r.passes + ' · ' + r.tackles + ' · ' + r.saves + '</b></div>' +
       '<div class="rline"><span>MVP</span><b style="margin-left:auto">' + esc(r.mvp.name) + ' (' + r.mvpRating.toFixed(1) + ')</b></div></div>' +
+      mapCardHTML(r) +
       '<div class="band">GOALS</div><div class="card tight" style="margin:0 0 8px">' + goals + '</div>' +
       (r.manager ? '<div class="band">MANAGER</div><div class="card tight" style="margin:0 0 8px">' +
         '<div class="rline"><span>감독</span><b style="margin-left:auto">' + esc(r.manager.name) + ' · ' + esc(r.manager.style) + '</b></div>' +
@@ -1423,8 +1583,10 @@
       '<button class="btn primary" data-act="closemodal">확인</button></div>';
   }
 
+  var shownReport = null;
   function showReport(r) {
     var m = document.getElementById('modal');
+    shownReport = r;
     m.className = 'on';
     m.setAttribute('data-report', '1');
     m.innerHTML = '<div class="sheet"><div class="sheet-head"><b>RESULTS</b>' +
@@ -1432,6 +1594,7 @@
       '<button class="x" data-act="closemodal">닫기 ✕</button></div>' +
       '<div class="sheet-body">' + reportHTML(r) + '</div></div>';
     paintEmblems(m);
+    paintShotMaps(m);
   }
 
   /* ═════════════════  경기 ═════════════════ */
@@ -1596,6 +1759,8 @@
       possession: res.possession,
       xg: res.xg || [0, 0],
       cards: res.cards || 0,
+      tele: res.tele || null,
+      v19: res.v19 || null,
       manager: {
         name: mgr().name, style: mgr().style, formation: mgr().formation,
         traits: DS.managerTraitText(mgr()), sync: mgrSync()
@@ -2070,6 +2235,25 @@
     var id, v, j;
     if (!act) { return; }
     if (act === 'closemodal') { closeModal(); return; }
+    if (act === 'maptab' || act === 'mapside') {
+      /* v19 ④ — 상세 결과서 미니피치 탭 · 홈/원정 토글 */
+      var mcard = t;
+      while (mcard && (!mcard.getAttribute || mcard.getAttribute('data-rmap') !== '1')) { mcard = mcard.parentNode; }
+      if (!mcard || !mcard.setAttribute) { return; }
+      var isTab = act === 'maptab';
+      var mval = isTab ? t.getAttribute('data-map') : t.getAttribute('data-side');
+      if (!mval) { return; }
+      mcard.setAttribute(isTab ? 'data-mapmode' : 'data-mapside', mval);
+      var mkey = isTab ? 'data-map' : 'data-side';
+      var mbase = isTab ? 'rmap-tab' : 'rmap-side';
+      var mlist = mcard.querySelectorAll ? mcard.querySelectorAll('.' + mbase) : [];
+      var mi;
+      for (mi = 0; mi < mlist.length; mi++) {
+        mlist[mi].className = mbase + (mlist[mi].getAttribute(mkey) === mval ? ' on' : '');
+      }
+      paintShotMaps(document.getElementById('modal'));
+      return;
+    }
     if (act === 'tab') { closeModal(); setTab(t.getAttribute('data-tab')); return; }
 
     if (act === 'player') { id = t.getAttribute('data-id'); var pp = byId(id); if (pp) { playerModal(pp); } return; }
