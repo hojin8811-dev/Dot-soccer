@@ -2341,7 +2341,7 @@
   function hairBackPath(g, st, cx, cy, hair) {
     g.fillStyle = hair;
     if (st === 'afro') {
-      g.beginPath(); g.ellipse(cx, cy - 2.5, 16.4, 16.0, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 2.0, 14.8, 14.6, 0, 0, Math.PI * 2); g.fill();
     } else if (st === 'mohawk') {
       g.beginPath();
       g.moveTo(cx - 12, cy - 3);
@@ -2363,7 +2363,7 @@
       g.lineTo(cx + 13.8, cy - 1);
       g.closePath(); g.fill();
     } else if (st === 'ponytail' || st === 'braids') {
-      g.beginPath(); g.ellipse(cx, cy - 3, 14.6, 15.4, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 2.4, 14.0, 14.8, 0, 0, Math.PI * 2); g.fill();
       g.beginPath();
       g.moveTo(cx - 12.6, cy + 1);
       g.quadraticCurveTo(cx - 20, cy + 6, cx - 17.4, cy + 15);
@@ -2377,7 +2377,7 @@
         g.closePath(); g.fill();
       }
     } else if (st === 'wavy' || st === 'long') {
-      g.beginPath(); g.ellipse(cx, cy - 1.5, 15.4, 16.2, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 1.0, 14.4, 15.2, 0, 0, Math.PI * 2); g.fill();
       g.beginPath();
       g.moveTo(cx - 14.4, cy + 1);
       g.quadraticCurveTo(cx - 17.6, cy + 9, cx - 12.6, cy + 14);
@@ -2387,7 +2387,7 @@
       g.beginPath(); g.ellipse(cx, cy - 6.5, 12.6, 9.6, 0, 0, Math.PI * 2); g.fill();
     } else {
       /* short · slick · undercut · swoop */
-      g.beginPath(); g.ellipse(cx, cy - 5.5, 14.0, 12.6, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy - 5.0, 13.4, 12.2, 0, 0, Math.PI * 2); g.fill();
     }
   }
 
@@ -2703,7 +2703,7 @@
       g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
       if (img && (img.naturalWidth || img.width) > 0) {
         var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-        g.drawImage(img, 0, 0, iw, Math.round(ih * 0.88), cx - 17.6, cy - 20.4, 35.2, 37.4);
+        g.drawImage(img, 0, 0, iw, ih, cx - 20.0, cy - 23.0, 40.0, 40.0);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
