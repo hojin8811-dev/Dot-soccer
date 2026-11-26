@@ -1377,7 +1377,7 @@
     var side = (card && card.getAttribute('data-mapside')) || 'home';
     var rect = cv.getBoundingClientRect ? cv.getBoundingClientRect() : null;
     var w = Math.max(220, Math.round((rect && rect.width) || 320));
-    var h = Math.round(w * 0.62);
+    var h = Math.round(w * 0.66);
     var dpr = Math.min(2, (global.devicePixelRatio || 1));
     cv.style.width = '100%';
     cv.style.height = h + 'px';
@@ -1390,8 +1390,8 @@
   }
 
   function drawMiniPitch(c, w, h, r, mode, side) {
-    var pad = 7;
-    var pw = w - pad * 2, ph = h - pad * 2 - 10;
+    var pad = 7, legH = 12;
+    var pw = w - pad * 2, ph = h - pad * 2 - legH;
     var X = function (wy) { return pad + (clamp(wy, 0, 120) / 120) * pw; };
     var Y = function (wx) { return pad + (clamp(wx, 0, 100) / 100) * ph; };
     var i, sh, xg, rad, col;
@@ -1448,12 +1448,12 @@
           c.beginPath(); c.arc(cx, cy, 1.4, 0, Math.PI * 2); c.fillStyle = '#ffe98a'; c.fill();
         }
       }
-      var txt = '홈 ' + (r.tele.shots || []).filter(function (s) { return s.side === 'home'; }).length +
-        '슛 · 원정 ' + (r.tele.shots || []).filter(function (s) { return s.side === 'away'; }).length + '슛 (원 크기 = xG)';
+      var txt = (r.homeShort || 'HOME') + ' ' + (r.tele.shots || []).filter(function (s) { return s.side === 'home'; }).length +
+        ' · ' + (r.awayShort || 'AWAY') + ' ' + (r.tele.shots || []).filter(function (s) { return s.side === 'away'; }).length + '슛 (원 = xG)';
       c.fillStyle = 'rgba(233,244,221,.62)';
       c.font = '600 7px system-ui, sans-serif';
       c.textAlign = 'left';
-      c.fillText(txt, pad + 1, h - 2);
+      c.fillText(txt, pad + 1, h - 3);
       return;
     }
 
@@ -1481,22 +1481,23 @@
     for (i = 0; i < avg.length; i++) {
       var q = avg[i];
       var px = X(q.y), py = Y(q.x);
-      c.beginPath(); c.arc(px, py, 6.2, 0, Math.PI * 2);
+      c.beginPath(); c.arc(px, py, 7.2, 0, Math.PI * 2);
       c.fillStyle = 'rgba(9,33,27,.9)'; c.fill();
       c.strokeStyle = col2; c.lineWidth = 1.4; c.stroke();
       c.fillStyle = '#eaf6dd';
-      c.font = '800 6.5px system-ui, sans-serif';
+      c.font = '800 7px system-ui, sans-serif';
       c.textAlign = 'center';
-      c.fillText(q.sn || '', px, py + 2.2);
-      c.fillStyle = 'rgba(233,244,221,.55)';
-      c.font = '700 5.5px system-ui, sans-serif';
-      c.fillText(q.pos || '', px, py - 8.5);
+      c.fillText(q.sn || '', px, py + 2.4);
+      c.fillStyle = 'rgba(233,244,221,.6)';
+      c.font = '700 5.8px system-ui, sans-serif';
+      c.fillText(q.pos || '', px, py - 9.4);
     }
-    var label = (side === 'home' ? 'HOME' : 'AWAY') + ' 평균 포지션 · 패스 ' + net.length + '쌍';
+    var label = (r[side === 'home' ? 'homeShort' : 'awayShort'] || side.toUpperCase()) +
+      ' 평균 포지션 · 패스 ' + net.length + '쌍';
     c.fillStyle = 'rgba(233,244,221,.62)';
     c.font = '600 7px system-ui, sans-serif';
     c.textAlign = 'left';
-    c.fillText(label, pad + 1, h - 2);
+    c.fillText(label, pad + 1, h - 3);
   }
 
   function mapCardHTML(r) {
@@ -1514,8 +1515,8 @@
       '<canvas class="rmap-cv" data-mapcv="1" width="320" height="198"></canvas>' +
       '<div class="rmap-foot">' +
       '<span class="rmap-sides">' +
-      '<button class="rmap-side on" data-act="mapside" data-side="home">HOME</button>' +
-      '<button class="rmap-side" data-act="mapside" data-side="away">AWAY</button>' +
+      '<button class="rmap-side on" data-act="mapside" data-side="home">' + esc(r.homeShort || 'HOME') + '</button>' +
+      '<button class="rmap-side" data-act="mapside" data-side="away">' + esc(r.awayShort || 'AWAY') + '</button>' +
       '</span>' +
       '<span class="rmap-note">' + (r.v19 && r.v19.aiShifts && r.v19.aiShifts.length
         ? '상대 감독 전술 변경 ' + r.v19.aiShifts.length + '회' : '') + '</span>' +
