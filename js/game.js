@@ -244,6 +244,8 @@
         if (!p.lock) { p.lock = DS.LOCKER[i % 4].key; }
         /* v13: 주발 — 기존 선수는 id/이름 시드로 결정적 배정 + 좌우 적성 재보정 */
         DS.ensureFoot(p);
+        /* 이전 세이브의 좌우 적성 순서도 주발에 맞게 정돈 (반대쪽만 내림, 되돌려도 같은 값) */
+        if (p.apt) { DS.enforceFootOrder(p.apt, p.foot); }
       }
       if (d.scoutCandidates && d.scoutCandidates.length) {
         for (i = 0; i < d.scoutCandidates.length; i++) { DS.ensureFoot(d.scoutCandidates[i]); }
