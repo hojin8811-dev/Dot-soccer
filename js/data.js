@@ -2409,7 +2409,7 @@
 
   function hairFrontPath(g, st, cx, cy, hair, hairD) {
     g.save();
-    g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
+    g.beginPath(); g.ellipse(cx, cy + 0.2, 12.4, 14.2, 0, 0, Math.PI * 2); g.clip();
     g.fillStyle = hexAlpha(hair, 0.94);
     g.fillRect(cx - 14, cy - 16.4, 28, 8.0);
     if (st === 'spiky' || st === 'mohawk' || st === 'swoop' || st === 'undercut') {
@@ -2541,7 +2541,7 @@
     var style = opt.style != null ? opt.style : kitStyleOf(kit);
 
     var rig = poseRig(pose, frame, opt.t || 0);
-    var hipX = 30, hipY = 62;
+    var hipX = 30, hipY = 60.4;
     var hairSt = meta.hair || 'short';
     var OL = function (w) { g.lineWidth = w || 1.0; g.strokeStyle = ink; };
 
@@ -2566,8 +2566,8 @@
     }
 
     function leg(hx, hy, a, k, front) {
-      var kx = hx + Math.sin(a) * 9.6, ky = hy + Math.cos(a) * 9.6;
-      var ax = kx + Math.sin(a + k) * 8.4, ay = ky + Math.cos(a + k) * 8.4;
+      var kx = hx + Math.sin(a) * 10.4, ky = hy + Math.cos(a) * 10.4;
+      var ax = kx + Math.sin(a + k) * 9.2, ay = ky + Math.cos(a + k) * 9.2;
       g.strokeStyle = front ? skin : skinD;
       g.lineWidth = 5.7;
       g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
@@ -2610,13 +2610,13 @@
     /* ── 몸통 · 유니폼 ── */
     function torsoPath() {
       g.beginPath();
-      g.moveTo(21.6, 41.4);
-      g.quadraticCurveTo(18.0, 45.2, 18.6, 52.0);
-      g.quadraticCurveTo(19.1, 58.6, 21.0, 61.8);
-      g.lineTo(39.0, 61.8);
-      g.quadraticCurveTo(40.9, 58.6, 41.4, 52.0);
-      g.quadraticCurveTo(42.0, 45.2, 38.4, 41.4);
-      g.quadraticCurveTo(30.0, 38.4, 21.6, 41.4);
+      g.moveTo(21.6, 39.8);
+      g.quadraticCurveTo(18.0, 43.4, 18.6, 50.0);
+      g.quadraticCurveTo(19.1, 56.6, 21.0, 60.2);
+      g.lineTo(39.0, 60.2);
+      g.quadraticCurveTo(40.9, 56.6, 41.4, 50.0);
+      g.quadraticCurveTo(42.0, 43.4, 38.4, 39.8);
+      g.quadraticCurveTo(30.0, 36.8, 21.6, 39.8);
       g.closePath();
     }
 
@@ -2633,46 +2633,46 @@
       var i;
       if (style === 1) {                      /* 세로 줄무늬 */
         g.fillStyle = hexAlpha(trim, 0.85);
-        for (i = 0; i < 7; i++) { g.fillRect(19 + i * 3.4, 38, 1.7, 25); }
+        for (i = 0; i < 7; i++) { g.fillRect(19 + i * 3.4, 36, 1.7, 25); }
       } else if (style === 2) {               /* 가로 밴드 */
         g.fillStyle = hexAlpha(trim, 0.8);
-        g.fillRect(16, 47.2, 28, 3.4);
-        g.fillRect(16, 55.6, 28, 2.2);
+        g.fillRect(16, 45.6, 28, 3.2);
+        g.fillRect(16, 54.0, 28, 2.2);
       } else if (style === 3) {               /* 사선 새시 */
         g.strokeStyle = hexAlpha(trim, 0.75);
         g.lineWidth = 4.2;
-        g.beginPath(); g.moveTo(17, 45); g.lineTo(43, 59); g.stroke();
+        g.beginPath(); g.moveTo(17, 43.4); g.lineTo(43, 57.4); g.stroke();
       } else if (style === 4) {               /* 어깨 배색 */
         g.fillStyle = hexAlpha(trim, 0.72);
         g.beginPath();
-        g.moveTo(16, 38); g.lineTo(44, 38); g.lineTo(44, 45.4);
-        g.quadraticCurveTo(30, 49.6, 16, 45.4);
+        g.moveTo(16, 36.4); g.lineTo(44, 36.4); g.lineTo(44, 43.8);
+        g.quadraticCurveTo(30, 48.0, 16, 43.8);
         g.closePath(); g.fill();
       }
       /* 유니폼 결 */
       g.strokeStyle = hexAlpha('#ffffff', 0.10);
       g.lineWidth = 0.7;
-      for (i = 0; i < 3; i++) { g.beginPath(); g.moveTo(20 + i * 7, 40); g.lineTo(20 + i * 7, 62); g.stroke(); }
+      for (i = 0; i < 3; i++) { g.beginPath(); g.moveTo(20 + i * 7, 38); g.lineTo(20 + i * 7, 61); g.stroke(); }
       g.restore();
 
       /* 칼라 */
       g.fillStyle = trim;
       g.beginPath();
-      g.moveTo(25.4, 40.4);
-      g.quadraticCurveTo(30, 45.0, 34.6, 40.4);
-      g.quadraticCurveTo(30, 43.2, 25.4, 40.4);
+      g.moveTo(25.4, 38.8);
+      g.quadraticCurveTo(30, 43.4, 34.6, 38.8);
+      g.quadraticCurveTo(30, 41.6, 25.4, 38.8);
       g.closePath(); g.fill();
       g.strokeStyle = shade(trim, -30); g.lineWidth = 0.7; g.stroke();
       /* 어깨 라인 */
       g.strokeStyle = hexAlpha('#000000', 0.18); g.lineWidth = 0.9;
-      g.beginPath(); g.moveTo(21.4, 41.6); g.quadraticCurveTo(30, 38.6, 38.6, 41.6); g.stroke();
+      g.beginPath(); g.moveTo(21.4, 40.0); g.quadraticCurveTo(30, 37.0, 38.6, 40.0); g.stroke();
 
       /* 등번호 */
       if (p.number) {
         g.fillStyle = hexAlpha('#ffffff', 0.94);
         g.font = '800 5.6px system-ui, -apple-system, sans-serif';
         g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(String(p.number), 30, 50.6);
+        g.fillText(String(p.number), 30, 49.4);
         g.strokeStyle = hexAlpha('#000000', 0.20); g.lineWidth = 0.6;
         g.strokeText(String(p.number), 30, 50.2);
       }
@@ -2681,16 +2681,16 @@
     function drawShorts() {
       g.fillStyle = shorts;
       g.beginPath();
-      g.moveTo(20.2, 60.2);
-      g.lineTo(39.8, 60.2);
-      g.lineTo(40.8, 68.6);
-      g.quadraticCurveTo(35.4, 69.8, 33.4, 67.4);
-      g.quadraticCurveTo(30, 69.8, 26.6, 67.4);
-      g.quadraticCurveTo(24.6, 69.8, 19.2, 68.6);
+      g.moveTo(20.2, 58.6);
+      g.lineTo(39.8, 58.6);
+      g.lineTo(40.8, 67.4);
+      g.quadraticCurveTo(35.4, 68.6, 33.4, 66.2);
+      g.quadraticCurveTo(30, 68.6, 26.6, 66.2);
+      g.quadraticCurveTo(24.6, 68.6, 19.2, 67.4);
       g.closePath(); g.fill();
       OL(0.95); g.stroke();
       g.strokeStyle = trim; g.lineWidth = 0.9;
-      g.beginPath(); g.moveTo(20.6, 62.4); g.lineTo(39.4, 62.4); g.stroke();
+      g.beginPath(); g.moveTo(20.6, 60.8); g.lineTo(39.4, 60.8); g.stroke();
     }
 
     /* ── 머리 ── */
@@ -2698,30 +2698,30 @@
       /* 목 */
       g.fillStyle = skinD;
       g.beginPath();
-      g.moveTo(cx - 3.6, cy + 9);
-      g.lineTo(cx + 3.6, cy + 9);
-      g.lineTo(cx + 3.4, cy + 18.6);
-      g.lineTo(cx - 3.4, cy + 18.6);
+      g.moveTo(cx - 3.5, cy + 8.4);
+      g.lineTo(cx + 3.5, cy + 8.4);
+      g.lineTo(cx + 3.3, cy + 20.0);
+      g.lineTo(cx - 3.3, cy + 20.0);
       g.closePath(); g.fill();
 
       hairBackPath(g, hairSt, cx, cy, hair);
 
       /* 귀 */
       g.fillStyle = skin;
-      g.beginPath(); g.ellipse(cx - 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
-      g.beginPath(); g.ellipse(cx + 12.4, cy + 1.6, 2.2, 3.0, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx - 11.8, cy + 1.4, 2.1, 2.9, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx + 11.8, cy + 1.4, 2.1, 2.9, 0, 0, Math.PI * 2); g.fill();
 
       /* 얼굴 — 일러스트 크롭 (투명 여백은 피부색으로 채운다) */
       var img = Art.headImage(p);
       g.fillStyle = skin;
-      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(cx, cy + 0.2, 12.4, 14.2, 0, 0, Math.PI * 2); g.fill();
       g.save();
-      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
+      g.beginPath(); g.ellipse(cx, cy + 0.2, 12.4, 14.2, 0, 0, Math.PI * 2); g.clip();
       if (img && (img.naturalWidth || img.width) > 0) {
         var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
         var fb = headBox(p.pic || 1);
         var kx = iw / 240, ky = ih / 240;
-        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 14.6, cy - 17.4, 29.2, 30.4);
+        g.drawImage(img, fb.x * kx, fb.y * ky, fb.s * kx, fb.s * ky, cx - 13.4, cy - 16.4, 26.8, 27.8);
       } else {
         g.fillStyle = skin;
         g.fillRect(cx - 15, cy - 16, 30, 32);
@@ -2746,11 +2746,11 @@
       /* 얼굴 테두리 */
       g.strokeStyle = hexAlpha(ink, 0.9);
       g.lineWidth = 1.15;
-      g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.ellipse(cx, cy + 0.2, 12.4, 14.2, 0, 0, Math.PI * 2); g.stroke();
       /* 뺨 · 턱 */
       g.strokeStyle = hexAlpha(skinD2, 0.45);
       g.lineWidth = 0.8;
-      g.beginPath(); g.ellipse(cx, cy + 4.2, 10.4, 9.4, 0, 0.55, Math.PI - 0.55); g.stroke();
+      g.beginPath(); g.ellipse(cx, cy + 4.0, 9.8, 8.8, 0, 0.55, Math.PI - 0.55); g.stroke();
     }
 
     /* ── 조립 ── */
@@ -2758,12 +2758,12 @@
     g.translate(0, -(rig.hop || 0) - (rig.bob || 0));
 
     /* 뒤쪽 다리 · 팔 */
-    leg(hipX - 3.4, hipY + 1.0, rig.legB.a, rig.legB.k, false);
+    leg(hipX - 3.4, hipY + 1.2, rig.legB.a, rig.legB.k, false);
     g.save();
     g.translate(hipX, hipY);
     g.rotate(rig.lean * 0.5);
     g.translate(-hipX, -hipY);
-    arm(22.0, 43.4, rig.armB.a, rig.armB.e, false);
+    arm(22.0, 41.8, rig.armB.a, rig.armB.e, false);
     g.restore();
 
     /* 몸통 + 머리 (허리를 축으로 상체 기울기) */
@@ -2773,22 +2773,22 @@
     g.translate(-hipX, -hipY);
     drawTorso();
     g.save();
-    g.translate(30, 34);
+    g.translate(30, 32);
     g.rotate(rig.headTilt || 0);
-    g.translate(-30, -34);
-    drawHead(30, 20 + (rig.headDy || 0));
+    g.translate(-30, -32);
+    drawHead(30, 18.4 + (rig.headDy || 0));
     g.restore();
     g.restore();
 
     drawShorts();
 
     /* 앞쪽 다리 · 팔 */
-    leg(hipX + 3.4, hipY + 1.0, rig.legA.a, rig.legA.k, true);
+    leg(hipX + 3.4, hipY + 1.2, rig.legA.a, rig.legA.k, true);
     g.save();
     g.translate(hipX, hipY);
     g.rotate(rig.lean);
     g.translate(-hipX, -hipY);
-    arm(38.0, 43.4, rig.armA.a, rig.armA.e, true);
+    arm(38.0, 41.8, rig.armA.a, rig.armA.e, true);
     g.restore();
 
     g.restore();
