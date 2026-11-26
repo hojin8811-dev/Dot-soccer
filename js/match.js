@@ -62,6 +62,20 @@
   var buffs = {};
   var mgrFx = {};          /* 감독 특기 (경기 내내 고정) */
   var homeMetrics = null;  /* 감독 전술 보정이 반영된 우리 팀 포메이션 지표 */
+  /* v14 — 감독 전술 철학 계측기 (검증·QA용) */
+  var tele = null;
+  function blankTele() {
+    return {
+      pass: { home: { short: 0, long: 0, through: 0, cross: 0, switch: 0 }, away: { short: 0, long: 0, through: 0, cross: 0, switch: 0 } },
+      passDist: { home: { sum: 0, n: 0 }, away: { sum: 0, n: 0 } },
+      press: { home: 0, away: 0 },           /* 태클 시도(압박 접촉) 횟수 */
+      pressHigh: { home: 0, away: 0 },       /* 상대 진영에서 시작한 높은 압박 */
+      pressY: { home: { sum: 0, n: 0 }, away: { sum: 0, n: 0 } },   /* 압박이 일어난 평균 높이 */
+      swarm: { home: 0, away: 0 },           /* 볼 상실 직후 즉시 압박(카운터프레스) 가동 */
+      longwin: { home: 0, away: 0 }         /* 자기 진영 탈취 직후 전방 롱패스 */
+    };
+  }
+  tele = blankTele();
   var cutinHold = 0;
   var cardUses = 0;
   var lastHud = 0;
@@ -118,8 +132,9 @@
      → 홈팀은 화면 왼쪽 골대에서 오른쪽 골대로, 원정팀은 오른쪽에서 왼쪽으로 공격한다. */
   var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
   var pitchImg = null;
-  /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링 */
-  var TOKEN_R = 0.55;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 1.1 × SPR_H) */
+  /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링
+     v14 — 원을 한 단계 더 축소(0.55 → 0.43): 잔디 공간·패스 레인이 넓게 보인다 */
+  var TOKEN_R = 0.43;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 0.86 × SPR_H) */
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
   var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
@@ -288,8 +303,10 @@
     var sh = shapeOf(side);
     var df = lineYOf(side);
     var dir = goalDir(side);            /* 공격 방향 */
-    if (group === 'MF') { return df + dir * sh.bank; }
-    if (group === 'FW') { return df + dir * sh.bank * 2.05; }
+    /* v14 — 감독 전술: 더블 볼란테·역습형은 두 줄 간격을 좁혀 컴팩트 블록 */
+    var bank = Math.max(6.4, sh.bank + (styleOf(side).blockBank - 12.6));
+    if (group === 'MF') { return df + dir * bank; }
+    if (group === 'FW') { return df + dir * (bank * 2.05 + (styleOf(side).fwStay || 0)); }
     return df;
   }
 
@@ -315,6 +332,15 @@
     };
     return homeMetrics;
   }
+  /* ── v14 감독 전술 철학: 감독마다 피치 위 움직임이 실제로 달라진다 ── */
+  function styleKeyOf(side) {
+    return (side === 'home' ? (cfg && cfg.homeTacticStyle) : (cfg && cfg.awayTacticStyle)) || 'balanced';
+  }
+  function styleOf(side) { return DS.tacticStyle(styleKeyOf(side)); }
+  function morphOf(side) {
+    var f = DS.FORMATIONS[formationOf(side)];
+    return (f && f.morph) || null;
+  }
   function dfBaseAvg(side) {
     var sum = 0, n = 0, i, p;
     for (i = 0; i < players.length; i++) {
@@ -326,7 +352,8 @@
   /* 그 팀 수비 라인의 월드 y — 포메이션 line 지표 · 전술 · 카드에 따라 달라진다 */
   function lineYOf(side) {
     var m = metricsOf(side);
-    var depth = 12 + m.line * 0.44;
+    var stl = styleOf(side);
+    var depth = 12 + m.line * 0.44 + stl.line;
     var t = side === 'home' ? tactic : 'balanced';
     if (t === 'attack') { depth += 10; }
     else if (t === 'defense') { depth -= 12; }
@@ -341,12 +368,33 @@
   function blockShift(side) { return lineYOf(side) - dfBaseAvg(side); }
   function anchorOf(p) {
     var w = isDefGroup(p) ? 1 : (isMidGroup(p) ? 0.86 : 0.72);
-    return { x: p.baseX, y: p.baseY + blockShift(p.side) * w };
+    var ax = p.baseX;
+    var ay = p.baseY + blockShift(p.side) * w;
+    /* v14 변칙 포메이션 — 공격 중에는 기본 대형 자체가 변한다 */
+    var mo = morphOf(p.side);
+    if (mo && ball.carrier && ball.carrier.side === p.side) {
+      var dirM = goalDir(p.side);
+      if (mo.boxMid > 0 && p.pos === 'DM') {
+        ax = 50 + (ax - 50) * (1 - 0.55 * mo.boxMid);
+        ay -= dirM * 4.5 * mo.boxMid;
+      }
+      if (mo.wbUp > 0 && (p.pos === 'LWB' || p.pos === 'RWB')) {
+        ay -= dirM * 10 * mo.wbUp;
+      }
+      if (mo.wingHigh > 0 && (p.pos === 'LWF' || p.pos === 'RWF')) {
+        ay -= dirM * 4;
+      }
+      if (mo.fbIn > 0 && (p.pos === 'LB' || p.pos === 'RB')) {
+        ax = 50 + (ax - 50) * (1 - 0.28 * mo.fbIn);
+      }
+    }
+    return { x: ax, y: ay };
   }
   /* 압박 인원 · 반경 — press 지표와 게겐프레싱 카드로 확대 */
   function pressConfig(side) {
     var m = metricsOf(side);
-    var press = m.press;
+    var stl = styleOf(side);
+    var press = m.press + stl.press;
     if (side === 'home') {
       press += shapeOf('home').press;
       if (buffOf('press') > 0) { press += 26; }
@@ -698,6 +746,7 @@
     homeXg = 0; awayXg = 0;
     stats = { passes: 0, tackles: 0, saves: 0, interceptions: 0 };
     goals = []; cautions = [];
+    tele = blankTele();
     possession = { home: 0.001, away: 0.001 };
     halfScore = [[0, 0], [0, 0]];
     halftimeDone = false;
@@ -803,6 +852,20 @@
       interceptions: stats.interceptions,
       shots: goalStats, cautions: cautions.length, goals: goals.length, minute: minute(),
       momentum: Math.round(momentum), cards: cardUses
+    };
+  };
+  /* v14 검증용: 전술 철학별 실제 플레이 계측값 */
+  M.tele = function () {
+    return {
+      styleHome: styleKeyOf('home'), styleAway: styleKeyOf('away'),
+      home: { pass: tele.pass.home, press: tele.press.home, pressHigh: tele.pressHigh.home, swarm: tele.swarm.home, longwin: tele.longwin.home,
+        pressProgress: tele.pressY.home.n ? Math.round(tele.pressY.home.sum / tele.pressY.home.n) : 0,
+        passDist: tele.passDist.home.n ? Math.round(tele.passDist.home.sum / tele.passDist.home.n * 10) / 10 : 0,
+        shots: goalStats.homeShots, tackles: Math.round(stats.tackles), line: Math.round(defLineY('home')), shape: formationOf('home') },
+      away: { pass: tele.pass.away, press: tele.press.away, pressHigh: tele.pressHigh.away, swarm: tele.swarm.away, longwin: tele.longwin.away,
+        pressProgress: tele.pressY.away.n ? Math.round(tele.pressY.away.sum / tele.pressY.away.n) : 0,
+        passDist: tele.passDist.away.n ? Math.round(tele.passDist.away.sum / tele.passDist.away.n * 10) / 10 : 0,
+        shots: goalStats.awayShots, line: Math.round(defLineY('away')), shape: formationOf('away') }
     };
   };
 
@@ -1058,7 +1121,8 @@
     }
     list.sort(function (a, b) { return a.d - b.d; });
     var dir = goalDir(carrier.side);
-    var gap = 10.5;
+    /* v14 — 감독 전술: 티키타카는 삼각 거리를 좁히고, 직선 롱볼은 넓게 벌린다 */
+    var gap = styleOf(carrier.side).supportGap;
     /* 좌우로 벌린 두 명 + 앞쪽 한 명 — 세 방향이 겹치지 않게 고른다 */
     var wantL = null, wantR = null, wantF = null, j, it;
     for (j = 0; j < list.length; j++) {
@@ -1128,11 +1192,35 @@
     }
   }
 
+  function nearestNToBall(side, n) {
+    var cand = [], i, p;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== side || p.off || isGK(p)) { continue; }
+      cand.push({ p: p, d: d2(p, ball) });
+    }
+    cand.sort(function (a, b) { return a.d - b.d; });
+    var out = [];
+    for (i = 0; i < cand.length && i < n; i++) { out.push(cand[i].p); }
+    return out;
+  }
+
   function updateTargets(dt) {
     var atk = play.atkSide;
     var def = atk === 'home' ? 'away' : 'home';
     var carrier = ball.carrier;
     var pressers = carrier ? assignPressers(def, pressConfig(def)) : [];
+    /* v14 게겐프레싱 — 볼을 잃은 직후 3명이 반경과 상관없이 즉시 달려든다 */
+    if (carrier) {
+      var stDef = styleOf(def);
+      if (stDef.counterPress > 0 && play.recoverT > 0 && play.recoverSide === def) {
+        var swarm = nearestNToBall(def, stDef.counterPress);
+        if (swarm.length > 1) {
+          pressers = swarm;
+          if (!play.swarmed) { play.swarmed = true; tele.swarm[def] += 1; }
+        }
+      }
+    }
     if (carrier) {
       assignMarks(def);
       play.supT -= dt;
@@ -1198,12 +1286,13 @@
     var z = p.zone;
     var st = play.stage;
     var m = metricsOf(p.side);
+    var sty = styleOf(p.side);
     var a = anchorOf(p);
     var push = stagePush(p, st);
     var g = groupOf(p);
     var kx = g === 'DF' ? 0.17 : (g === 'MF' ? 0.19 : 0.13);   /* v8: 볼 쪽 압축을 줄여 포메이션 대형을 지킨다 */
     var ky = g === 'DF' ? 0.08 : (g === 'MF' ? 0.11 : 0.12);
-    var spread = 0.94 + m.width / 100 * 0.52;   /* 폭 지표: 넓은 포메이션은 더 벌어진다 */
+    var spread = 0.94 + clamp(m.width + sty.width, 20, 99) / 100 * 0.52;   /* 폭 지표 + 감독 전술 */
     /* 공에서 먼 선수일수록 자기 구역을 지킨다 (전원이 볼로 몰리지 않게) */
     var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 18) / 55, 0.14, 1);
     var tx = 50 + (a.x - 50) * spread + (ball.x - 50) * kx * hold;
@@ -1255,6 +1344,42 @@
       ty -= z.dir * 5 * sh.secondLine;
     }
 
+    /* ── v14 감독 전술 철학: 침투 인원 · 하이 라인 · 폭 성향 ── */
+    if (sty.throughBias > 1.6 && (g === 'MF' || isFwdGroup(p)) && st !== 'build') { ty -= z.dir * 2.5; }
+    if (sty.crossBias > 1.8 && (p.pos === 'LWF' || p.pos === 'RWF') && st !== 'build') {
+      tx = p.pos === 'LWF' ? 2.6 : 97.4;
+      if (st === 'wide' || st === 'final') { ty -= z.dir * 4; }
+    }
+
+    /* ── v14 변칙 포메이션 morph: 공격 시 대형이 실제로 바뀐다 ── */
+    var mo = morphOf(p.side);
+    if (mo) {
+      if (mo.boxMid > 0 && (p.pos === 'DM' || ((p.pos === 'LB' || p.pos === 'RB') && (mo.fbIn || 0) >= 0.5))) {
+        var cx2 = p.baseX < 50 ? 42.5 : 57.5;
+        tx = tx * (1 - 0.72 * mo.boxMid) + cx2 * (0.72 * mo.boxMid);
+        if (st !== 'build') { ty -= z.dir * 5 * mo.boxMid; }
+      }
+      if (mo.wbUp > 0 && (p.pos === 'LWB' || p.pos === 'RWB')) {
+        if (st === 'mid' || st === 'wide' || st === 'final') {
+          tx = p.pos === 'LWB' ? 3.6 : 96.4;
+          ty -= z.dir * (st === 'final' ? 18 : 27);
+        }
+      }
+      if (mo.diamond > 0 && (p.pos === 'LWF' || p.pos === 'RWF')) {
+        if (st === 'wide' || st === 'final') {
+          tx += (p.baseX < 50 ? 11 : -11);
+          ty -= z.dir * 6;
+        }
+      }
+      if (mo.fbIn > 0 && (p.pos === 'LB' || p.pos === 'RB') && st !== 'build') {
+        tx += (p.baseX < 50 ? 9 : -9) * mo.fbIn;
+      }
+      if (mo.wingHigh > 0 && (p.pos === 'LWF' || p.pos === 'RWF')) {
+        tx = p.pos === 'LWF' ? 3 : 97;
+        if (st !== 'build') { ty -= z.dir * 5; }
+      }
+    }
+
     /* 하프스페이스 카드: AM/WF 대각선 침투 */
     if (buffOf('atk') > 0 && (p.pos === 'AM' || p.pos === 'LWF' || p.pos === 'RWF') && st !== 'build') {
       ty += z.dir * 8;
@@ -1290,8 +1415,10 @@
     var g = groupOf(p);
     var m = metricsOf(p.side);
     var sh = shapeOf(p.side);
-    var compress = 0.94 - (m.width / 100) * 0.06;   /* 좁은 포메이션은 중앙으로 더 모인다 */
+    var sty = styleOf(p.side);
+    var compress = 0.94 - (clamp(m.width + sty.width, 20, 99) / 100) * 0.06;   /* 좁은 포메이션은 중앙으로 더 모인다 */
     compress *= sh.width;                            /* 수비 전술은 폭을 더 좁혀 두 줄 블록을 만든다 */
+    compress *= sty.blockWidth;                      /* 감독 전술: 블록 폭 성향 */
     /* 공에서 먼 수비수는 자기 구역·라인 간격을 유지한다 */
     var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 16) / 50, 0.16, 1);
     var tx = 50 + (a.x - 50) * compress + (ball.x - 50) * (0.18 + (sh.name === 'defense' ? 0.05 : 0)) * hold;
@@ -1451,6 +1578,7 @@
     ball.trail = [];
     p.throughRun = null;
     p.dribbleT = 0;
+    play.swarmed = false;
     actionTimer = 0.3 + Math.random() * 0.25;
     play.atkSide = p.side;
     play.looseT = 0;
@@ -1460,10 +1588,33 @@
     if (p.side === 'home') { charge(0.4); }
   }
 
+  function counterLongBall(p) {
+    var dirF = p.side === 'home' ? 1 : -1;
+    var best = null, bv = -1e9, i, q, fwd, open, v;
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q.side !== p.side || q === p || q.off || isGK(q)) { continue; }
+      fwd = (p.y - q.y) * dirF;
+      if (fwd < 8) { continue; }
+      open = nearestOpponent(q, 26).dist;
+      v = fwd * 1.6 + open * 0.85 + (isFwdGroup(q) ? 14 : 0);
+      if (v > bv) { bv = v; best = q; }
+    }
+    if (!best) { return false; }
+    bubble(p, '⚡ 탈취 후 롱패스!', '#9fd8ff', 1.3);
+    say('⚡ ' + U.josa(short(p.name), '이/가') + ' 탈취 직후 단번에 전방으로 롱패스!', 'normal');
+    return kickPass(p, best, 'through');
+  }
+
   function onTurnover(fromSide, toP) {
     var prog = progressOf(toP.side, toP.y);
     play.recoverSide = fromSide;
     play.recoverT = 1.4;
+    var sty = styleOf(toP.side);
+    if (prog < 0.5 && sty.longBallAfterWin > 0 && chance(sty.longBallAfterWin)) {
+      tele.longwin[toP.side] += 1;
+      if (counterLongBall(toP)) { return; }
+    }
     if (prog < 0.45) {
       play.counterSide = toP.side;
       play.counterT = 5.5;
@@ -1507,12 +1658,13 @@
   function passBall(p) {
     var tiki = buffOf('tiki') > 0;
     var through = buffOf('through') > 0;
+    var sty = styleOf(p.side);
     var best = null, bestScore = -1e9, i, q, d, fwd, open, score;
     for (i = 0; i < players.length; i++) {
       q = players[i];
       if (q === p || q.side !== p.side || q.off) { continue; }
       d = Math.hypot(q.x - p.x, q.y - p.y);
-      if (d < 5 || d > 55) { continue; }
+      if (d < 5 || d > (sty.maxPass || 55)) { continue; }
       if (isGK(q)) {
         /* 골키퍼는 최후의 안전 패스만 */
         if (play.stage !== 'build' || d > 26) { continue; }
@@ -1540,6 +1692,10 @@
       if (q.mark && q.mark === p) { score -= 4; }
       /* 반대편 전환: 볼에서 먼 쪽 윙어·풀백이 비어 있으면 적극적으로 본다 */
       if (Math.abs(q.x - p.x) > 22 && open > 6) { score += 9; }
+      /* v14 감독 전술: 짧은 패스 취향 / 직선 롱볼 / 수비 뒤 스루패스 성향 */
+      score += sty.shortBias * (d < 18 ? 12 : (d > 30 ? -12 : 0));
+      score += sty.longBias * (d > 28 ? 12 : 0);
+      if (isBehindLine(q) && open > 4) { score += (sty.throughBias - 1) * 11; }
       score += Math.random() * 5;
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
     }
@@ -1550,6 +1706,10 @@
     else if (Math.abs(best.q.x - p.x) > 20 && chance(0.62)) { type = 'switch'; }
     else if (play.stage === 'mid' && best.fwd > 8 && best.open > 8 && chance(0.45)) { type = 'through'; }
     else if (best.fwd > 5) { type = 'progressive'; }
+    /* v14 — 크로스 성향이 낮은 감독(티키타카)은 박스 옆에서 올리지 않고 안으로 접어 연결한다 */
+    if (type === 'cross' && !chance(clamp(0.62 * sty.crossBias, 0.12, 0.98))) { type = 'progressive'; }
+    /* v14 — 스루패스 성향이 강한 감독(역습·직선)은 중원에서도 뒤공간을 먼저 본다 */
+    if (type === 'progressive' && sty.throughBias > 1.2 && best.open > 5 && chance(clamp((sty.throughBias - 1) * 0.5, 0, 0.6))) { type = 'through'; }
     return kickPass(p, best.q, type);
   }
 
@@ -1581,6 +1741,10 @@
     }
     var dist = Math.hypot(tx - p.x, ty - p.y);
     speed = clamp(dist * 2.9, 40, 90) * (buffOf('tiki') > 0 ? 1.14 : 1);
+    /* v14 계측: 패스 종류별 카운트 */
+    var bucket = type === 'through' ? 'through' : (type === 'cross' ? 'cross' : (type === 'switch' ? 'switch' : (dist > 25 ? 'long' : 'short')));
+    if (tele.pass[p.side]) { tele.pass[p.side][bucket] += 1; }
+    if (tele.passDist[p.side]) { tele.passDist[p.side].sum += dist; tele.passDist[p.side].n += 1; }
     ball.x = p.x;
     ball.y = p.y + goalDir(p.side) * 0.8;
     kickBall(p, tx, ty, speed, 'pass', q, type === 'short' ? 0 : 1);
@@ -1640,25 +1804,27 @@
     var opp = nearestOpponent(p, 40);
     var pressure = opp.player ? opp.dist : 40;
     var tac = p.side === 'home' ? tactic : 'balanced';
-    var shootRange = 22 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0);
+    var sty = styleOf(p.side);
+    var shootRange = 22 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
     if (p.side === 'home' && buffOf('atk') > 0) { shootRange += 2; }
 
     /* 1) 슛 */
     if (dist < shootRange) {
       var pShot = dist < 12 ? 0.52 : (dist < 18 ? 0.36 : 0.22);
+      pShot *= sty.shootBias;
       if (pressure < 2.2 && dist > 10) { pShot *= 0.45; }
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
       if (chance(pShot)) { shoot(p, dist); return; }
     }
     /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다 */
-    if (pressure < 3.4 && chance(0.55)) {
+    if (pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
       if (backPass(p)) { actionTimer = 0.14; return; }
     }
 
-    /* 2) 측면 크로스 · 컷백 */
-    if ((play.stage === 'wide' || play.stage === 'final') && (p.x < 22 || p.x > 78) && dist < 34) {
+    /* 2) 측면 크로스 · 컷백 — 크로스 성향이 강한 감독은 더 넓고 더 자주 올린다 */
+    if ((play.stage === 'wide' || play.stage === 'final') && (p.x < 22 + (sty.crossBias - 1) * 6 || p.x > 78 - (sty.crossBias - 1) * 6) && dist < 34 + Math.max(0, sty.crossBias - 1) * 4) {
       var box = bestBoxTarget(p.side);
-      if (box && dist < 28 && chance(0.72)) {
+      if (box && dist < 28 + Math.max(0, sty.crossBias - 1) * 4 && chance(clamp(0.72 * sty.crossBias, 0.18, 0.98))) {
         bubble(p, p.x < 22 ? '→ 컷백!' : '← 컷백!', '#ffd98a', 1.2);
         if (kickPass(p, box, 'cross')) { return; }
       }
@@ -1873,6 +2039,18 @@
   function tryTackle(defender, carrier, dt) {
     var d = d2(defender, carrier);
     if (d > 5.2) { return; }
+    if (tele.press[defender.side] !== undefined) {
+      /* v14 계측: 같은 수비수가 같은 소유자에게 붙은 '압박 이벤트'만 센다 */
+      if (!defender.lastPressT || simTime - defender.lastPressT > 0.7) {
+        tele.press[defender.side] += 1;
+        if (progressOf(defender.side, ball.y) > 0.45) { tele.pressHigh[defender.side] += 1; }
+        if (tele.pressY[defender.side]) {
+          tele.pressY[defender.side].sum += progressOf(defender.side, ball.y) * 100;
+          tele.pressY[defender.side].n += 1;
+        }
+        defender.lastPressT = simTime;
+      }
+    }
     /* 가까울수록 성공 확률이 높다 (v10 — 분리 간격 때문에 예전 3.1로는 거의 닿지 못했다) */
     var near = clamp(1.18 - (d - 3.2) / 9, 0.42, 1.18);
     var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 : 0);
@@ -2654,11 +2832,11 @@
     var txt = b.text;
     ctx.save();
     ctx.globalAlpha = a;
-    ctx.font = '900 ' + (clamp(SPR_H * 0.30, 7.4, 9.5)).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 ' + (clamp(SPR_H * 0.28, 7, 9)).toFixed(1) + 'px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var tw = ctx.measureText(txt).width;
-    var bh = Math.round(clamp(SPR_H * 0.48, 12, 16));
+    var bh = Math.round(clamp(SPR_H * 0.44, 11, 15));
     var bw = tw + bh * 0.9;
     var rise = (1 - clamp(b.t / b.t0, 0, 1)) * 4;
     var below = false;
@@ -2696,7 +2874,7 @@
   function drawPlayer(p) {
     var g = scr(p.x, p.y);
     var pose = poseOf(p);
-    var r = Math.max(6.5, SPR_H * g.s * TOKEN_R);   /* 토큰 반지름 — 원근 스케일 적용 */
+    var r = Math.max(5.6, SPR_H * g.s * TOKEN_R);   /* 토큰 반지름 — 원근 스케일 적용 (v14 축소) */
     var tf = TEAM_FX[p.side];
     var isCarrier = ball.carrier === p;
     var gk = isGK(p);
@@ -2732,7 +2910,7 @@
 
     var cx = g.x + slide;
     var cy = g.y - r * 0.96 + hop;             /* 원 아래가 잔디에 닿는다 */
-    var ringW = Math.max(2.2, r * 0.26);       /* 팀 링 두께 */
+    var ringW = Math.max(1.7, r * 0.22);       /* 팀 링 두께 — v14: 토큰과 함께 슬림하게 */
     var PI2 = Math.PI * 2;
 
     /* ── 지면 그림자 (떠 있는 높이만큼 짙고 넓게) ── */
@@ -2754,15 +2932,15 @@
     if (isCarrier) {
       var pz = 0.5 + 0.5 * Math.sin(t * 6.2);
       ctx.save();
-      ctx.beginPath(); ctx.arc(0, 0, r * (1.16 + 0.06 * pz), 0, PI2);
+      ctx.beginPath(); ctx.arc(0, 0, r * (1.15 + 0.05 * pz), 0, PI2);
       ctx.strokeStyle = 'rgba(120,242,255,' + (0.55 + 0.35 * pz) + ')';
-      ctx.lineWidth = 1.35;
+      ctx.lineWidth = 1.15;
       ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, r * (1.34 + 0.10 * pz), 0, PI2);
+      ctx.beginPath(); ctx.arc(0, 0, r * (1.29 + 0.08 * pz), 0, PI2);
       ctx.strokeStyle = 'rgba(255,222,126,' + (0.35 + 0.45 * pz) + ')';
-      ctx.lineWidth = 1.6;
+      ctx.lineWidth = 1.35;
       ctx.shadowColor = 'rgba(255,214,90,0.9)';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 6;
       ctx.stroke();
       ctx.restore();
     }
@@ -2837,7 +3015,7 @@
     ctx.lineWidth = ringW;
     ctx.strokeStyle = ringGrad;
     ctx.shadowColor = tf.glow;
-    ctx.shadowBlur = isCarrier ? r * 0.7 : (p.skillT > 0 || p.glow > 0 ? r * 0.55 : r * 0.30);
+    ctx.shadowBlur = isCarrier ? r * 0.55 : (p.skillT > 0 || p.glow > 0 ? r * 0.44 : r * 0.22);
     ctx.stroke();
     ctx.restore();
     /* 바깥 경계선 — 밝은 잔디·관중 위에서도 원이 또렷하게 */
@@ -2850,7 +3028,7 @@
     if (gk) {
       ctx.beginPath(); ctx.arc(0, 0, r - ringW * 1.05, 0, PI2);
       ctx.strokeStyle = '#f6c945';
-      ctx.lineWidth = Math.max(1.1, r * 0.13);
+      ctx.lineWidth = Math.max(0.9, r * 0.11);
       ctx.globalAlpha = 0.95;
       ctx.stroke();
       ctx.globalAlpha = 1;
@@ -2864,8 +3042,8 @@
     if (isCarrier) {
       drawNamePlate(p, cx, g.y + 4.2, tf);
     } else if (gk) {
-      var gb = clamp(r * 0.55, 3.2, 4.6);
-      var gw = Math.max(12, gb * 3.1);
+      var gb = clamp(r * 0.50, 2.9, 4.2);
+      var gw = Math.max(10, gb * 3.0);
       ctx.font = '900 ' + gb.toFixed(1) + 'px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2884,12 +3062,12 @@
 
   /* 공 소유자 이름표 */
   function drawNamePlate(p, cx, y, tf) {
-    var lb = clamp(SPR_H * 0.26, 6.5, 9);
+    var lb = clamp(SPR_H * 0.24, 6, 8.4);
     ctx.font = '800 ' + lb.toFixed(1) + 'px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     var label = short(p.name);
-    var lh = lb + 3.6;
+    var lh = lb + 3.1;
     var tw2 = ctx.measureText(label).width + lh * 0.9;
     ctx.fillStyle = 'rgba(6,26,22,0.82)';
     roundRect(cx - tw2 / 2, y, tw2, lh, lh / 2);
@@ -2924,7 +3102,7 @@
     /* 우상단 경고 점 */
     var dx = cx + rr * 0.70, dy = cy - rr * 0.70;
     ctx.beginPath();
-    ctx.arc(dx, dy, Math.max(1.7, r * 0.19), 0, Math.PI * 2);
+    ctx.arc(dx, dy, Math.max(1.5, r * 0.18), 0, Math.PI * 2);
     ctx.fillStyle = col;
     ctx.fill();
     ctx.strokeStyle = 'rgba(6,20,16,0.85)';
@@ -3155,12 +3333,18 @@
       passLine: play.passLine ? true : false,
       formation: {
         home: formationOf('home'), away: formationOf('away'), tactic: tactic,
+        styleHome: styleKeyOf('home'), styleAway: styleKeyOf('away'),
+        morphHome: morphOf('home'), morphAway: morphOf('away'),
         lineHome: Math.round(lineYOf('home')), lineAway: Math.round(lineYOf('away')),
         pressHome: Math.round(pcs.press), pressers: pcs.n,
+        pressAway: Math.round(pressConfig('away').press), pressersAway: pressConfig('away').n,
         shape: shapeOf('home'),
         bankMf: Math.round(bankYOf('home', 'MF')), bankFw: Math.round(bankYOf('home', 'FW')),
         mfRowY: (function () { var s = 0, n = 0, j; for (j = 0; j < players.length; j++) { if (players[j].side === 'home' && isMidGroup(players[j]) && !players[j].off) { s += players[j].y; n++; } } return n ? Math.round(s / n) : null; })(),
         dfRowY: Math.round(defLineY('home')),
+        dfRowYAway: Math.round(defLineY('away')),
+        mfRowYAway: (function () { var s = 0, n = 0, j; for (j = 0; j < players.length; j++) { if (players[j].side === 'away' && isMidGroup(players[j]) && !players[j].off) { s += players[j].y; n++; } } return n ? Math.round(s / n) : null; })(),
+        widthAway: (function () { var lo = 999, hi = -999, j; for (j = 0; j < players.length; j++) { if (players[j].side === 'away' && !isGK(players[j]) && !players[j].off) { lo = Math.min(lo, players[j].x); hi = Math.max(hi, players[j].x); } } return hi > lo ? Math.round(hi - lo) : 0; })(),
         widthHome: (function () { var lo = 999, hi = -999, j; for (j = 0; j < players.length; j++) { if (players[j].side === 'home' && !isGK(players[j]) && !players[j].off) { lo = Math.min(lo, players[j].x); hi = Math.max(hi, players[j].x); } } return hi > lo ? Math.round(hi - lo) : 0; })()
       },
       support: {
@@ -3173,6 +3357,7 @@
         flash: Math.round(flash.t * 100) / 100, passLine: play.passLine ? 1 : 0
       },
       buffs: (function () { var o = [], k; for (k in buffs) { if (buffs[k] > 0) { o.push(k); } } return o; })(),
+      tele: { pass: tele.pass, press: tele.press, swarm: tele.swarm, longwin: tele.longwin },
       home: h, away: a
     };
   };

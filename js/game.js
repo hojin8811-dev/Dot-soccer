@@ -346,7 +346,7 @@
       '<span class="mgr-art"><img src="' + DS.Art.managerHead(m) + '" alt=""></span>' +
       '<span class="mgr-main"><span class="mgr-top"><b>' + esc(m.name) + ' 감독</b>' +
       '<span class="chip" style="background:' + DS.RARITY[m.rarity].color + '22;color:' + DS.RARITY[m.rarity].color + '">' + DS.RARITY[m.rarity].name + '</span></span>' +
-      '<span class="mgr-sub">' + esc(m.style) + ' · 고유 ' + m.formation + (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</span>' +
+      '<span class="mgr-sub">' + esc(DS.tacticStyle(m.tacticStyle).name) + ' · 고유 ' + m.formation + (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</span>' +
       '<span class="mgr-tags">' + tags + '</span></span>' +
       '</div>';
   }
@@ -513,7 +513,7 @@
         '<div class="card-head"><span class="dot"></span><b>다음 경기 · ' + (S.round + 1) + '라운드</b><span class="meta">' + (next.home ? '홈' : '원정') + ' · ' + nextLabel() + '</span></div>' +
         '<div class="vs">' +
         '<div class="vs-team"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="38" height="44"></canvas><span class="nm">' + esc(S.club.name) + '</span><span class="st">전력 ' + power + '</span></div>' +
-        '<div class="vs-mid"><b>VS</b><span>' + DS.FORMATIONS[oppFormation(opp)].tag + '</span></div>' +
+        '<div class="vs-mid"><b>VS</b><span>' + oppFormation(opp) + ' · ' + DS.tacticStyle(oppManager(opp).tacticStyle).name + '</span></div>' +
         '<div class="vs-team"><canvas data-emblem="' + opp.emblem + '" data-kit="' + opp.kit.shirt + '|' + opp.kit.trim + '" width="38" height="44"></canvas><span class="nm">' + esc(opp.name) + '</span><span class="st">전력 ' + opp.strength + '</span></div>' +
         '</div>' +
         '<div class="kpis" style="margin-bottom:8px">' +
@@ -602,9 +602,19 @@
     return ['19:30', '20:00', '21:00'][S.round % 3];
   }
   function oppFormation(team) {
-    var keys = DS.FORMATION_KEYS, h = 0, i;
-    for (i = 0; i < team.id.length; i++) { h = (h * 31 + team.id.charCodeAt(i)) % 97; }
-    return keys[h % keys.length];
+    return oppManager(team).formation;
+  }
+  /* v14 — 상대 팀에도 감독이 있다: 팀마다 전술 철학이 다른 감독이 벤치에 선다 */
+  var OPP_MANAGER = {
+    byeoksan: 'm19', hangang: 'm21', dokdo: 'm27', cheongchun: 'm12',
+    cheolma: 'm29', byeolbit: 'm31', baekho: 'm09'
+  };
+  function oppManager(team) {
+    var id = team && OPP_MANAGER[team.id];
+    if (id) { return DS.managerOf(id); }
+    var h = 0, i, tid = (team && team.id) || '';
+    for (i = 0; i < tid.length; i++) { h = (h * 31 + tid.charCodeAt(i)) % 97; }
+    return DS.managerOf(DS.MANAGERS[h % DS.MANAGERS.length].id);
   }
 
   /* ═════════════════  S매치 ═════════════════ */
@@ -666,6 +676,15 @@
       var kk = DS.FORMATION_KEYS[i];
       chips += '<button class="fchip ' + (S.formation === kk ? 'on' : '') + '" data-act="formation" data-f="' + kk + '">' +
         '<b>' + kk + '</b><span>' + DS.FORMATIONS[kk].tag + '</span></button>';
+    }
+    /* v14 — 현재 감독이 보유한 변칙 포메이션은 여기서도 선택 가능 (감독 고유는 시너지 하이라이트) */
+    var anoms = DS.managerAnomalies(mgr());
+    if (S.formation && DS.isAnomaly(S.formation) && anoms.indexOf(S.formation) < 0) { anoms.push(S.formation); }
+    for (i = 0; i < anoms.length; i++) {
+      var ak = anoms[i];
+      var owned = mgr().formation === ak;
+      chips += '<button class="fchip anom' + (S.formation === ak ? ' on' : '') + '" data-act="formation" data-f="' + ak + '">' +
+        '<b>' + ak + '</b><span>' + DS.FORMATIONS[ak].tag + ' · ' + (owned ? '감독 고유' : '감독 전용') + '</span></button>';
     }
 
     for (i = 0; i < f.slots.length; i++) {
@@ -1059,7 +1078,7 @@
       ownHTML += '<button class="mrow' + (on ? ' on' : '') + '" data-act="mgrset" data-id="' + om.id + '">' +
         '<span class="mrow-art"><img src="' + DS.Art.managerHead(om) + '" alt=""></span>' +
         '<span class="mrow-main"><b>' + esc(om.name) + '</b>' +
-        '<span class="mrow-sub">' + esc(om.style) + ' · ' + om.formation + '</span>' +
+        '<span class="mrow-sub">' + esc(DS.tacticStyle(om.tacticStyle).name) + ' · ' + om.formation + '</span>' +
         '<span class="mrow-tr">' + DS.managerTraitText(om) + '</span></span>' +
         '<span class="mrow-side" style="color:' + DS.RARITY[om.rarity].color + '">' + DS.RARITY[om.rarity].name +
         (on ? '<em class="on">선임중</em>' : '<em>선임</em>') + '</span></button>';
@@ -1076,7 +1095,7 @@
         '<span class="mcard-main"><span class="mcard-top"><b>' + esc(cm.name) + '</b>' +
         '<span class="chip" style="background:' + DS.RARITY[cm.rarity].color + '22;color:' + DS.RARITY[cm.rarity].color + '">' + DS.RARITY[cm.rarity].name + '</span>' +
         '<span class="tiny muted">' + cm.age + '세</span></span>' +
-        '<span class="mcard-sub">' + esc(cm.style) + ' · 고유 ' + cm.formation + '</span>' +
+        '<span class="mcard-sub">' + esc(DS.tacticStyle(cm.tacticStyle).name) + ' · 고유 ' + cm.formation + '</span>' +
         '<span class="mcard-tr">' + DS.managerTraitText(cm) + '</span></span>' +
         '<button class="btn sm primary" data-act="mgrsign" data-id="' + cm.id + '" ' + (S.money < price ? 'disabled' : '') + '>' + fmt(price) + '</button></div>';
     }
@@ -1089,8 +1108,15 @@
       '<div class="mhero-kicker">' + DS.RARITY[m.rarity].name + ' · ' + m.age + '세</div>' +
       '<div class="mhero-name">' + esc(m.name) + ' <small>감독</small></div>' +
       '<div class="mhero-style">' + esc(m.style) + '</div>' +
+      '<div class="mhero-tac">🧠 <b>' + esc(DS.tacticStyle(m.tacticStyle).name) + '</b> — ' + esc(m.tacticLine || '') + '</div>' +
       '<div class="mhero-form">고유 포메이션 <b>' + m.formation + '</b> · ' + DS.FORMATIONS[m.formation].tag +
       (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</div>' +
+      (function () {
+        var an = DS.managerAnomalies(m), i, tags = [];
+        if (!an.length) { return ''; }
+        for (i = 0; i < an.length; i++) { tags.push(DS.FORMATIONS[an[i]].tag); }
+        return '<div class="mhero-form">감독 전용 변칙 <b>' + an.join(' · ') + '</b> — ' + tags.join(' / ') + '</div>';
+      })() +
       '</div></div>' +
       '<div class="mstory">' + esc(m.story) + '</div>' +
       fxHTML +
@@ -1393,6 +1419,7 @@
       return { player: b, pos: b.pos, rating: DS.ratingOf(b) };
     });
     var awayFormation = oppFormation(oppTeam);
+    var oppMgr = oppManager(oppTeam);
 
     var cfg = {
       homeName: S.club.name,
@@ -1408,6 +1435,10 @@
       homeFormation: S.formation,
       awayPlayers: buildAwaySquad(oppTeam, awayFormation),
       awayFormation: awayFormation,
+      homeTacticStyle: mgr().tacticStyle,
+      awayTacticStyle: oppMgr.tacticStyle,
+      awayManagerName: oppMgr.name,
+      awayManagerStyle: DS.tacticStyle(oppMgr.tacticStyle).name,
       tactics: S.tactics,
       condition: S.condition,
       roles: S.roles,
@@ -1586,7 +1617,7 @@
       var opp = opponentTeam(next.id);
       html += '<div class="card"><div class="card-head"><b>킥오프 준비</b><span class="meta">' + (S.round + 1) + '라운드</span></div>' +
         '<div class="vs"><div class="vs-team"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="38" height="44"></canvas><span class="nm">' + esc(S.club.name) + '</span></div>' +
-        '<div class="vs-mid"><b>VS</b><span>' + DS.FORMATIONS[oppFormation(opp)].tag + '</span></div>' +
+        '<div class="vs-mid"><b>VS</b><span>' + oppFormation(opp) + ' · ' + DS.tacticStyle(oppManager(opp).tacticStyle).name + '</span></div>' +
         '<div class="vs-team"><canvas data-emblem="' + opp.emblem + '" data-kit="' + opp.kit.shirt + '|' + opp.kit.trim + '" width="38" height="44"></canvas><span class="nm">' + esc(opp.short) + '</span></div></div>' +
         '<div class="kpis" style="margin-bottom:8px"><div class="kpi"><b class="lime">' + xgEstimate(opp.strength).toFixed(1) + '</b><span>xG</span></div>' +
         '<div class="kpi"><b>' + pressLevel() + '</b><span>압박</span></div><div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력</span></div></div>' +
@@ -1652,7 +1683,7 @@
       '<div class="m-ticker">' +
       '<span class="tk-lbl">🎙 캐스터</span>' +
       '<div class="cmt-body" id="m-comm-body"></div>' +
-      '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · ' + esc(DS.managerTraitText(mgr())) + '</span>' +
+      '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · <b class="tk-style">' + esc(DS.tacticStyle(mgr().tacticStyle).name) + '</b> · ' + esc(S.formation) + '</span>' +
       '</div>';
     paintEmblems(box);
     var hand = document.getElementById('m-hand');

@@ -314,6 +314,20 @@ main {
   box-shadow: 0 4px 14px rgba(166, 216, 76, .28);
 }
 .fchip.on span { opacity: .78; }
+/* v14 — 감독 전용 변칙 포메이션 칩 */
+.fchip.anom {
+  border-color: rgba(178, 146, 255, .45);
+  background: linear-gradient(160deg, rgba(138, 92, 214, .24), rgba(74, 168, 224, .14));
+}
+.fchip.anom b { color: #dcc9ff; }
+.fchip.anom span { color: rgba(220, 201, 255, .8); opacity: .85; }
+.fchip.anom.on {
+  background: linear-gradient(160deg, #e0ccff, #a88cf5);
+  border-color: rgba(138, 92, 214, .72);
+  box-shadow: 0 4px 14px rgba(138, 92, 214, .32);
+}
+.fchip.anom.on b { color: #241436; }
+.fchip.anom.on span { color: rgba(36, 20, 54, .8); opacity: .9; }
 
 .pitch {
   position: relative;
@@ -965,6 +979,8 @@ main::-webkit-scrollbar { width: 0; height: 0; }
 .mhero-name { font-size: 18px; font-weight: 900; letter-spacing: -1px; color: #f2ffe2; line-height: 1.2; }
 .mhero-name small { font-size: 9px; font-weight: 800; color: rgba(233, 244, 221, .6); letter-spacing: 0; }
 .mhero-style { font-size: 10px; font-weight: 800; color: rgba(233, 244, 221, .8); margin-top: 1px; }
+.mhero-tac { font-size: 9px; font-weight: 700; line-height: 1.45; color: rgba(214, 196, 255, .92); margin-top: 3px; }
+.mhero-tac b { color: #e2d2ff; font-weight: 900; }
 .mhero-form { font-size: 9px; font-weight: 800; color: rgba(233, 244, 221, .62); margin-top: 4px; }
 .mhero-form b { color: #eaffd2; }
 
@@ -1194,6 +1210,7 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
 #m-comm-body .cmt-line { font-size: 10.5px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #m-comm-body .cmt-line:nth-last-child(n+2) { display: none; }
 .tk-mgr { flex: 0 0 auto; max-width: 33%; font-size: 9px; color: rgba(233, 244, 221, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-mgr .tk-style { color: #c8f169; font-weight: 900; }
 
 /* ── 마이팀: 가로 전술판 + 감독 카드 2단 ── */
 #screen-squad.on { display: block; }

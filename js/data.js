@@ -336,8 +336,202 @@
       ]
     }
   };
+
+  /* ─────────────────────────  감독 전용 변칙 포메이션 (v14 · 6종)  ─────────────────────────
+     정통 8종으로는 표현되지 않는 감독의 색. morph 는 경기 중 실제 대형 변형을 지시한다.
+       boxMid  : 공격 시 DM·풀백이 중앙 박스 미드필더로 좁혀 들어온다
+       wbUp    : 윙백이 하프라인을 넘어 최전방까지 오버래핑
+       diamond : 2선이 다이아몬드로 모이고 투톱과 연결
+       fbIn    : 풀백이 인버티드로 중원에 합류
+       wingHigh: 윙어가 터치라인을 붙잡고 최전방 유지 */
+  FORMATIONS['3-2-4-1'] = {
+    name: '3-2-4-1', tag: '박스 미드필더', desc: '공격 시 DM·풀백이 중앙 4각으로', key: 3, anom: true,
+    morph: { boxMid: 1, wbUp: 1 },
+    metrics: { press: 82, line: 76, width: 58, tempo: 82 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'CB',  role: 'CB',  x: 26, y: 82 },
+      { pos: 'CB',  role: 'CB',  x: 50, y: 84, k: true },
+      { pos: 'CB',  role: 'CB',  x: 74, y: 82 },
+      { pos: 'DM',  role: 'DM',  x: 38, y: 62, k: true },
+      { pos: 'DM',  role: 'DM',  x: 62, y: 62 },
+      { pos: 'LWB', role: 'LWB', x: 12, y: 44 },
+      { pos: 'AM',  role: 'AM',  x: 40, y: 36 },
+      { pos: 'AM',  role: 'AM',  x: 60, y: 36, k: true },
+      { pos: 'RWB', role: 'RWB', x: 88, y: 44 },
+      { pos: 'ST',  role: 'ST',  x: 50, y: 16, k: true }
+    ]
+  };
+  FORMATIONS['3-4-1-2'] = {
+    name: '3-4-1-2', tag: '더블 볼란테', desc: '두 명의 6번이 전방을 보호', key: 3, anom: true,
+    morph: { boxMid: 0.8, wbUp: 1 },
+    metrics: { press: 70, line: 64, width: 66, tempo: 72 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'CB',  role: 'CB',  x: 26, y: 82 },
+      { pos: 'CB',  role: 'CB',  x: 50, y: 84, k: true },
+      { pos: 'CB',  role: 'CB',  x: 74, y: 82 },
+      { pos: 'LWB', role: 'LWB', x: 8,  y: 58 },
+      { pos: 'DM',  role: 'DM',  x: 40, y: 62, k: true },
+      { pos: 'DM',  role: 'DM',  x: 60, y: 62 },
+      { pos: 'RWB', role: 'RWB', x: 92, y: 58 },
+      { pos: 'AM',  role: 'AM',  x: 50, y: 36, k: true },
+      { pos: 'ST',  role: 'ST',  x: 38, y: 18 },
+      { pos: 'ST',  role: 'ST',  x: 62, y: 18 }
+    ]
+  };
+  FORMATIONS['4-1-3-2'] = {
+    name: '4-1-3-2', tag: '전방 다이아', desc: '2선 다이아몬드 · 투톱 연결', key: 4, anom: true,
+    morph: { diamond: 1, fbIn: 0.6 },
+    metrics: { press: 72, line: 68, width: 50, tempo: 76 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'LB',  role: 'LB',  x: 12, y: 76 },
+      { pos: 'CB',  role: 'CB',  x: 36, y: 80 },
+      { pos: 'CB',  role: 'CB',  x: 64, y: 80, k: true },
+      { pos: 'RB',  role: 'RB',  x: 88, y: 76 },
+      { pos: 'DM',  role: 'DM',  x: 50, y: 64, k: true },
+      { pos: 'LWF', role: 'LWF', x: 18, y: 46 },
+      { pos: 'AM',  role: 'AM',  x: 50, y: 40, k: true },
+      { pos: 'RWF', role: 'RWF', x: 82, y: 46 },
+      { pos: 'ST',  role: 'ST',  x: 38, y: 18 },
+      { pos: 'ST',  role: 'ST',  x: 62, y: 18, k: true }
+    ]
+  };
+  FORMATIONS['5-2-2-1'] = {
+    name: '5-2-2-1', tag: '더블 10번', desc: '두 명의 10번이 하프스페이스 점령', key: 5, anom: true,
+    morph: { wbUp: 1, boxMid: 0.6 },
+    metrics: { press: 58, line: 52, width: 64, tempo: 66 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'LWB', role: 'LWB', x: 8,  y: 74 },
+      { pos: 'CB',  role: 'CB',  x: 28, y: 84 },
+      { pos: 'CB',  role: 'CB',  x: 50, y: 86, k: true },
+      { pos: 'CB',  role: 'CB',  x: 72, y: 84 },
+      { pos: 'RWB', role: 'RWB', x: 92, y: 74 },
+      { pos: 'DM',  role: 'DM',  x: 40, y: 62 },
+      { pos: 'DM',  role: 'DM',  x: 60, y: 62, k: true },
+      { pos: 'AM',  role: 'AM',  x: 36, y: 38 },
+      { pos: 'AM',  role: 'AM',  x: 64, y: 38, k: true },
+      { pos: 'ST',  role: 'ST',  x: 50, y: 16 }
+    ]
+  };
+  FORMATIONS['3-3-1-3'] = {
+    name: '3-3-1-3', tag: '비엘사식 초공격', desc: '세 명 최전방 · 전원 전진', key: 3, anom: true,
+    morph: { wingHigh: 1 },
+    metrics: { press: 94, line: 88, width: 84, tempo: 92 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'CB',  role: 'CB',  x: 26, y: 80 },
+      { pos: 'CB',  role: 'CB',  x: 50, y: 82, k: true },
+      { pos: 'CB',  role: 'CB',  x: 74, y: 80 },
+      { pos: 'CM',  role: 'CM',  x: 30, y: 58 },
+      { pos: 'DM',  role: 'DM',  x: 50, y: 62, k: true },
+      { pos: 'CM',  role: 'CM',  x: 70, y: 58 },
+      { pos: 'AM',  role: 'AM',  x: 50, y: 36 },
+      { pos: 'LWF', role: 'LWF', x: 18, y: 22 },
+      { pos: 'ST',  role: 'ST',  x: 50, y: 15, k: true },
+      { pos: 'RWF', role: 'RWF', x: 82, y: 22 }
+    ]
+  };
+  FORMATIONS['4-2-4'] = {
+    name: '4-2-4', tag: '클래식 초공격', desc: '윙 2 + 투톱 · 측면 폭주', key: 4, anom: true,
+    morph: { wingHigh: 1, fbIn: 0.2 },
+    metrics: { press: 80, line: 74, width: 96, tempo: 88 },
+    slots: [
+      { pos: 'GK',  role: 'GK',  x: 50, y: 93 },
+      { pos: 'LB',  role: 'LB',  x: 12, y: 78 },
+      { pos: 'CB',  role: 'CB',  x: 36, y: 82 },
+      { pos: 'CB',  role: 'CB',  x: 64, y: 82, k: true },
+      { pos: 'RB',  role: 'RB',  x: 88, y: 78 },
+      { pos: 'CM',  role: 'CM',  x: 36, y: 58 },
+      { pos: 'CM',  role: 'CM',  x: 64, y: 58, k: true },
+      { pos: 'LWF', role: 'LWF', x: 12, y: 28 },
+      { pos: 'ST',  role: 'ST',  x: 38, y: 16, k: true },
+      { pos: 'ST',  role: 'ST',  x: 62, y: 16 },
+      { pos: 'RWF', role: 'RWF', x: 88, y: 28 }
+    ]
+  };
+
   DS.FORMATIONS = FORMATIONS;
   DS.FORMATION_KEYS = ['4-2-3-1', '3-4-2-1', '4-3-3', '4-1-4-1', '4-4-2', '3-5-2', '5-3-2', '4-2-2-2'];
+  DS.ANOMALY_KEYS = ['3-2-4-1', '3-4-1-2', '4-1-3-2', '5-2-2-1', '3-3-1-3', '4-2-4'];
+  DS.ALL_FORMATION_KEYS = DS.FORMATION_KEYS.concat(DS.ANOMALY_KEYS);
+  DS.isAnomaly = function (key) {
+    var f = FORMATIONS[key];
+    return !!(f && f.anom);
+  };
+
+  /* ─────────────────────────  감독 전술 철학 (v14 · 7종)  ─────────────────────────
+     경기 엔진이 이 수치를 그대로 읽어 라인·압박·패스 선택·침투를 바꾼다.
+       press/line/width/tempo : 포메이션 지표에 더해지는 보정
+       counterPress           : 볼을 잃은 직후 즉시 달려드는 인원 (게겐프레싱)
+       supportGap             : 볼 소유자 주변 삼각 지원 거리
+       maxPass / shortBias / longBias : 패스 거리 취향
+       throughBias / crossBias        : 스루패스 · 크로스 빈도
+       blockBank / blockWidth         : 수비 시 두 줄 간격 · 폭
+       longBallAfterWin              : 자기 진영에서 탈취 직후 전방 롱패스 확률 */
+  var TACTIC_STYLES = {
+    gegenpress: {
+      key: 'gegenpress', name: '게겐프레싱', short: 'GEGEN', color: '#e2553f',
+      line: '잃으면 3명이 즉시 달려들어 6초 안에 되찾는다',
+      press: 14, line: 8, width: 2, tempo: 8,
+      counterPress: 3, supportGap: 9.6, maxPass: 50,
+      shortBias: 0.5, longBias: -0.4, throughBias: 1.2, crossBias: 0.9, shootBias: 1.08,
+      runCount: 2, fwStay: 9, blockBank: 11.6, blockWidth: 0.96, longBallAfterWin: 0.08
+    },
+    tikitaka: {
+      key: 'tikitaka', name: '티키타카', short: 'TIKI', color: '#38a86b',
+      line: '짧은 패스로 삼각을 만들고 점유로 조른다',
+      press: -4, line: 4, width: -2, tempo: -4,
+      counterPress: 1, supportGap: 7.4, maxPass: 42,
+      shortBias: 1.7, longBias: -1.3, throughBias: 0.7, crossBias: 0.6, shootBias: 0.88,
+      runCount: 1, fwStay: 0, blockBank: 12.2, blockWidth: 0.90, longBallAfterWin: 0
+    },
+    counter: {
+      key: 'counter', name: '질식 역습', short: 'BLOCK', color: '#3f7fb8',
+      line: '두 줄 블록으로 내려앉아 탈취 후 한 번에 찌른다',
+      press: -10, line: -10, width: -8, tempo: 2,
+      counterPress: 0, supportGap: 11.5, maxPass: 62,
+      shortBias: -0.6, longBias: 0.9, throughBias: 1.9, crossBias: 0.8, shootBias: 1.2,
+      runCount: 2, fwStay: 15, blockBank: 8.2, blockWidth: 0.78, longBallAfterWin: 0.6
+    },
+    wingplay: {
+      key: 'wingplay', name: '측면 오버래핑', short: 'WING', color: '#c8a83a',
+      line: '풀백·윙백이 터치라인을 타고 박스까지 올라간다',
+      press: 2, line: 2, width: 14, tempo: 6,
+      counterPress: 1, supportGap: 11.0, maxPass: 56,
+      shortBias: -0.2, longBias: 0.4, throughBias: 0.9, crossBias: 2.3, shootBias: 1.0,
+      runCount: 2, fwStay: 4, blockBank: 11.8, blockWidth: 1.14, longBallAfterWin: 0.16
+    },
+    hybrid3241: {
+      key: 'hybrid3241', name: '가변 3-2-4-1', short: 'HYBRID', color: '#8a5cd6',
+      line: '공격 시 DM·풀백이 중앙 4각, 수비 시 3-2 두 줄로 변형',
+      press: 8, line: 6, width: 0, tempo: 6,
+      counterPress: 2, supportGap: 9.2, maxPass: 48,
+      shortBias: 0.9, longBias: -0.3, throughBias: 1.25, crossBias: 1.0, shootBias: 1.0,
+      runCount: 2, fwStay: 5, blockBank: 10.4, blockWidth: 0.94, longBallAfterWin: 0.1
+    },
+    direct: {
+      key: 'direct', name: '직선 롱볼', short: 'DIRECT', color: '#4aa8e0',
+      line: '중원을 건너뛰고 최전방·측면으로 곧장 보낸다',
+      press: 0, line: 0, width: 4, tempo: 10,
+      counterPress: 0, supportGap: 12.0, maxPass: 66,
+      shortBias: -1.1, longBias: 1.7, throughBias: 1.3, crossBias: 1.4, shootBias: 1.04,
+      runCount: 1, fwStay: 7, blockBank: 10.8, blockWidth: 1.0, longBallAfterWin: 0.4
+    },
+    balanced: {
+      key: 'balanced', name: '균형', short: 'BAL', color: '#9aa196',
+      line: '라인과 간격을 지키며 상황에 맞춰 전환한다',
+      press: 0, line: 0, width: 0, tempo: 0,
+      counterPress: 0, supportGap: 10.5, maxPass: 55,
+      shortBias: 0, longBias: 0, throughBias: 1, crossBias: 1, shootBias: 1.0,
+      runCount: 1, fwStay: 0, blockBank: 12.6, blockWidth: 1.0, longBallAfterWin: 0.12
+    }
+  };
+  DS.TACTIC_STYLES = TACTIC_STYLES;
+  DS.STYLE_KEYS = ['gegenpress', 'tikitaka', 'counter', 'wingplay', 'hybrid3241', 'direct', 'balanced'];
+  DS.tacticStyle = function (key) { return TACTIC_STYLES[key] || TACTIC_STYLES.balanced; };
 
   /* ─────────────────────────  현대 롤  ───────────────────────── */
   var ROLES = [
@@ -470,109 +664,162 @@
   DS.managerTrait = function (key) { return MANAGER_TRAITS[key] || MANAGER_TRAITS.org; };
 
   /* ─────────────────────────  감독 32명 (100% 가상 창작)  ───────────────────────── */
-  /* rarity: 동/은/금/전설 · formation: 고유 포메이션 · traits: 특기 1~2종 */
+  /* rarity: 동/은/금/전설 · formation: 고유 포메이션 · alt: 두 번째 포메이션
+     tacticStyle: 전술 철학(경기 엔진이 실제 좌표·패스·압박을 바꾼다) · tacticLine: 1줄 전술 특징 · traits: 특기 1~2종 */
   var MANAGERS = [
     /* ── 동급 8명 ── */
-    { id: 'm01', name: '김두식',  age: 58, rarity: 'dong', formation: '4-4-2',
+    { id: 'm01', name: '김두식',  age: 58, rarity: 'dong', formation: '4-4-2', alt: '4-1-3-2', tacticStyle: 'balanced',
+      tacticLine: '간격과 기본기 — 화려함 없이 4-4-2 균형을 지킨다',
       style: '무명의 장인', story: '동네 체육관에서 30년을 가르친 지도자. 화려함보다 기본기를 믿고, 매일 같은 훈련을 반복시킨다.',
       traits: [{ k: 'org', v: 3 }] },
-    { id: 'm02', name: '나승표',  age: 47, rarity: 'dong', formation: '4-1-4-1',
+    { id: 'm02', name: '나승표',  age: 47, rarity: 'dong', formation: '4-1-4-1', alt: '5-2-2-1', tacticStyle: 'counter',
+      tacticLine: '홀딩이 내려앉아 두 줄 블록, 탈취 후 한 번에 전진',
       style: '짜임새 수비', story: '선수 시절 수비형 미드필더. 실점을 줄이는 재주 하나로 지도자 자리를 지켜 왔다.',
       traits: [{ k: 'def', v: 3 }] },
-    { id: 'm03', name: '문태산',  age: 52, rarity: 'dong', formation: '3-5-2',
+    { id: 'm03', name: '문태산',  age: 52, rarity: 'dong', formation: '3-5-2', alt: '3-3-1-3', tacticStyle: 'gegenpress',
+      tacticLine: '산악 훈련으로 만든 체력 — 전방에서부터 물고 늘어진다',
       style: '산골 압박', story: '산악 마라톤 출신. 체력 훈련 하나는 누구에게도 지지 않는다고 자부한다.',
       traits: [{ k: 'press', v: 3 }] },
-    { id: 'm04', name: '서을녀',  age: 44, rarity: 'dong', formation: '4-3-3',
+    { id: 'm04', name: '서을녀',  age: 44, rarity: 'dong', formation: '4-3-3', alt: '3-2-4-1', tacticStyle: 'tikitaka',
+      tacticLine: '짧은 패스 백 번 — 삼각 간격을 좁혀 점유로 조른다',
       style: '기본기 신봉자', story: '여자 실업 리그에서 잔뼈가 굵은 지도자. 짧은 패스 하나를 백 번 다시 시킨다.',
       traits: [{ k: 'pass', v: 3 }] },
-    { id: 'm05', name: '하동철',  age: 55, rarity: 'dong', formation: '5-3-2',
+    { id: 'm05', name: '하동철',  age: 55, rarity: 'dong', formation: '5-3-2', alt: '3-4-1-2', tacticStyle: 'direct',
+      tacticLine: '공중볼 장인 — 롱볼과 크로스로 머리 싸움을 건다',
       style: '공중볼 장인', story: '장신 센터백 출신. 코너킥 Situation만 따로 연구하는 별난 지도자.',
       traits: [{ k: 'jump', v: 3 }] },
-    { id: 'm06', name: '고만복',  age: 61, rarity: 'dong', formation: '4-2-2-2',
+    { id: 'm06', name: '고만복',  age: 61, rarity: 'dong', formation: '4-2-2-2', alt: '4-2-4', tacticStyle: 'direct',
+      tacticLine: '두 줄로 나란히 밀어붙이는 직선 축구',
       style: '두 줄 공격', story: '두 줄로 나란히 서서 밀어붙이는 단순한 축구를 고집한다. 그런데 자주 통한다.',
       traits: [{ k: 'atk', v: 3 }] },
-    { id: 'm07', name: '진선우',  age: 39, rarity: 'dong', formation: '4-2-3-1',
+    { id: 'm07', name: '진선우',  age: 39, rarity: 'dong', formation: '4-2-3-1', alt: '3-3-1-3', tacticStyle: 'gegenpress',
+      tacticLine: '벤치에서 제일 크게 소리치며 전원 압박을 지시한다',
       style: '젊은 열정', story: '은퇴 3년 차 초보 감독. 벤치에서 제일 크게 소리치고, 선수들과 같이 뛴다.',
       traits: [{ k: 'speed', v: 3 }] },
-    { id: 'm08', name: '임복순',  age: 49, rarity: 'dong', formation: '4-4-2',
+    { id: 'm08', name: '임복순',  age: 49, rarity: 'dong', formation: '4-4-2', alt: '4-2-4', tacticStyle: 'wingplay',
+      tacticLine: '측면에서 올려주고 골문 앞에서 마무리 — 크로스 축구',
       style: '슛 하나만', story: '골문 앞에서의 결정력만 파고드는 지도자. 연습장에 골대를 세 개나 세워 놨다.',
       traits: [{ k: 'shoot', v: 3 }] },
     /* ── 은급 10명 ── */
-    { id: 'm09', name: '백인호',  age: 43, rarity: 'eun', formation: '4-2-3-1',
+    { id: 'm09', name: '백인호',  age: 43, rarity: 'eun', formation: '4-2-3-1', alt: '3-2-4-1', tacticStyle: 'gegenpress',
+      tacticLine: '구역별 압박 타이밍 도면 — 잃으면 3명이 동시에 덮친다',
       style: '구역 압박 설계자', story: '구역별 압박 타이밍을 도면에 그려 지시하는 지도자. 선수들은 그 도면을 외우고 뛴다.',
       traits: [{ k: 'org', v: 4 }, { k: 'press', v: 3 }] },
-    { id: 'm10', name: '오달수',  age: 50, rarity: 'eun', formation: '4-4-2',
+    { id: 'm10', name: '오달수',  age: 50, rarity: 'eun', formation: '4-1-3-2', alt: '4-4-2', tacticStyle: 'counter',
+      tacticLine: '두 공격수의 움직임을 반대로 엮는 투톱 다이아 역습',
       style: '투톱 연출가', story: '두 공격수의 움직임을 서로 반대로 엮는 데 열광한다. 수비수들은 늘 헷갈린다.',
       traits: [{ k: 'atk', v: 4 }, { k: 'shoot', v: 3 }] },
-    { id: 'm11', name: '차민서',  age: 37, rarity: 'eun', formation: '4-3-3',
+    { id: 'm11', name: '차민서',  age: 37, rarity: 'eun', formation: '4-3-3', alt: '4-1-3-2', tacticStyle: 'tikitaka',
+      tacticLine: '한 번의 패스로 라인을 가르는 전방 다이아 점유',
       style: '패스 마에스트로', story: '한 번의 패스로 수비 라인을 가르는 그림을 머릿속에 그리고 지시한다.',
       traits: [{ k: 'pass', v: 4 }, { k: 'org', v: 3 }] },
-    { id: 'm12', name: '노경필',  age: 54, rarity: 'eun', formation: '5-3-2',
+    { id: 'm12', name: '노경필',  age: 54, rarity: 'eun', formation: '5-3-2', alt: '5-2-2-1', tacticStyle: 'counter',
+      tacticLine: '골문 앞 다섯 명 — 로우 블록 후 한 번의 역습',
       style: '철벽 스리백', story: '스리백을 두 줄의 벽으로 만든다. “안 넣기면 이긴다”가 좌우명이다.',
       traits: [{ k: 'def', v: 4 }, { k: 'jump', v: 3 }] },
-    { id: 'm13', name: '문정아',  age: 41, rarity: 'eun', formation: '3-4-2-1',
+    { id: 'm13', name: '문정아',  age: 41, rarity: 'eun', formation: '3-4-2-1', alt: '3-2-4-1', tacticStyle: 'wingplay',
+      tacticLine: '윙백을 미드필더처럼 — 측면 한 번 뚫리면 끝장',
       style: '측면 질주', story: '윙백을 미드필더처럼 쓰는 지도자. 측면 한 번 뚫리면 그것으로 끝장을 본다.',
       traits: [{ k: 'speed', v: 4 }, { k: 'pass', v: 3 }] },
-    { id: 'm14', name: '서강토',  age: 46, rarity: 'eun', formation: '3-5-2',
+    { id: 'm14', name: '서강토',  age: 46, rarity: 'eun', formation: '3-5-2', alt: '3-3-1-3', tacticStyle: 'wingplay',
+      tacticLine: '크로스 3천 개의 감각 — 측면 공중볼 지배',
       style: '공중전 지배자', story: '크로스만 3천 개를 올려 보고 감각을 잡은 지도자. 공중볼 경합은 그의 영지다.',
       traits: [{ k: 'jump', v: 4 }, { k: 'press', v: 3 }] },
-    { id: 'm15', name: '이완수',  age: 62, rarity: 'eun', formation: '4-1-4-1',
+    { id: 'm15', name: '이완수',  age: 62, rarity: 'eun', formation: '3-4-1-2', alt: '4-1-4-1', tacticStyle: 'tikitaka',
+      tacticLine: '두 명의 6번이 균형을 잡고 짧게 돌리는 고전 점유',
       style: '홀딩의 미학', story: '한 명의 홀딩 미드필더가 전체 균형을 잡게 만드는 고전파 지도자.',
       traits: [{ k: 'org', v: 4 }, { k: 'def', v: 3 }] },
-    { id: 'm16', name: '한지예',  age: 35, rarity: 'eun', formation: '4-2-2-2',
+    { id: 'm16', name: '한지예',  age: 35, rarity: 'eun', formation: '3-2-4-1', alt: '4-2-2-2', tacticStyle: 'hybrid3241',
+      tacticLine: '공격 시 DM·풀백이 중앙 4각으로 — 박스 침투 6경로',
       style: '박스 침투 요원', story: '박스 안으로 들어가는 경로를 여섯 가지로 나눠 훈련시키는 신세대 지도자.',
       traits: [{ k: 'shoot', v: 4 }, { k: 'atk', v: 3 }] },
-    { id: 'm17', name: '최돌이',  age: 57, rarity: 'eun', formation: '4-2-3-1',
+    { id: 'm17', name: '최돌이',  age: 57, rarity: 'eun', formation: '4-2-3-1', alt: '3-3-1-3', tacticStyle: 'gegenpress',
+      tacticLine: '백패스가 나오면 벤치가 먼저 뛰어나온다 — 압박 교본',
       style: '전방 압박 교본', story: '상대 후방 빌드업을 읽는 눈이 남다르다. 백패스가 나오면 벤치가 먼저 뛰어나온다.',
       traits: [{ k: 'press', v: 4 }, { k: 'speed', v: 3 }] },
-    { id: 'm18', name: '석민관',  age: 48, rarity: 'eun', formation: '4-4-2',
+    { id: 'm18', name: '석민관',  age: 48, rarity: 'eun', formation: '4-4-2', alt: '4-1-3-2', tacticStyle: 'tikitaka',
+      tacticLine: '두 번 터치하면 벌점 — 원터치로 경기를 누른다',
       style: '원터치 축구', story: '두 번 터치하면 벌점을 주는 훈련을 한다. 패스 속도로 경기를 눌러 버린다.',
       traits: [{ k: 'pass', v: 4 }, { k: 'shoot', v: 3 }] },
     /* ── 금급 9명 ── */
-    { id: 'm19', name: '강태오',  age: 45, rarity: 'geum', formation: '4-2-3-1',
+    { id: 'm19', name: '강태오',  age: 45, rarity: 'geum', formation: '4-2-3-1', alt: '3-3-1-3', tacticStyle: 'gegenpress',
+      tacticLine: '잃으면 3초 안에 되찾는다 — 게겐프레싱 전도사',
       style: '게겐프레싱 전도사', story: '독일어 교재를 스스로 번역해 훈련에 적용한 지도자. 잃으면 3초 안에 되찾는다.',
       traits: [{ k: 'org', v: 6 }, { k: 'press', v: 5 }] },
-    { id: 'm20', name: '백만호',  age: 52, rarity: 'geum', formation: '4-4-2',
+    { id: 'm20', name: '백만호',  age: 52, rarity: 'geum', formation: '4-2-4', alt: '4-4-2', tacticStyle: 'direct',
+      tacticLine: '윙 2 + 투톱으로 골문을 향해 곧장 — 득점 설계사',
       style: '득점 설계사', story: '리그 득점 1위 팀을 세 번 만들었다. 공격수의 버릇을 하루면 간파한다.',
       traits: [{ k: 'shoot', v: 6 }, { k: 'atk', v: 5 }] },
-    { id: 'm21', name: '윤소라',  age: 38, rarity: 'geum', formation: '4-3-3',
+    { id: 'm21', name: '윤소라',  age: 38, rarity: 'geum', formation: '3-2-4-1', alt: '4-3-3', tacticStyle: 'hybrid3241',
+      tacticLine: '짧은 패스 200개 — 공격 시 중앙 4각으로 변형되는 점유',
       style: '티키타카 사제', story: '짧은 패스 200개를 3분 안에 성공시키는 훈련을 매일 돌린다. 경기장이 연습장처럼 보인다.',
       traits: [{ k: 'pass', v: 6 }, { k: 'org', v: 5 }] },
-    { id: 'm22', name: '도정한',  age: 56, rarity: 'geum', formation: '5-3-2',
+    { id: 'm22', name: '도정한',  age: 56, rarity: 'geum', formation: '5-3-2', alt: '5-2-2-1', tacticStyle: 'counter',
+      tacticLine: '골문 앞 30미터 사수 — 두 줄 블록 후 전방 롱패스',
       style: '로우 블록 장인', story: '골문 앞 30미터를 절대 내주지 않는 로우 블록의 대가. 강팀을 상대로 특히 무섭다.',
       traits: [{ k: 'def', v: 6 }, { k: 'jump', v: 5 }] },
-    { id: 'm23', name: '김세비',  age: 40, rarity: 'geum', formation: '3-4-2-1',
+    { id: 'm23', name: '김세비',  age: 40, rarity: 'geum', formation: '3-4-2-1', alt: '4-2-4', tacticStyle: 'wingplay',
+      tacticLine: '윙백을 최전방까지 — 측면에서 수적 우위 오버래핑',
       style: '윙백 오버래핑', story: '윙백을 최전방까지 밀어 올리는 윙백 축구의 신봉자. 측면에서 수적 우위를 만든다.',
       traits: [{ k: 'speed', v: 6 }, { k: 'atk', v: 5 }] },
-    { id: 'm24', name: '마재운',  age: 49, rarity: 'geum', formation: '3-5-2',
+    { id: 'm24', name: '마재운',  age: 49, rarity: 'geum', formation: '3-5-2', alt: '5-2-2-1', tacticStyle: 'wingplay',
+      tacticLine: '장신 자원 + 코너킥 제국 — 크로스와 세트피스',
       style: '공중볼 제국', story: '장신 자원을 모아 세트피스 제국을 세웠다. 코너킥 한 번이 곧 득점 기회다.',
       traits: [{ k: 'jump', v: 6 }, { k: 'press', v: 5 }] },
-    { id: 'm25', name: '성민규',  age: 43, rarity: 'geum', formation: '4-1-4-1',
+    { id: 'm25', name: '성민규',  age: 43, rarity: 'geum', formation: '3-4-1-2', alt: '4-1-4-1', tacticStyle: 'balanced',
+      tacticLine: '더블 볼란테로 균형 — 절반씩 바꿔도 흔들리지 않는다',
       style: '균형의 귀재', story: '경기마다 전술을 절반씩 바꿔도 흔들리지 않는 팀을 만든다. 균형 자체가 무기다.',
       traits: [{ k: 'def', v: 6 }, { k: 'org', v: 5 }] },
-    { id: 'm26', name: '우지환',  age: 51, rarity: 'geum', formation: '4-2-2-2',
+    { id: 'm26', name: '우지환',  age: 51, rarity: 'geum', formation: '4-2-2-2', alt: '4-1-3-2', tacticStyle: 'hybrid3241',
+      tacticLine: '되살린 2-2 배열 — 하프스페이스에서 숫자로 누른다',
       style: '투톱 투메짤라', story: '없어진 줄 알았던 2-2 배열을 되살린 지도자. 중원에서 숫자로 눌러 버린다.',
       traits: [{ k: 'atk', v: 6 }, { k: 'shoot', v: 5 }] },
-    { id: 'm27', name: '남궁혁',  age: 47, rarity: 'geum', formation: '4-2-3-1',
+    { id: 'm27', name: '남궁혁',  age: 47, rarity: 'geum', formation: '3-3-1-3', alt: '4-2-4', tacticStyle: 'gegenpress',
+      tacticLine: '전반 15분에 끝내는 3명 최전방 압박 — 미친 압박',
       style: '미친 압박', story: '전반 15분에 경기를 끝내는 압박 축구. 후반 체력은 그의 유일한 약점이다.',
       traits: [{ k: 'press', v: 6 }, { k: 'speed', v: 5 }] },
     /* ── 전설 5명 ── */
-    { id: 'm28', name: '조영광',  age: 63, rarity: 'legend', formation: '4-3-3',
+    { id: 'm28', name: '조영광',  age: 63, rarity: 'legend', formation: '4-3-3', alt: '3-2-4-1', tacticStyle: 'tikitaka',
+      tacticLine: '패스 성공률 20년 1위 — 공이 발에 붙어 도는 점유',
       style: '패스의 신', story: '리그 통산 패스 성공률 1위를 20년째 지키는 전설. 그의 팀은 공이 발에 붙어 다닌다.',
       traits: [{ k: 'pass', v: 8 }, { k: 'org', v: 7 }] },
-    { id: 'm29', name: '하태봉',  age: 59, rarity: 'legend', formation: '5-3-2',
+    { id: 'm29', name: '하태봉',  age: 59, rarity: 'legend', formation: '5-2-2-1', alt: '5-3-2', tacticStyle: 'counter',
+      tacticLine: '한 시즌 최소 실점 — 다섯 수비 두 줄 블록',
       style: '철벽의 전설', story: '한 시즌 최소 실점 기록을 세운 지도자. 상대 공격수들이 그 앞에서 작아진다.',
       traits: [{ k: 'def', v: 8 }, { k: 'jump', v: 7 }] },
-    { id: 'm30', name: '유일한',  age: 55, rarity: 'legend', formation: '4-2-3-1',
+    { id: 'm30', name: '유일한',  age: 55, rarity: 'legend', formation: '4-2-4', alt: '4-3-3', tacticStyle: 'direct',
+      tacticLine: '찬스 한 번을 놓치지 않는 직선 초공격',
       style: '결정력의 화신', story: '슛 하나로 경기를 뒤집는 법을 아는 지도자. 찬스가 오면 절대 놓치지 않는 팀을 만든다.',
       traits: [{ k: 'shoot', v: 8 }, { k: 'atk', v: 7 }] },
-    { id: 'm31', name: '문세진',  age: 46, rarity: 'legend', formation: '3-4-2-1',
+    { id: 'm31', name: '문세진',  age: 46, rarity: 'legend', formation: '3-4-2-1', alt: '3-3-1-3', tacticStyle: 'wingplay',
+      tacticLine: '손짓 한 번에 라인이 30미터 — 폭풍 윙백',
       style: '폭풍의 지휘자', story: '경기장을 세로로 찢는 윙백 축구의 완성자. 벤치에서 손짓 한 번이면 라인이 30미터 올라간다.',
       traits: [{ k: 'speed', v: 8 }, { k: 'press', v: 7 }] },
-    { id: 'm32', name: '배영달',  age: 66, rarity: 'legend', formation: '4-4-2',
+    { id: 'm32', name: '배영달',  age: 66, rarity: 'legend', formation: '4-4-2', alt: '4-1-4-1', tacticStyle: 'balanced',
+      tacticLine: '무패 우승 두 번 — 화려함 없이 이기는 균형',
       style: '무패의 설계자', story: '한 시즌 무패 우승을 두 번 달성한 원로. 화려함 없이도 이기는 법을 안다.',
       traits: [{ k: 'org', v: 8 }, { k: 'jump', v: 7 }] }
   ];
+
+  /* 감독이 보유한 변칙 포메이션 (고유 + 두 번째) — 마이팀에서 선택 가능 */
+  DS.managerAnomalies = function (m) {
+    var out = [], i, k;
+    if (!m) { return out; }
+    var keys = [m.formation, m.alt];
+    for (i = 0; i < keys.length; i++) {
+      k = keys[i];
+      if (k && DS.isAnomaly(k) && out.indexOf(k) < 0) { out.push(k); }
+    }
+    return out;
+  };
+  DS.managerFormations = function (m) {
+    var out = [], i, keys;
+    if (!m) { return out; }
+    keys = [m.formation, m.alt];
+    for (i = 0; i < keys.length; i++) { if (keys[i] && DS.FORMATIONS[keys[i]] && out.indexOf(keys[i]) < 0) { out.push(keys[i]); } }
+    return out;
+  };
+  DS.managerStyle = function (m) { return DS.tacticStyle(m && m.tacticStyle); };
   DS.MANAGERS = MANAGERS;
   DS.managerOf = function (id) {
     var i;

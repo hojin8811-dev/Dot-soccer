@@ -1,12 +1,12 @@
-/*! 도트싸커 v13 — 주발 좌우 적성 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v13d-20261126';
+/*! 도트싸커 v14 — 감독별 전술 철학 · 변칙 포메이션 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v14a-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=13&b=42', './js/data.js?v=13&b=42', './js/match.js?v=13&b=42', './js/game.js?v=13&b=42',
+        './css/style.css?v=14&b=45', './js/data.js?v=14&b=45', './js/match.js?v=14&b=45', './js/game.js?v=14&b=45',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
