@@ -113,11 +113,14 @@
       if (img && !(img.naturalWidth > 0)) { img.onload = function () { paintCell(cv); }; }
     })(cvs[i]);
   }
-  /* 이미지 늦게 뜨는 경우 한 번 더 */
-  setTimeout(function () {
+  /* 이미지가 늦게 디코드되는 환경 — 준비될 때까지 주기적으로 다시 그린다 */
+  var ticks = 0;
+  var timer = setInterval(function () {
     var all = host.querySelectorAll('canvas');
     for (var k = 0; k < all.length; k++) { paintCell(all[k]); }
-  }, 2200);
+    ticks++;
+    if (ticks > 24) { clearInterval(timer); }
+  }, 700);
 })();
 </script>
 </body>
