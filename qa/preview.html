@@ -2,21 +2,53 @@
 <html lang="ko"><head><meta charset="utf-8">
 <title>도트싸커 844×390 미리보기</title>
 <style>
-html,body{margin:0;height:100%;background:#0a1c17;display:flex;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}
+html,body{margin:0;height:100%;background:#0a1c17;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
 .wrap{display:flex;flex-direction:column;gap:6px}
-.cap{color:#9fb8a8;font-size:12px;font-weight:700;letter-spacing:.4px}
+.cap{color:#9fb8a8;font-size:12px;font-weight:700;letter-spacing:.4px;display:flex;gap:10px;align-items:center}
+.cap b{color:#c8f169}
+.cap em{font-style:normal;color:#ffb0a0}
 iframe{width:844px;height:390px;border:0;background:#061a16;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 </style></head>
 <body>
-<div class="wrap"><div class="cap" id="cap">844 × 390 · 가로 모바일</div>
-<iframe id="pv"></iframe></div>
+<div class="wrap">
+  <div class="cap"><span>844 × 390 · 가로 모바일</span><b id="st">불러오는 중…</b><em id="err"></em></div>
+  <iframe id="pv"></iframe>
+</div>
 <script>
+/* 개발용 미리보기 하네스 — CDN 캐시를 피해 raw.githubusercontent의 최신 소스를 그대로 주입한다.
+   (저장소에 남기지 않는 QA 전용 파일) */
+(async function () {
   var q = new URLSearchParams(location.search);
-  var b = q.get('b') || '1';
-  var page = q.get('p') || '../index.html';
-  var seed = q.get('seed') || '';
-  document.getElementById('cap').textContent = '844 × 390 · 가로 모바일 · b=' + b;
-  var src = page + '?v=20&b=' + b + (seed ? '&seed=' + seed : '');
-  document.getElementById('pv').src = src;
+  var BR = q.get('br') || 'v20';
+  var ROOT = 'https://raw.githubusercontent.com/hojin8811-dev/Dot-soccer/' + BR + '/';
+  var BASE = 'https://rawcdn.githack.com/hojin8811-dev/Dot-soccer/' + BR + '/';
+  var st = document.getElementById('st'), errEl = document.getElementById('err');
+  function stamp() { return '?t=' + Date.now() + Math.random().toString(36).slice(2, 6); }
+  function fail(e) { errEl.textContent = 'ERR ' + (e && e.message ? e.message : e); st.textContent = '실패'; }
+  try {
+    var idx = await (await fetch(ROOT + 'index.html' + stamp())).text();
+    var css = await (await fetch(ROOT + 'css/style.css' + stamp())).text();
+    idx = idx.replace(/<link rel="stylesheet"[^>]*>/g, '');
+    idx = idx.replace(/<script src="js\/[^"]*"><\/script>/g, '');
+    idx = idx.replace(/<script>[\s\S]*?serviceWorker[\s\S]*?<\/script>/g, '');
+    idx = idx.replace('<head>', '<head><base href="' + BASE + '">');
+    var f = document.getElementById('pv');
+    var d = f.contentDocument;
+    d.open(); d.write(idx); d.close();
+    var style = d.createElement('style');
+    style.textContent = css;
+    d.head.appendChild(style);
+    var files = ['js/data.js', 'js/match.js', 'js/game.js'];
+    for (var i = 0; i < files.length; i++) {
+      var src = await (await fetch(ROOT + files[i] + stamp())).text();
+      var s = d.createElement('script');
+      s.textContent = src;
+      d.body.appendChild(s);
+    }
+    var ok = !!(f.contentWindow.DS && f.contentWindow.DS.game);
+    st.textContent = (ok ? '최신 소스 OK' : '로드 실패') + ' · ' + BR;
+    f.contentWindow.addEventListener('error', function (e) { errEl.textContent = 'ERR ' + e.message; });
+  } catch (e) { fail(e); }
+})();
 </script>
 </body></html>
