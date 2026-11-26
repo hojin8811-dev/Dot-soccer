@@ -5,12 +5,16 @@
 <title>도트싸커 v6 · SD 스프라이트 랩</title>
 <style>
   html, body { margin: 0; padding: 0; background: #0b2f28; color: #dff3d0; font: 12px system-ui, -apple-system, sans-serif; }
-  .wrap { padding: 12px; }
-  h2 { font-size: 13px; margin: 14px 0 6px; color: #c8f169; letter-spacing: .4px; }
-  .grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 4px; }
+  .wrap { padding: 10px; }
+  h2 { font-size: 12px; margin: 12px 0 5px; color: #c8f169; letter-spacing: .4px; }
+  .hero { display: flex; gap: 6px; }
+  .hero .cell { background: radial-gradient(60% 46% at 50% 90%, rgba(0,0,0,.34), transparent 72%); }
+  .hero canvas { display: block; width: 300px; height: 420px; }
+  .hero span { font-size: 10px; color: #9fb9a8; }
+  .grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; }
   .cell { text-align: center; }
-  .cell canvas { display: block; width: 66px; height: 92px; margin: 0 auto; background: radial-gradient(60% 50% at 50% 88%, rgba(0,0,0,.32), transparent 70%); }
-  .cell span { font-size: 8px; color: #9fb9a8; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .grid canvas { display: block; width: 120px; height: 168px; margin: 0 auto; background: radial-gradient(60% 48% at 50% 90%, rgba(0,0,0,.30), transparent 72%); }
+  .grid span { font-size: 8px; color: #9fb9a8; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -19,19 +23,6 @@
 <script>
 (function () {
   var DS = window.DS, Art = DS.Art;
-  var poses = [
-    { key: 'idle', label: '대기' },
-    { key: 'run', frame: 0, label: '달리기1' },
-    { key: 'run', frame: 1, label: '달리기2' },
-    { key: 'run', frame: 2, label: '달리기3' },
-    { key: 'run', frame: 3, label: '달리기4' },
-    { key: 'dribble', frame: 1, label: '드리블' },
-    { key: 'kick', label: '슛' },
-    { key: 'pass', label: '패스' },
-    { key: 'tackle', label: '태클' },
-    { key: 'dive', label: 'GK 다이빙' },
-    { key: 'celebrate', label: '세리머니' }
-  ];
   var homeKit = { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' };
   var awayKit = { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' };
   var gkKitA = { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' };
@@ -44,60 +35,88 @@
   var host = document.getElementById('lab');
   var html = '';
 
-  function row(title, list, kit, gkKit, startGK) {
-    html += '<h2>' + title + '</h2><div class="grid">';
-    for (var i = 0; i < 11; i++) {
-      var p = list[i];
-      var isGK = (startGK && i === 0);
-      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + (isGK ? [gkKit.shirt, gkKit.shorts, gkKit.trim] : [kit.shirt, kit.shorts, kit.trim]).join('|') +
-        '" data-gk="' + (isGK ? 1 : 0) + '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '"></canvas>' +
-        '<span>' + p.pos + ' #' + (p.number || (i + 1)) + '</span></div>';
-    }
-    html += '</div>';
+  /* 큰 컷: 홈 GK / 홈 필드 / 원정 필드 / 원정 GK */
+  html += '<h2>큰 컷</h2><div class="hero">';
+  var heroes = [
+    { p: squad[0], kit: gkKitA, pose: 'dive', gk: 1, label: '홈 GK 다이빙' },
+    { p: squad[8], kit: homeKit, pose: 'run', frame: 0, label: '홈 필드 달리기' },
+    { p: out[8], kit: awayKit, pose: 'run', frame: 2, label: '원정 필드 달리기' },
+    { p: out[0], kit: gkKitB, pose: 'idle', gk: 1, label: '원정 GK 대기' },
+    { p: squad[9], kit: homeKit, pose: 'kick', label: '홈 슛' }
+  ];
+  var i;
+  for (i = 0; i < heroes.length; i++) {
+    html += '<div class="cell"><canvas data-hero="' + i + '"></canvas><span>' + heroes[i].label + '</span></div>';
   }
+  html += '</div>';
 
-  function poseRow(title, list, kit, pose, gkKit) {
+  function row(title, list, kit) {
     html += '<h2>' + title + '</h2><div class="grid">';
     for (var i = 0; i < 11; i++) {
       var p = list[i];
       html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
-        '" data-gk="0" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '" data-pose="' + pose + '"></canvas></div>';
+        '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '"></canvas><span>' + p.pos + ' #' + (p.number || (i + 1)) + '</span></div>';
     }
     html += '</div>';
   }
-
-  row('홈 · 도트 유나이티드 (11명)', squad, homeKit, gkKitA, false);
-  row('원정 · 한강 FC (11명)', out, awayKit, gkKitB, false);
-  poseRow('포즈 · 달리기 1', squad, homeKit, 'run');
+  function poseRow(title, list, kit, pose, gk) {
+    html += '<h2>' + title + '</h2><div class="grid">';
+    for (var i = 0; i < 11; i++) {
+      var p = list[i];
+      html += '<div class="cell"><canvas data-pic="' + p.pic + '" data-kit="' + kit.shirt + '|' + kit.shorts + '|' + kit.trim +
+        '" data-num="' + (p.number || (i + 1)) + '" data-id="' + p.id + '" data-pose="' + pose + '" data-gk="' + (gk ? 1 : 0) + '"></canvas></div>';
+    }
+    html += '</div>';
+  }
+  row('홈 · 도트 유나이티드 (11명)', squad, homeKit);
+  row('원정 · 한강 FC (11명)', out, awayKit);
+  poseRow('포즈 · 달리기', squad, homeKit, 'run');
   poseRow('포즈 · 슛', squad, homeKit, 'kick');
   poseRow('포즈 · 태클', squad, homeKit, 'tackle');
-  poseRow('포즈 · 다이빙', squad, gkKitA, 'dive');
+  poseRow('포즈 · GK 다이빙', squad, gkKitA, 'dive', 1);
   host.innerHTML = html;
 
-  var cvs = host.querySelectorAll('canvas');
-  var S = 2.2;
-  for (var k = 0; k < cvs.length; k++) {
-    (function (cv) {
-      var pic = parseInt(cv.getAttribute('data-pic'), 10);
-      var bits = cv.getAttribute('data-kit').split('|');
-      var kit = { shirt: bits[0], shorts: bits[1], trim: bits[2] };
-      var fake = { id: cv.getAttribute('data-id'), pic: pic, number: parseInt(cv.getAttribute('data-num'), 10), pos: 'CM', name: 'x' };
-      var pose = cv.getAttribute('data-pose') || 'idle';
-      var frame = 0;
-      function paint() {
-        var spr = Art.sdSprite(fake, kit, { pose: pose, frame: frame, gk: cv.getAttribute('data-gk') === '1', t: 0.4 });
-        var w = Math.round(Art.SD_SIZE.w * S), h = Math.round(Art.SD_SIZE.h * S);
-        cv.width = w; cv.height = h;
-        var g = cv.getContext('2d');
-        g.clearRect(0, 0, w, h);
-        g.imageSmoothingEnabled = true;
-        g.drawImage(spr, 0, 0, w, h);
-      }
-      var img = Art.headImage(fake);
-      if (img && !img.complete) { img.onload = paint; }
-      paint();
-    })(cvs[k]);
+  function paintCell(cv) {
+    var fake = cv.__fake, kit = cv.__kit, S = cv.__scale;
+    var pose = cv.getAttribute('data-pose') || 'idle';
+    var spr = Art.sdSprite(fake, kit, { pose: pose, frame: cv.__frame || 0, gk: !!cv.__gk, t: 0.4 });
+    var w = Math.round(Art.SD_SIZE.w * S), h = Math.round(Art.SD_SIZE.h * S);
+    cv.width = w; cv.height = h;
+    var g = cv.getContext('2d');
+    g.clearRect(0, 0, w, h);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(spr, 0, 0, w, h);
   }
+
+  var hc = host.querySelectorAll('.hero canvas');
+  for (i = 0; i < hc.length; i++) {
+    (function (cv, h) {
+      cv.__fake = h.p; cv.__kit = h.kit; cv.__scale = 5; cv.__gk = !!h.gk; cv.__frame = h.frame || 0;
+      cv.setAttribute('data-pose', h.pose);
+      paintCell(cv);
+      var img = Art.headImage(h.p);
+      if (img && !img.complete) { img.onload = function () { paintCell(cv); }; }
+    })(hc[i], heroes[i]);
+  }
+
+  var cvs = host.querySelectorAll('.grid canvas');
+  for (i = 0; i < cvs.length; i++) {
+    (function (cv) {
+      var bits = cv.getAttribute('data-kit').split('|');
+      cv.__fake = { id: cv.getAttribute('data-id'), pic: parseInt(cv.getAttribute('data-pic'), 10), number: parseInt(cv.getAttribute('data-num'), 10), pos: 'CM', name: 'x' };
+      cv.__kit = { shirt: bits[0], shorts: bits[1], trim: bits[2] };
+      cv.__scale = 2.4;
+      cv.__gk = cv.getAttribute('data-gk') === '1';
+      paintCell(cv);
+      var img = Art.headImage(cv.__fake);
+      if (img && !img.complete) { img.onload = function () { paintCell(cv); }; }
+    })(cvs[i]);
+  }
+  /* 이미지 늦게 뜨는 경우 한 번 더 */
+  setTimeout(function () {
+    var all = host.querySelectorAll('canvas');
+    for (var k = 0; k < all.length; k++) { paintCell(all[k]); }
+  }, 1200);
 })();
 </script>
 </body>
