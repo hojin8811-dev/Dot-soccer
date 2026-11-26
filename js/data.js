@@ -2528,16 +2528,16 @@
       g.rotate(-ang * 0.55);
       g.fillStyle = front ? '#1a2226' : '#12181c';
       g.beginPath();
-      g.moveTo(-3.6, 0.2);
-      g.lineTo(2.8, -0.6);
-      g.quadraticCurveTo(6.6, 0.2, 5.8, 2.9);
-      g.lineTo(-3.8, 2.9);
+      g.moveTo(-3.0, 0.2);
+      g.lineTo(2.4, -0.5);
+      g.quadraticCurveTo(5.6, 0.1, 5.0, 2.4);
+      g.lineTo(-3.2, 2.4);
       g.closePath(); g.fill();
-      OL(0.85); g.stroke();
+      OL(0.8); g.stroke();
       g.fillStyle = trim;
-      g.fillRect(-3.6, 1.0, 8.8, 0.95);
-      g.fillStyle = 'rgba(240,248,255,0.82)';
-      g.fillRect(-3.6, 2.5, 9.0, 0.7);
+      g.fillRect(-3.0, 0.85, 7.6, 0.8);
+      g.fillStyle = 'rgba(240,248,255,0.8)';
+      g.fillRect(-3.0, 2.1, 7.8, 0.6);
       g.restore();
     }
 
@@ -2545,15 +2545,15 @@
       var kx = hx + Math.sin(a) * 9.6, ky = hy + Math.cos(a) * 9.6;
       var ax = kx + Math.sin(a + k) * 8.4, ay = ky + Math.cos(a + k) * 8.4;
       g.strokeStyle = front ? skin : skinD;
-      g.lineWidth = 6.4;
+      g.lineWidth = 5.7;
       g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.stroke();
       /* 스타킹 */
       g.strokeStyle = front ? sock : shade(sock, -18);
-      g.lineWidth = 5.8;
+      g.lineWidth = 5.1;
       g.beginPath(); g.moveTo(kx, ky); g.lineTo(ax, ay); g.stroke();
       /* 스타킹 밴드 */
       g.strokeStyle = front ? shirt : shade(shirt, -24);
-      g.lineWidth = 5.9;
+      g.lineWidth = 5.2;
       g.beginPath();
       g.moveTo(kx + (ax - kx) * 0.10, ky + (ay - ky) * 0.10);
       g.lineTo(kx + (ax - kx) * 0.20, ky + (ay - ky) * 0.20);
@@ -2566,33 +2566,33 @@
       var ex = sx + Math.sin(a) * 7.6, ey = sy + Math.cos(a) * 7.6;
       var hx = ex + Math.sin(a + e) * 6.8, hy = ey + Math.cos(a + e) * 6.8;
       g.strokeStyle = front ? gkKit : shade(gkKit, -22);
-      g.lineWidth = 6.2;
+      g.lineWidth = 5.6;
       g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex, ey); g.stroke();
       /* 소매 트림 */
       g.strokeStyle = front ? trim : shade(trim, -22);
-      g.lineWidth = 6.3;
+      g.lineWidth = 5.7;
       g.beginPath();
       g.moveTo(ex - (ex - sx) * 0.18, ey - (ey - sy) * 0.18);
       g.lineTo(ex, ey);
       g.stroke();
       g.strokeStyle = front ? (gk ? gkKit : skin) : shade(gk ? gkKit : skin, -20);
-      g.lineWidth = 4.8;
+      g.lineWidth = 4.3;
       g.beginPath(); g.moveTo(ex, ey); g.lineTo(hx, hy); g.stroke();
       g.fillStyle = front ? glove : shade(glove, -14);
-      g.beginPath(); g.arc(hx, hy, gk ? 2.7 : 2.0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(hx, hy, gk ? 2.5 : 1.8, 0, Math.PI * 2); g.fill();
       OL(0.8); g.stroke();
     }
 
     /* ── 몸통 · 유니폼 ── */
     function torsoPath() {
       g.beginPath();
-      g.moveTo(21.2, 41.4);
-      g.quadraticCurveTo(17.2, 45.2, 17.8, 52.0);
-      g.quadraticCurveTo(18.3, 58.6, 20.4, 61.8);
-      g.lineTo(39.6, 61.8);
-      g.quadraticCurveTo(41.7, 58.6, 42.2, 52.0);
-      g.quadraticCurveTo(42.8, 45.2, 38.8, 41.4);
-      g.quadraticCurveTo(30.0, 38.2, 21.2, 41.4);
+      g.moveTo(21.6, 41.4);
+      g.quadraticCurveTo(18.0, 45.2, 18.6, 52.0);
+      g.quadraticCurveTo(19.1, 58.6, 21.0, 61.8);
+      g.lineTo(39.0, 61.8);
+      g.quadraticCurveTo(40.9, 58.6, 41.4, 52.0);
+      g.quadraticCurveTo(42.0, 45.2, 38.4, 41.4);
+      g.quadraticCurveTo(30.0, 38.4, 21.6, 41.4);
       g.closePath();
     }
 
@@ -2646,9 +2646,9 @@
       /* 등번호 */
       if (p.number) {
         g.fillStyle = hexAlpha('#ffffff', 0.94);
-        g.font = '800 6.3px system-ui, -apple-system, sans-serif';
+        g.font = '800 5.6px system-ui, -apple-system, sans-serif';
         g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(String(p.number), 30, 50.2);
+        g.fillText(String(p.number), 30, 50.6);
         g.strokeStyle = hexAlpha('#000000', 0.20); g.lineWidth = 0.6;
         g.strokeText(String(p.number), 30, 50.2);
       }
