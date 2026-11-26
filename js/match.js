@@ -1816,7 +1816,7 @@
     sepMove = 0;
     var guardOn = play.phase !== 'setpiece';
     var gkNeed = 1.6 * 2 * SPR_H * TOKEN_R;
-    for (pass = 0; pass < 3; pass++) {
+    for (pass = 0; pass < 4; pass++) {
       /* v16 — GK 보호 반경(위치 강제): 공을 몬 1명 말고는 상대 GK 코앞에 서지 못한다 */
       if (guardOn) {
         for (j = 0; j < 2; j++) {
@@ -2677,7 +2677,7 @@
       p = recv[i];
       if (p === taker || isGK(p)) { continue; }
       k++;
-      sendTo(p, left ? clamp(6 + k * 6, 6, 32) : clamp(94 - k * 6, 68, 94), clamp(y + dir * (k === 1 ? 5 : -4), 6, 114));
+      sendTo(p, left ? clamp(6 + k * 9, 6, 34) : clamp(94 - k * 9, 66, 94), clamp(y + dir * (k === 1 ? 5 : -4), 6, 114));
     }
     beginSetpiece('throw', side, 1.1);
     play.stage = 'mid';
@@ -2779,7 +2779,7 @@
     }
     wall.sort(function (a, b) { return Math.abs(a.y - wy) - Math.abs(b.y - wy); });
     for (i = 0; i < wall.length && i < 3; i++) {
-      var off = (i - 1) * 3.1;
+      var off = (i - 1) * 5.4;
       sendTo(wall[i], clamp(wx + px * off, 4, 96), clamp(wy + py * off, 4, 116));
     }
     var gk = goalkeeper(side === 'home' ? 'away' : 'home');
@@ -2810,7 +2810,9 @@
     for (i = 0; i < players.length; i++) {
       p = players[i];
       if (p.off || p === taker || p === gk) { continue; }
-      sendTo(p, clamp(26 + (k * 8) % 44, 24, 76), gy - dir * 21);
+      /* v16 — 줄을 서는 선수들이 같은 좌표에 겹치지 않게 두 줄로 벌린다 */
+      var row = k % 2, col = Math.floor(k / 2);
+      sendTo(p, clamp(20 + col * 15, 18, 82), gy - dir * (row ? 21 : 26.5));
       k++;
     }
     beginSetpiece('pk', side, 2.9);
