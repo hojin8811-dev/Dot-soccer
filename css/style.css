@@ -442,7 +442,7 @@ main {
 .sb-clock { display: block; text-align: center; font-size: 8.5px; color: var(--lime); font-weight: 800; letter-spacing: .5px; }
 
 .pitch-wrap { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 8px; border: 1px solid rgba(200,241,105,.14); background: #0d3b32; }
-#m-pitch { display: block; width: 100%; height: clamp(300px, calc(100dvh - 486px), 400px); }
+#m-pitch { display: block; width: 100%; height: clamp(286px, calc(100dvh - 514px), 400px); }
 #m-banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
 #m-banner.on { display: flex; animation: gb .5s ease; }
 @keyframes gb { from { transform: scale(1.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -538,7 +538,7 @@ main {
 .cmt { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 7px 9px; margin-bottom: 8px; }
 .cmt-head { display: flex; align-items: center; gap: 5px; font-size: 8.5px; color: rgba(233,244,221,.5); font-weight: 800; letter-spacing: .5px; margin-bottom: 3px; }
 .cmt-head b { color: var(--lime); font-size: 9px; }
-.cmt-body { max-height: 62px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+.cmt-body { max-height: 58px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
 .cmt-body::-webkit-scrollbar { width: 0; }
 .cmt-line { font-size: 10px; color: rgba(236,246,226,.86); line-height: 1.4; }
 .cmt-line .cmt-min { display: inline-block; min-width: 22px; color: var(--lime); font-weight: 800; font-size: 8.5px; }
