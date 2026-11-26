@@ -704,9 +704,9 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     var pm = DS.Art.pitchMargin(W, H);
-    SPR_H = Math.round(clamp(W * 0.162, 46, 66));
+    SPR_H = Math.round(clamp(W * 0.152, 44, 62));
     /* 상단 골라인 위로 선수 머리가 잘리지 않도록 스프라이트 높이만큼 여백을 둔다 */
-    var topPad = Math.round(Math.min(H * 0.26, SPR_H * 0.98 + 12));
+    var topPad = Math.round(Math.min(H * 0.26, SPR_H * 0.95 + 8));
     var botPad = Math.round(pm * 0.75);
     field = { x: pm, y: topPad, w: W - pm * 2, h: H - topPad - botPad };
     buildPitchLayer();

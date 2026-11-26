@@ -442,7 +442,7 @@ main {
 .sb-clock { display: block; text-align: center; font-size: 8.5px; color: var(--lime); font-weight: 800; letter-spacing: .5px; }
 
 .pitch-wrap { position: relative; border-radius: 14px; overflow: hidden; margin-bottom: 8px; border: 1px solid rgba(200,241,105,.14); background: #0d3b32; }
-#m-pitch { display: block; width: 100%; height: clamp(286px, calc(100dvh - 514px), 400px); }
+#m-pitch { display: block; width: 100%; height: clamp(300px, calc(100dvh - 487px), 420px); }
 #m-banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
 #m-banner.on { display: flex; animation: gb .5s ease; }
 @keyframes gb { from { transform: scale(1.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -495,10 +495,10 @@ main {
 .mom {
   background: linear-gradient(160deg, #143a31, #0b2721);
   border: 1px solid rgba(200, 241, 105, .16);
-  border-radius: 14px; padding: 9px 10px 10px; margin-bottom: 8px;
+  border-radius: 14px; padding: 7px 9px 8px; margin-bottom: 7px;
   box-shadow: var(--shadow);
 }
-.mom-top { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.mom-top { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .mom-top b {
   font-size: 9.5px; font-weight: 900; letter-spacing: 1.1px; color: var(--lime);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Helvetica Neue", Arial, sans-serif;
@@ -520,7 +520,7 @@ main {
   background: linear-gradient(165deg, #1b463b, #0e2b25);
   border: 1px solid rgba(255,255,255,.12);
   color: #e9f4dd; text-align: left; overflow: hidden; cursor: pointer;
-  min-height: 76px;
+  min-height: 66px;
 }
 .tcard::before {
   content: ""; position: absolute; right: -18px; top: -18px;
@@ -535,10 +535,10 @@ main {
 .tcard .cost em { font-style: normal; color: var(--lime); }
 .tcard .cd { position: absolute; left: 7px; bottom: 6px; font-size: 8px; color: rgba(233,244,221,.55); font-weight: 700; }
 
-.cmt { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 7px 9px; margin-bottom: 8px; }
+.cmt { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 6px 9px; margin-bottom: 6px; }
 .cmt-head { display: flex; align-items: center; gap: 5px; font-size: 8.5px; color: rgba(233,244,221,.5); font-weight: 800; letter-spacing: .5px; margin-bottom: 3px; }
 .cmt-head b { color: var(--lime); font-size: 9px; }
-.cmt-body { max-height: 58px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
+.cmt-body { max-height: 54px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; }
 .cmt-body::-webkit-scrollbar { width: 0; }
 .cmt-line { font-size: 10px; color: rgba(236,246,226,.86); line-height: 1.4; }
 .cmt-line .cmt-min { display: inline-block; min-width: 22px; color: var(--lime); font-weight: 800; font-size: 8.5px; }
@@ -933,8 +933,8 @@ main::-webkit-scrollbar { width: 0; height: 0; }
 
 /* 경기 화면 감독 줄 */
 .mgr-live {
-  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-  margin: 6px 0 0; padding: 5px 8px; border-radius: 10px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: nowrap;
+  margin: 5px 0 0; padding: 3px 8px; border-radius: 9px;
   background: rgba(200, 241, 105, .10);
   border: 1px solid rgba(200, 241, 105, .22);
   font-size: 9px; font-weight: 800; color: #d9f0b4;
