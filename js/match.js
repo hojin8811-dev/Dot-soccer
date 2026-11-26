@@ -119,13 +119,10 @@
   var pitchImg = null;
   /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링 */
   var TOKEN_R = 0.58;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 1.16 × SPR_H) */
-  var portraits = {};             /* pic 번호 → { img, ready } — 마이팀·카드용 전신(그대로 사용) */
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
   var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
-  var portraitLeft = 0;
-  var portraitNeed = 0;
-  var artGateOn = false;          /* 22명 일러스트가 준비될 때까지 킥오프를 잠깐 미룬다 */
+  var artGateOn = false;          /* 22명 초상화가 준비될 때까지 킥오프를 잠깐 미룬다 */
   var artGateT = 0;
 
   /* 월드 좌표 → 화면 좌표 (사다리꼴 원근 투영) */
@@ -139,24 +136,6 @@
   }
   function depthPx(z) { return z * (field.h / WORLD_H) * 1.5; }
 
-  /* 2.5등신 전신 일러스트 프리로드 풀 */
-  function loadPortrait(p) {
-    var pl = p && p.player ? p.player : p;
-    if (!pl) { return { img: null, ready: false }; }
-    var n = pl.pic || 1;
-    var rec = portraits[n];
-    if (rec) { return rec; }
-    rec = { img: new global.Image(), ready: false };
-    portraits[n] = rec;
-    portraitLeft++;
-    rec.img.onload = function () {
-      rec.ready = rec.img.naturalWidth > 0;
-      portraitLeft--;
-    };
-    rec.img.onerror = function () { rec.ready = false; portraitLeft--; };
-    rec.img.src = DS.Art.portraitSrc(pl);
-    return rec;
-  }
   /* ── 원형 토큰 초상화 (두상 PNG · 얼굴 중심 크롭) ── */
   function loadHead(p) {
     var n = (p && p.player && p.player.pic) ? p.player.pic : 1;
@@ -670,7 +649,6 @@
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
     var pi;
     for (pi = 0; pi < players.length; pi++) {
-      loadPortrait(players[pi]);
       loadHead(players[pi]);
     }
     benchState = (cfg.bench || []).map(function (b) {
@@ -718,8 +696,8 @@
     say('피치 위 상황 배너를 보고 전술 카드를 타이밍에 맞춰 쓰세요.', 'normal');
     pushHud();
     /* 선수단 입장 연출 — 2.5등신 일러스트가 준비되면 킥오프 */
-    portraitNeed = portraitLeft;
-    artGateOn = portraitNeed > 0 || headLeft > 0;
+
+    artGateOn = headLeft > 0;      /* v10 — 입장 게이트는 초상화 두상만 기다린다 (전신 프리로드 제거) */
     artGateT = 0;
     if (artGateOn) { M.paused = true; }
     cancelAnimationFrame(rafId);
@@ -2021,7 +1999,7 @@
     lastT = t;
     if (artGateOn) {
       artGateT += realDt;
-      if (portraitLeft <= 0 && headLeft <= 0 || artGateT > 9) {
+      if (headLeft <= 0 || artGateT > 9) {
         artGateOn = false;
         M.paused = false;
         acc = 0;
@@ -2937,20 +2915,20 @@
           var g = scr(p.x, p.y);
           return { x: Math.round(g.x), y: Math.round(g.y), scale: Math.round(g.s * 100) / 100, sprH: Math.round(SPR_H * g.s) };
         })(),
-        art: (function () { var rec = portraits[p.player.pic || 1]; return rec && rec.ready ? 'loaded' : 'pending'; })()
+        art: (function () { var rec = heads[(p.player && p.player.pic) || 1]; return rec && rec.ready ? 'loaded' : 'pending'; })()
       };
       if (p.side === 'home') { h.push(row); } else { a.push(row); }
     }
     var pcs = pressConfig('home');
     var ready = 0, kk;
-    for (kk in portraits) { if (portraits.hasOwnProperty(kk) && portraits[kk].ready) { ready++; } }
+    for (kk in heads) { if (heads.hasOwnProperty(kk) && heads[kk].ready) { ready++; } }
     return {
       clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey, paused: M.paused, halftime: M.halftime,
       view: {
         mode: 'landscape', w: W, h: H, sprH: SPR_H, field: field,
         pitchImage: !!(pitchImg && pitchImg.naturalWidth),
-        loadingGate: artGateOn, loadingLeft: portraitLeft,
-        portraitsReady: ready, portraitsTotal: (function () { var n = 0; for (kk in portraits) { if (portraits.hasOwnProperty(kk)) { n++; } } return n; })(),
+        loadingGate: artGateOn, loadingLeft: headLeft,
+        portraitsReady: ready, portraitsTotal: (function () { var n = 0; for (kk in heads) { if (heads.hasOwnProperty(kk)) { n++; } } return n; })(),
         homeAttack: 'left→right', awayAttack: 'right→left'
       },
       ball: { x: Math.round(ball.x), y: Math.round(ball.y), z: Math.round(ball.z * 10) / 10, vz: Math.round(ball.vz), kind: ball.kind, shot: !!ball.shot },
