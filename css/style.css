@@ -1022,7 +1022,7 @@ main::-webkit-scrollbar { width: 0; height: 0; }
 #app { max-width: 1280px; }
 
 /* ── 상단 바 ── */
-.topbar { height: 36px; padding: 0 10px; gap: 6px; }
+.topbar { height: 36px; padding: 0 10px 0 62px; gap: 6px; }
 .tb-emblem { width: 20px; height: 23px; }
 .tb-name { font-size: 12px; max-width: 190px; }
 .tb-sub { font-size: 9px; }
@@ -1239,3 +1239,19 @@ body.rot-off .rotate { display: none; }
   .m-ticker { height: 24px; }
   .tabbar button { height: 50px; }
 }
+
+/* v7 보정: 밝은 카드 위 포메이션 칩 · 라커룸 시너지 한 줄 */
+.sq-card .fchip { background: #f1ecdd; border: 1px solid var(--line); color: var(--ink2); }
+.sq-card .fchip.on { background: linear-gradient(170deg, #d6fb8a, #a8da4e); border-color: #a8da4e; color: #1d3b07; box-shadow: 0 2px 6px rgba(120,180,50,.35); }
+.sq-card .fchip.on b { color: #1d3b07; }
+.sq-card .fchip span { color: var(--ink3); }
+.sq-card .fchip.on span { color: #3d6b12; opacity: 1; }
+.sq-syn { padding: 5px 9px; }
+.sq-syn .card-head { margin-bottom: 2px; }
+.sq-syn { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow: hidden; }
+.sq-syn .card-head { flex: 0 0 auto; margin: 0; }
+.sq-syn .card-head .meta { display: none; }
+.sq-syn .row { flex: 0 0 auto; padding: 0 !important; }
+.sq-syn .row b { display: none; }
+.sq-syn .chip { font-size: 8px; height: 17px; padding: 0 6px; }
+.mgr-strip-btn { margin-left: auto; font-size: 8.5px; font-weight: 800; color: var(--lime); border: 1px solid rgba(200,241,105,.4); border-radius: 7px; padding: 2px 6px; white-space: nowrap; }

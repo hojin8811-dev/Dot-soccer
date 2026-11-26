@@ -120,6 +120,9 @@
   var pitchImgTried = false;
   var portraits = {};             /* pic 번호 → { img, ready } */
   var portraitLeft = 0;
+  var portraitNeed = 0;
+  var artGateOn = false;          /* 22명 일러스트가 준비될 때까지 킥오프를 잠깐 미룬다 */
+  var artGateT = 0;
 
   /* 월드 좌표 → 화면 좌표 (사다리꼴 원근 투영) */
   function scr(wx, wy) {
@@ -624,6 +627,11 @@
     say('휘슬이 울립니다! ' + cfg.homeName + ' 대 ' + cfg.awayName + ', 경기 시작!', 'big');
     say('피치 위 상황 배너를 보고 전술 카드를 타이밍에 맞춰 쓰세요.', 'normal');
     pushHud();
+    /* 선수단 입장 연출 — 2.5등신 일러스트가 준비되면 킥오프 */
+    portraitNeed = portraitLeft;
+    artGateOn = portraitNeed > 0;
+    artGateT = 0;
+    if (artGateOn) { M.paused = true; }
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(loop);
   };
@@ -773,7 +781,7 @@
     ctx.imageSmoothingEnabled = true;
     /* 가로 피치 — 스타디움 이미지가 캔버스를 꽉 채운다 */
     field = { x: 0, y: 0, w: W, h: H };
-    SPR_H = Math.round(clamp(H * 0.155, 36, 78));
+    SPR_H = Math.round(clamp(H * 0.168, 38, 82));
     loadPitchImage();
     buildPitchLayer();
   }
@@ -1859,6 +1867,15 @@
     if (!lastT) { lastT = t; }
     var realDt = Math.min(0.05, (t - lastT) / 1000);
     lastT = t;
+    if (artGateOn) {
+      artGateT += realDt;
+      if (portraitLeft <= 0 || artGateT > 6) {
+        artGateOn = false;
+        M.paused = false;
+        acc = 0;
+        say('선수단 입장 완료! 양 팀 22명이 피치에 섰습니다.', 'big');
+      }
+    }
     if (!M.paused) {
       var dt = realDt * M.speed;
       acc += dt;
@@ -2483,6 +2500,26 @@
     }
     DS.Art.drawBall(ctx, bp.x, bp.y - zpx - r * 0.35, r);
 
+    if (artGateOn) {
+      var ready = Math.max(0, portraitNeed - portraitLeft);
+      var pct = portraitNeed ? clamp(ready / portraitNeed, 0, 1) : 1;
+      ctx.fillStyle = 'rgba(3,16,13,0.82)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#0d2a24';
+      ctx.fillStyle = '#eaffd0';
+      ctx.font = '900 17px system-ui, sans-serif';
+      ctx.fillText('선수단 입장 중', W / 2, H / 2 - 16);
+      ctx.font = '700 11px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(233,244,221,.72)';
+      ctx.fillText('2.5등신 일러스트 ' + ready + ' / ' + portraitNeed + '명 준비', W / 2, H / 2 + 6);
+      var bw = Math.min(240, W * 0.46), bh = 6;
+      ctx.fillStyle = 'rgba(255,255,255,.14)';
+      roundRect(W / 2 - bw / 2, H / 2 + 18, bw, bh, 3); ctx.fill();
+      ctx.fillStyle = '#c8f169';
+      roundRect(W / 2 - bw / 2, H / 2 + 18, Math.max(2, bw * pct), bh, 3); ctx.fill();
+      ctx.textAlign = 'left';
+    }
     if (M.halftime && M.running) {
       ctx.fillStyle = 'rgba(4,20,16,0.55)';
       ctx.fillRect(0, H / 2 - 22, W, 44);
@@ -2529,6 +2566,7 @@
       view: {
         mode: 'landscape', w: W, h: H, sprH: SPR_H, field: field,
         pitchImage: !!(pitchImg && pitchImg.naturalWidth),
+        loadingGate: artGateOn, loadingLeft: portraitLeft,
         portraitsReady: ready, portraitsTotal: (function () { var n = 0; for (kk in portraits) { if (portraits.hasOwnProperty(kk)) { n++; } } return n; })(),
         homeAttack: 'left→right', awayAttack: 'right→left'
       },

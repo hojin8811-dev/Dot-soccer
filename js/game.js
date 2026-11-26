@@ -716,7 +716,7 @@
       '</div>' +
 
       '<aside class="sq-right">' +
-      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') + '<span class="mgr-go">감독실 ›</span></div>' +
+      '<div class="mgr-wrap" data-act="mgrmodal">' + managerHTML('strip') + '<span class="mgr-strip-btn" data-act="mgrmodal">감독실 · 상세 ›</span></div>' +
       '<div class="sq-card"><div class="card-head"><b>포메이션</b><span class="meta">' + f.tag + '</span></div>' +
       '<div class="fwrap">' + chips + '</div></div>' +
       '<div class="sq-card">' + kpiHTML + '</div>' +
