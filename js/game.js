@@ -1129,7 +1129,7 @@
       (role ? '<span class="chip lime">' + role.name + '</span>' : '') + '</div>' +
       '<div class="row" style="align-items:flex-end;gap:8px"><div class="pd-ov">' + rt + '<small>OVR</small></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.6);padding-bottom:2px">' + DS.RARITY[p.rarity].name + ' · ' + p.tenure + '기수 · Lv.' + (p.level || 0) + '</div></div>' +
-      '<div class="pd-rows"><div><span>주발</span>' + footChip(p) + '</div><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
+      '<div class="pd-rows"><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
       '</div></div>' +
 
       '<div class="band">STATUS<span>능력치 · 적성</span></div>' +
