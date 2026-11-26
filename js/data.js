@@ -2048,9 +2048,10 @@
   /* 파일명: p01~p99 (2자리) / p100~p330 (3자리) */
   function pad3(n) { return n < 10 ? '0' + n : String(n); }
 
+  Art.assetPrefix = '';
   Art.portraitSrc = function (p) {
     var n = (p && p.pic) ? p.pic : 1;
-    return 'assets/portraits/p' + pad3(n) + '.png';
+    return Art.assetPrefix + 'assets/portraits/p' + pad3(n) + '.png';
   };
   /* 감독 일러스트 (assets/managers/m01~m32) */
   Art.managerPortrait = function (mgr) {
@@ -2063,7 +2064,7 @@
   };
   Art.headSrc = function (p) {
     var n = (p && p.pic) ? p.pic : 1;
-    return 'assets/portraits/head/p' + pad3(n) + '.png';
+    return Art.assetPrefix + 'assets/portraits/head/p' + pad3(n) + '.png';
   };
   /* 카드 · 전술판용 일러스트 태그 */
   Art.portraitTag = function (p, cls, kind) {
@@ -2310,7 +2311,7 @@
     if (headImgCache[n]) { return headImgCache[n]; }
     if (typeof Image === 'undefined') { return null; }
     var img = new Image();
-    img.src = 'assets/portraits/head/p' + pad3(n) + '.png';
+    img.src = Art.assetPrefix + 'assets/portraits/head/p' + pad3(n) + '.png';
     headImgCache[n] = img;
     return img;
   };

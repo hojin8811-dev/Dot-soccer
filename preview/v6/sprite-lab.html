@@ -2,7 +2,6 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<base href="../../">
 <title>도트싸커 v6 · SD 스프라이트 랩</title>
 <style>
   html, body { margin: 0; padding: 0; background: #0b2f28; color: #dff3d0; font: 12px system-ui, -apple-system, sans-serif; }
@@ -24,6 +23,7 @@
 <script>
 (function () {
   var DS = window.DS, Art = DS.Art;
+  Art.assetPrefix = "../../";
   var homeKit = { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' };
   var awayKit = { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' };
   var gkKitA = { shirt: '#7ed0f0', shorts: '#12202a', trim: '#eaf9ff' };
