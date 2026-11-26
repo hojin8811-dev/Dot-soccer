@@ -160,6 +160,7 @@
     gkDecision: 0, gkShort: 0, gkLong: 0, gkClear: 0, gkDribble: 0,
     passOut: 0, passClamp: 0, knockOut: 0,
     throws: [],                                        /* {side, lineX, y, crossX, crossY, edge} */
+    spLaunch: [],                                      /* v19b: 세트피스 실제 발사 위치 {type,x,y,ox,oy,d} */
     trapFrames: 0, trapLineY: 0, trapSdSum: 0, trapSdN: 0, trapCaught: 0, trapLive: 0, trapZone: 0,
     pressMax: { home: 0, away: 0 }
   };
@@ -2908,7 +2909,7 @@
     return kickPass(p, best.q, type);
   }
 
-  function kickPass(p, q, type) {
+  function kickPass(p, q, type, origin) {
     var dir = goalDir(p.side);
     var tx, ty, speed;
     var err = buffOf('tiki') > 0 ? 1.2 : (buffOf('build') > 0 ? 2.0 : 3.0);
@@ -2978,8 +2979,15 @@
       if (v15) { v15.chk = (v15.chk || 0) + 1; if (ofs) { v15.behind = (v15.behind || 0) + 1; } }
       if (ofs) { flagOffside(q, ofs); }
     }
-    ball.x = p.x;
-    ball.y = p.y + goalDir(p.side) * 0.8;
+    /* v19b — 세트피스 재개 패스는 '공이 놓인 자리(origin)'에서 출발한다.
+       일반 패스는 지금처럼 패서 발밑에서 시작한다. */
+    if (origin && typeof origin.x === 'number' && typeof origin.y === 'number') {
+      ball.x = clamp(origin.x, 0, WORLD_W);
+      ball.y = clamp(origin.y, 0, WORLD_H);
+    } else {
+      ball.x = p.x;
+      ball.y = p.y + goalDir(p.side) * 0.8;
+    }
     kickBall(p, tx, ty, speed, 'pass', q, (type === 'short' || type === 'cutback' || type === 'wall') ? 0 : 1);
     setPose(p, type === 'cross' || type === 'through' ? 'kick' : 'pass', 0.28);
     fxRing(p, type === 'through' ? '#9ff0c4' : (type === 'cross' ? '#ffd98a' : '#c8f169'), 0.62);
@@ -3350,7 +3358,20 @@
     if (side === 'home') { xg += mfx('jump') * 0.006; }
     else { xg -= mfx('def') * 0.003 + mfx('jump') * 0.003; }
     if (sp.type === 'indirect') { xg -= 0.02; }
-    if (by) { ball.x = by.x; ball.y = by.y; }
+    /* v19b 버그 수정 — 공은 세트피스 지점(코너 플래그·파울 지점)에 그대로 두고, 키커를 그 자리로
+       스냅한다. 예전엔 ball.x = by.x 로 공이 키커 발밑으로 순간이동해, 2.4초(코너)·1.6초(간접) 안에
+       도착하지 못한 키커가 서 있던 미드필드·반대 측면에서 코너킥이 올라갔다. */
+    if (by) {
+      if (sp.type === 'corner') {
+        by.x = ball.x + (ball.x < 50 ? 0.9 : -0.9);      /* 플래그 바로 안쪽 */
+        by.y = ball.y + (ball.y < 60 ? 0.9 : -0.9);
+      } else {
+        by.x = ball.x;
+        by.y = ball.y - dir * 0.5;                       /* 파울 지점 바로 뒤 */
+      }
+      separate();
+    }
+    markLaunch(sp, ball.x, ball.y);
     ball.carrier = null;
     ball.shot = null;
     var dist = Math.hypot(tx - ball.x, ty - ball.y);
@@ -3880,7 +3901,7 @@
 
   function beginSetpiece(type, side, hold) {
     play.phase = 'setpiece';
-    play.setpiece = { type: type, side: side, t: hold };
+    play.setpiece = { type: type, side: side, t: hold, ox: ball.x, oy: ball.y };
     play.atkSide = side;
     ball.carrier = null;
     ball.kind = 'idle';
@@ -3896,6 +3917,21 @@
     if (v15 && v15.setpiece[type] !== undefined) { v15.setpiece[type] += 1; }
     logEvt('set:' + type, side, ball.x, ball.y);
     dead(hold * 0.45);
+  }
+
+  /* v19b 계측 — 세트피스가 실제로 '어디서' 출발했는지 기록한다.
+     sp.ox/sp.oy = 세트피스 성립 순간의 공 위치(터치라인 교차점·코너 플래그·파울 지점·골킥 지점),
+     x/y = 실제 발사 위치. d = 둘 사이 오차(월드 단위). QA가 이 값으로 발사 위치를 검사한다. */
+  function markLaunch(sp, x, y) {
+    var ox = (sp && typeof sp.ox === 'number') ? sp.ox : x;
+    var oy = (sp && typeof sp.oy === 'number') ? sp.oy : y;
+    v18t.spLaunch.push({
+      type: sp ? sp.type : null, side: sp ? sp.side : null,
+      x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
+      ox: Math.round(ox * 10) / 10, oy: Math.round(oy * 10) / 10,
+      d: Math.round(Math.hypot(x - ox, y - oy) * 100) / 100
+    });
+    if (v18t.spLaunch.length > 80) { v18t.spLaunch.shift(); }
   }
 
   /* 스로인 — v18 ④: 공이 터치라인을 넘은 정확한 교차점 (x=0 또는 100, y) 에서 던진다 */
@@ -4104,10 +4140,35 @@
         v = open * 1.5 - d * 0.55 + (isMidGroup(q) ? 6 : 0) + (isDefGroup(q) && sp.type === 'goalkick' ? 5 : 0);
         if (v > bv) { bv = v; target = q; }
       }
+      /* v19b — 반경 안에 받아 줄 동료가 없으면 '가장 가까운 동료'를 골라 그 선수에게 연결한다.
+         (예전엔 giveBall로 공을 아무 데나 있는 선수 발밑으로 옮겨, 스로인·골킥이 엉뚱한
+          위치에서 재개되는 두 번째 경로가 있었다) 공은 항상 세트피스 지점에서 출발한다. */
+      if (!target) {
+        var nd = 1e9;
+        for (i = 0; i < players.length; i++) {
+          q = players[i];
+          if (q.side !== side || q === passer || q.off || isGK(q)) { continue; }
+          d = Math.hypot(q.x - ball.x, q.y - ball.y);
+          if (d < nd) { nd = d; target = q; }
+        }
+      }
       if (passer && target) {
         ball.exempt = true;                 /* 스로인·골킥 재개 패스는 오프사이드 없음 */
-        ball.x = passer.x; ball.y = passer.y;
-        kickPass(passer, target, 'progressive');
+        /* v19b 버그 수정 — 공은 '세트피스 지점'에서 출발한다.
+           예전엔 ball.x = passer.x 로 공을 던지는 선수 발밑으로 순간이동시켰다. 스로인은 1.1초,
+           골킥은 1.7초뿐이라 터치라인·골킥 지점에 도착하지 못한 선수가 있으면 공이 피치
+           한가운데에서 올라갔다. 이제 공은 그대로 두고 선수를 공 자리로 스냅한다. */
+        var sox = ball.x, soy = ball.y;
+        if (sp.type === 'throw') {
+          passer.x = sox <= 50 ? 1.2 : WORLD_W - 1.2;   /* 터치라인 바로 안쪽 */
+          passer.y = soy;
+        } else {
+          passer.x = sox;                                 /* 골킥: 공 뒤에 선다 */
+          passer.y = soy - dir * 0.5;
+        }
+        separate();
+        kickPass(passer, target, 'progressive', { x: sox, y: soy });
+        markLaunch(sp, sox, soy);
         bubble(passer, sp.type === 'goalkick' ? '🥾 골킥!' : '🙌 스로인!', '#bfe8ff', 1.2);
         say(sp.type === 'goalkick'
           ? short(passer.name) + '의 골킥이 ' + short(target.name) + '에게 연결됩니다.'
@@ -4134,8 +4195,12 @@
       }
       if (opt && taker) {
         ball.exempt = false;
-        ball.x = taker.x; ball.y = taker.y;
-        kickPass(taker, opt, 'progressive');
+        /* v19b 버그 수정 — 간접 프리킥도 파울 지점에서 시작한다 (예전엔 공이 키커 발밑으로 텔레포트) */
+        var iox = ball.x, ioy = ball.y;
+        taker.x = iox; taker.y = ioy - dir * 0.5;
+        separate();
+        kickPass(taker, opt, 'progressive', { x: iox, y: ioy });
+        markLaunch(sp, iox, ioy);
         bubble(taker, '↔ 간접 프리킥', '#bfe8ff', 1.2);
         say('간접 프리킥 — ' + U.josa(short(taker.name), '이/가') + ' ' + short(opt.name) + '에게 내줍니다.', 'normal');
       } else if (opt) { giveBall(opt); }
@@ -4172,6 +4237,7 @@
     ball.x = originX; ball.y = originY;
     if (by) { by.x = originX; by.y = originY + dir * 0.6; }
     if (by) { separate(); }      /* v16 — 키커를 공 위치로 순간이동시킨 뒤 인접 선수와 겹치지 않게 */
+    markLaunch(sp, originX, originY);
     kickBall(by, tx, ty, speed, 'shot', null, 1);
     ball.dur = dur;
     var onT = 0.55 + (side === 'home' ? mfx('jump') * 0.01 : 0) - (side === 'away' ? mfx('def') * 0.006 : 0);
@@ -5643,6 +5709,7 @@
       caught: v18t.trapCaught, liveFrames: v18t.trapLive, zoneFrames: v18t.trapZone
     };
     out.throws = v18t.throws.slice(-6);
+    out.spLaunch = v18t.spLaunch.slice(-60);
     for (si = 0; si < 2; si++) {
       var side = sides[si];
       var b = blockOf(side);

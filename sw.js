@@ -1,12 +1,12 @@
 /*! 도트싸커 v19 — 전술 패턴 · 5초 전환 · AI 맞대응 · 세컨볼 · xG 리포트 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v19a-20261126';
+var CACHE = 'dot-soccer-v19b-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=19&b=51', './js/data.js?v=19&b=51', './js/match.js?v=19&b=51', './js/game.js?v=19&b=51',
+        './css/style.css?v=19&b=52', './js/data.js?v=19&b=52', './js/match.js?v=19&b=52', './js/game.js?v=19&b=52',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
