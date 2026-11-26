@@ -1,4 +1,5 @@
-/*! 도트싸커 v4 — 진짜 축구 AI · 실시간 경기 엔진 (match.js) */
+/*! 도트싸커 v16 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
+    v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀 */
 (function (global) {
   'use strict';
 
@@ -2729,11 +2730,10 @@
     }
     atkList.sort(function (a, b) { return (isFwdGroup(b) ? 1 : 0) - (isFwdGroup(a) ? 1 : 0); });
     defList.sort(function (a, b) { return Math.abs(a.y - gy) - Math.abs(b.y - gy); });
-    /* v16 — 박스 인원을 3×3 격자에 앉힌다. 토큰 지름(28px) 때문에 한 줄에 3명,
-       깊이 5단위 간격이면 겹치지 않는다. (골키퍼가 서는 50·6 자리는 비워 둔다) */
-    var gxs = [36, 50, 64], gds = [6, 11, 16];
-    var atkSlots = [[36, 6], [64, 6], [50, 11], [50, 16]];
-    var defSlots = [[36, 11], [64, 11], [36, 16], [64, 16]];
+    /* v16 — 박스 인원을 3×3 격자에 앉힌다. 토큰 지름(28px) + 18% 간격을 화면에서 지키려면
+       가로 15단위·깊이 5.5단위가 필요하다. (골키퍼가 서는 50·6 자리는 비워 둔다) */
+    var atkSlots = [[35, 6], [65, 6], [50, 11.5], [50, 17]];
+    var defSlots = [[35, 11.5], [65, 11.5], [35, 17], [65, 17]];
     for (i = 0; i < atkList.length && i < atkSlots.length; i++) {
       sendTo(atkList[i], atkSlots[i][0], gy - dir * atkSlots[i][1]);
     }
@@ -2747,7 +2747,7 @@
     for (i = defSlots.length; i < defList.length; i++) {
       sendTo(defList[i], 50 + ((i % 2) ? 14 : -14), gy - dir * (21 + (i % 3) * 6));
     }
-    void gxs; void gds;
+    void 0;
     var gk = goalkeeper(side === 'home' ? 'away' : 'home');
     if (gk) { sendTo(gk, left ? 47 : 53, gy - dir * 2.6); }
     beginSetpiece('corner', side, 2.4);
