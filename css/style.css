@@ -731,6 +731,7 @@ main {
 .aptcell .v { display: block; width: 27px; height: 27px; margin: 0 auto; border-radius: 50%; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); font-size: 11px; font-weight: 900; color: #eaf6dd; line-height: 27px; }
 .aptcell .c { display: block; font-size: 7px; font-weight: 800; color: rgba(233,244,221,.55); margin-top: 0; line-height: 1.1; letter-spacing: .2px; }
 .aptcell.hi .v { background: linear-gradient(160deg, #d6fb8a, #a8da4e); color: #1d3b07; border-color: #a8da4e; }
+.aptcell.halfline { transform: translate(-50%, calc(-50% + 4px)); }
 .aptcell.mid .v { background: rgba(200,241,105,.22); color: #dcf9a6; }
 
 .st-row { display: grid; grid-template-columns: 52px 1fr 26px; align-items: center; gap: 7px; margin-bottom: 4px; }

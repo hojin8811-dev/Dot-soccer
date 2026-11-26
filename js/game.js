@@ -1020,6 +1020,8 @@
       x = slot.side === 'R' ? 100 - lay.x : lay.x;
       y = lay.y;
       hi = code === p.pos ? ' hi' : (v >= 7 ? ' mid' : '');
+      /* LWB·RWB는 하프라인 위 — 라벨 높이만큼 원 중심을 내려 선 위에 정확히 앉힌다 */
+      if (code === 'LWB' || code === 'RWB') { hi += ' halfline'; }
       html += '<div class="aptcell' + hi + '" style="left:' + x + '%;top:' + y + '%">' +
         '<span class="v">' + v + '</span><span class="c">' + code + '</span></div>';
     }
