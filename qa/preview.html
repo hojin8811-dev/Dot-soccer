@@ -8,6 +8,15 @@ html,body{margin:0;height:100%;background:#0a1c17;display:flex;align-items:cente
 iframe{width:844px;height:390px;border:0;background:#061a16;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 </style></head>
 <body>
-<div class="wrap"><div class="cap">844 × 390 · 가로 모바일</div>
-<iframe id="pv" src="../index.html?v=20&b=1"></iframe></div>
+<div class="wrap"><div class="cap" id="cap">844 × 390 · 가로 모바일</div>
+<iframe id="pv"></iframe></div>
+<script>
+  var q = new URLSearchParams(location.search);
+  var b = q.get('b') || '1';
+  var page = q.get('p') || '../index.html';
+  var seed = q.get('seed') || '';
+  document.getElementById('cap').textContent = '844 × 390 · 가로 모바일 · b=' + b;
+  var src = page + '?v=20&b=' + b + (seed ? '&seed=' + seed : '');
+  document.getElementById('pv').src = src;
+</script>
 </body></html>
