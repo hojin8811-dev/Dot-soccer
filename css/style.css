@@ -1411,3 +1411,166 @@ body.rot-off .rotate { display: none; }
 .rmap-side.on { background: #143a31; color: #d6fb8a; border-color: #143a31; }
 .rmap-note { margin-left: auto; font-size: 8px; font-weight: 700; color: var(--ink3); text-align: right; }
 .rmap[data-mapmode="xg"] .rmap-sides { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   v20 — SD 아트와 같은 결의 '전술판' 톤
+   · 예전 도트 시설 아이콘을 고해상도 SD 일러스트 캔버스로 교체
+   · 프리매치/라커룸/선수 카드/전술판 프레임을 얇은 그리드 + 코너 틱으로 통일
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --board-line: rgba(200, 241, 105, .22);
+  --board-line-soft: rgba(255, 255, 255, .10);
+}
+
+/* ── 시설 SD 일러스트 (클럽 하우스) ── */
+.fac { position: relative; overflow: hidden; }
+.fac::after {
+  content: ""; position: absolute; right: 6px; top: 5px; width: 9px; height: 9px;
+  border-right: 1px solid var(--line); border-top: 1px solid var(--line); opacity: .8; pointer-events: none;
+}
+.fac-art {
+  width: 62px; height: 50px; flex: 0 0 auto; display: block;
+  border-radius: 9px; background: linear-gradient(160deg, #eef6dd, #dbe8c8);
+  box-shadow: inset 0 0 0 1px rgba(20, 33, 28, .07), 0 2px 5px rgba(20, 45, 30, .10);
+}
+
+/* ── 스카우터 안내원 (상점) ── */
+.scout-desk {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 7px;
+  padding: 6px 8px; border-radius: 12px;
+  background: linear-gradient(120deg, rgba(200, 241, 105, .10), rgba(255, 255, 255, .03));
+  border: 1px solid rgba(200, 241, 105, .20);
+}
+.staff-art { width: 48px; height: 56px; flex: 0 0 auto; display: block; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .35)); }
+.sd-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sd-copy b { font-size: 11.5px; font-weight: 900; color: #eaf6dd; letter-spacing: -.2px; }
+.sd-copy span { font-size: 8.5px; font-weight: 700; color: rgba(233, 244, 221, .70); }
+.sd-copy em { font-style: normal; font-size: 8px; font-weight: 700; color: rgba(200, 241, 105, .78); }
+
+/* ── v20 ① 라이브 터치라인 지시 ── */
+.m-side { position: relative; }
+.m-tac { flex: 0 0 auto; }
+.tl-strip {
+  display: flex; align-items: center; gap: 5px; width: 100%; height: 26px;
+  padding: 0 7px; border-radius: 9px; cursor: pointer;
+  border: 1px solid rgba(200, 241, 105, .30);
+  background: linear-gradient(180deg, rgba(200, 241, 105, .12), rgba(200, 241, 105, .05));
+  color: #eaf6dd; font-family: inherit; text-align: left;
+}
+.tl-strip.on { border-color: var(--lime); background: linear-gradient(180deg, rgba(200, 241, 105, .25), rgba(200, 241, 105, .10)); }
+.tl-lbl {
+  flex: 0 0 auto; font-size: 7.5px; font-weight: 900; letter-spacing: .4px;
+  color: #0d2a24; background: var(--lime); border-radius: 5px; padding: 1px 4px;
+}
+.tl-chips {
+  flex: 1 1 auto; min-width: 0; font-size: 8.5px; font-weight: 800; color: rgba(233, 244, 221, .88);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tl-go { flex: 0 0 auto; font-size: 8px; font-weight: 900; color: var(--lime); }
+
+.m-touch {
+  position: absolute; inset: 0; z-index: 12;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px 7px 7px; border-radius: 0;
+  background: linear-gradient(180deg, rgba(8, 30, 24, .985), rgba(5, 20, 17, .99));
+  border-left: 1px solid rgba(200, 241, 105, .28);
+  box-shadow: -8px 0 20px rgba(0, 0, 0, .45);
+  transform: translateX(103%); opacity: 0; pointer-events: none;
+  transition: transform .18s cubic-bezier(.2, .8, .3, 1), opacity .16s linear;
+}
+.m-touch.on { transform: none; opacity: 1; pointer-events: auto; }
+.mt-head { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.mt-head b { font-size: 10.5px; font-weight: 900; letter-spacing: -.2px; color: #eaf6dd; }
+.mt-x {
+  margin-left: auto; width: 26px; height: 24px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .07);
+  color: #dfeece; font-size: 11px; font-weight: 900; font-family: inherit;
+}
+.mt-groups { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-height: 0; }
+.mt-g { display: flex; flex-direction: column; gap: 2px; }
+.mt-lbl { font-size: 7.5px; font-weight: 900; letter-spacing: .3px; color: rgba(233, 244, 221, .55); }
+.mt-opts { display: flex; gap: 3px; }
+.mt-opts button {
+  flex: 1 1 0; min-width: 0; height: 27px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .13); background: rgba(255, 255, 255, .05);
+  color: rgba(233, 244, 221, .80); font-size: 9px; font-weight: 800; font-family: inherit;
+  padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mt-opts button.on {
+  border-color: var(--lime); color: #12290a;
+  background: linear-gradient(180deg, #dcff8f, #b4e154);
+  box-shadow: 0 0 8px rgba(200, 241, 105, .35);
+}
+.mt-opts button:active { transform: translateY(1px); }
+.mt-foot { flex: 0 0 auto; font-size: 7.5px; font-weight: 700; color: rgba(233, 244, 221, .45); }
+
+/* ── v20 ③ 상대 스카우팅 리포트 ── */
+.scout-card {
+  background: linear-gradient(165deg, #ffffff, #f4f1e6);
+  border: 1px solid var(--line); border-radius: 13px;
+  padding: 8px 10px 9px; position: relative; overflow: hidden;
+}
+.scout-card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, var(--lime2), rgba(200, 241, 105, .15));
+}
+.sc-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.sc-emblem { width: 24px; height: 28px; flex: 0 0 auto; }
+.sc-id { flex: 1 1 auto; min-width: 0; }
+.sc-id b { display: block; font-size: 11px; font-weight: 900; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-id span { display: block; font-size: 8px; font-weight: 700; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-tag { flex: 0 0 auto; text-align: center; padding: 0 5px; border-left: 1px solid var(--line); }
+.sc-tag b { display: block; font-size: 12px; font-weight: 900; color: #3d6b12; line-height: 1.05; }
+.sc-tag span { display: block; font-size: 7px; font-weight: 800; color: var(--ink3); letter-spacing: .3px; }
+.sc-lanes { display: flex; gap: 4px; margin-bottom: 5px; }
+.sc-lane {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 3px;
+  font-size: 7.5px; font-weight: 900; color: var(--ink3);
+}
+.sc-lane span { flex: 0 0 auto; }
+.sc-lane i {
+  flex: 1 1 auto; height: 5px; border-radius: 3px;
+  background: linear-gradient(90deg, #9fce55, #d6f58c);
+  box-shadow: inset 0 0 0 1px rgba(120, 160, 60, .18);
+}
+.sc-lane b { flex: 0 0 auto; font-size: 8px; color: var(--ink2); }
+.sc-danger { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.sc-danger-row {
+  display: flex; align-items: center; gap: 4px; font-size: 8.5px; font-weight: 800; color: var(--ink);
+  background: rgba(239, 106, 82, .09); border: 1px solid rgba(239, 106, 82, .22);
+  border-radius: 7px; padding: 2px 5px;
+}
+.sc-rank {
+  flex: 0 0 auto; width: 13px; height: 13px; border-radius: 4px; background: var(--coral); color: #fff;
+  font-size: 8px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+}
+.sc-danger-row b { font-size: 9.5px; font-weight: 900; letter-spacing: -.2px; }
+.sc-pos { color: var(--ink2); font-size: 8px; font-weight: 800; }
+.sc-foot { color: var(--ink3); font-size: 7.5px; font-weight: 800; }
+.sc-danger-row em { margin-left: auto; font-style: normal; font-size: 9.5px; font-weight: 900; color: #b8492f; }
+.sc-tips { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.sc-tips li {
+  position: relative; padding-left: 9px; font-size: 8.5px; font-weight: 700; color: var(--ink2); line-height: 1.45;
+}
+.sc-tips li::before {
+  content: ""; position: absolute; left: 1px; top: 5px; width: 4px; height: 4px; border-radius: 1px;
+  background: var(--lime2); transform: rotate(45deg);
+}
+.sc-note { margin-top: 4px; padding-top: 3px; border-top: 1px dashed var(--line); font-size: 7.5px; font-weight: 700; color: var(--ink3); }
+
+/* ── 전술판 프레임 통일: 피치판·선수 카드·라커룸 카드에 같은 헤어라인 ── */
+.sq-pitch, .pitch-wrap { position: relative; }
+.sq-pitch::before, .pitch-wrap::before {
+  content: ""; position: absolute; left: 4px; top: 4px; width: 11px; height: 11px; pointer-events: none; z-index: 4;
+  border-left: 1px solid var(--board-line); border-top: 1px solid var(--board-line);
+}
+.sq-pitch::after, .pitch-wrap::after {
+  content: ""; position: absolute; right: 4px; bottom: 4px; width: 11px; height: 11px; pointer-events: none; z-index: 4;
+  border-right: 1px solid var(--board-line); border-bottom: 1px solid var(--board-line);
+}
+.sq-card, .pcard, .pd-art, .sq-syn {
+  border-radius: 12px;
+}
+.sq-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), var(--shadow2); }
+.sq-pitch { box-shadow: inset 0 0 0 1px rgba(200, 241, 105, .10), 0 8px 18px rgba(0, 0, 0, .28); }
+.mgr-wrap { border-radius: 13px; }

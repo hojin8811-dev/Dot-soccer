@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v19 — 전술 스타일별 공격 패턴 · 5초 전환 · AI 감독 맞대응 · 세컨볼 · xG 리포트</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v19는 전술이 실제 공격 패턴으로 갈라지는 패치다 — 탈취 직후 5초 전환 창에서 역습·직선 롱볼 팀은 세로 스루패스로 찌르고 티키타카는 삼각 패스를 만들며, 측면 오버래핑 팀은 터치라인 끝까지 간 뒤 컷백을 올리고, AI 감독은 55·70·80분에 스코어를 읽고 라인을 올리거나 내린다. 코너·간접 프리킥은 박스 안 경합으로 전개돼 세컨볼과 역습이 살아 있고, 경기 후 상세 결과서에는 슈팅 xG맵과 평균 포지션·패스 연결망이 그려진다.">
+<title>도트싸커 v20 — 라이브 터치라인 지시 · 롤·주발 플레이 · 상대 스카우팅 · SD 아트</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v20은 경기 중 터치라인 지시로 직접 개입하는 패치다 — 공격 성향·압박 강도·수비 라인·공격 루트를 바꾸면 라인 높이와 압박 인원, 패스 레인이 그 자리에서 달라지고, 인버티드 윙어는 안으로 접어 강한 발로 슈팅하며 전통 윙어는 폭을 지켜 크로스를 올린다. 레지스타는 빌드업 때 CB 사이로 내려오고, B2B는 늦게 박스로 쇄도하며, 폴스나인과 포처는 서로 다른 공간을 쓴다. 킥오프 전에는 실제 상대 스쿼드를 읽은 스카우팅 리포트가 위험 선수와 카운터 팁을 알려준다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=19">
-<link rel="icon" href="icons/icon-192.png?v=19">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=19">
-<link rel="stylesheet" href="css/style.css?v=19&b=52">
+<link rel="manifest" href="manifest.webmanifest?v=20">
+<link rel="icon" href="icons/icon-192.png?v=20">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
+<link rel="stylesheet" href="css/style.css?v=20&b=1">
 </head>
 <body>
 <div id="app">
@@ -51,21 +51,21 @@
     <div class="rot-in">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="4" width="14" height="26" rx="3"/><path d="M24 38a14 14 0 1 0-12-6.8"/><path d="M6 26l5 6 6-4"/></svg>
       <b>가로로 돌려 주세요</b>
-      <span>도트싸커 v19는 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
+      <span>도트싸커 v20은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
       <button class="btn primary" data-act="rotgo">가로 화면으로 보기</button>
       <button class="btn ghost sm" data-act="rotstay">세로로 계속 보기</button>
     </div>
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=19&b=52"></script>
-<script src="js/match.js?v=19&b=52"></script>
-<script src="js/game.js?v=19&b=52"></script>
+<script src="js/data.js?v=20&b=1"></script>
+<script src="js/match.js?v=20&b=1"></script>
+<script src="js/game.js?v=20&b=1"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=19').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=20').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

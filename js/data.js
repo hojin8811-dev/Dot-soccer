@@ -533,6 +533,86 @@
   DS.STYLE_KEYS = ['gegenpress', 'tikitaka', 'counter', 'wingplay', 'hybrid3241', 'direct', 'balanced'];
   DS.tacticStyle = function (key) { return TACTIC_STYLES[key] || TACTIC_STYLES.balanced; };
 
+  /* ─────────────────────────  v20 ③ — 상대 스카우팅 리포트  ─────────────────────────
+     실제로 스폰될 원정 스쿼드(포지션·주발·롤)와 감독 철학을 그대로 읽어 FM식 리포트를 만든다.
+     formation · style · players(그 경기에 뛸 11명)를 넘기면 리포트의 모든 문장이 그 데이터에서 나온다. */
+  var LANE_KO = { left: '왼쪽', right: '오른쪽', center: '중앙' };
+  DS.scoutReport = function (opt) {
+    opt = opt || {};
+    var key = opt.formation || '4-4-2';
+    var f = FORMATIONS[key] || FORMATIONS['4-4-2'];
+    var st = TACTIC_STYLES[opt.style] || TACTIC_STYLES.balanced;
+    var players = opt.players || [];
+    var slots = f.slots || [];
+    var lanes = { left: 0, center: 0, right: 0 };
+    var i, s, x, w, g, p, ovr, threat, side, x2;
+    for (i = 0; i < slots.length; i++) {
+      s = slots[i];
+      if (s.pos === 'GK') { continue; }
+      g = posGroup(s.pos);
+      w = g === 'FW' ? 3 : (g === 'MF' ? 1.5 : 0.45);
+      x = s.x;
+      if (x < 34) { lanes.left += w; } else if (x > 66) { lanes.right += w; } else { lanes.center += w; }
+    }
+    /* 감독 철학 보정 — 측면형은 좌우, 중앙 점유형은 중앙으로 무게가 실린다 */
+    if (st.width > 6) { lanes.left *= 1 + st.width / 90; lanes.right *= 1 + st.width / 90; }
+    if (st.crossBias > 1.5) { lanes.left *= 1.12; lanes.right *= 1.12; }
+    if (st.key === 'tikitaka' || st.key === 'hybrid3241') { lanes.center *= 1.22; }
+    var total = lanes.left + lanes.center + lanes.right || 1;
+    var share = {
+      left: Math.round(lanes.left / total * 100),
+      center: Math.round(lanes.center / total * 100),
+      right: Math.round(lanes.right / total * 100)
+    };
+    var main = 'center';
+    if (share.right > share.center && share.right >= share.left) { main = 'right'; }
+    else if (share.left > share.center && share.left > share.right) { main = 'left'; }
+    /* 위험 선수 — OVR · 공격 지표 · 전방 가중치 순 */
+    var cand = [];
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (!p || p.pos === 'GK') { continue; }
+      ovr = ratingOf(p);
+      x2 = i < slots.length ? slots[i].x : 50;
+      side = x2 < 34 ? 'left' : (x2 > 66 ? 'right' : 'center');
+      g = posGroup(p.pos);
+      threat = ovr + (g === 'FW' ? 11 : (g === 'MF' ? 6 : 0)) + ((p.stats && p.stats.atk) ? p.stats.atk * 0.14 : 0);
+      cand.push({
+        name: p.name, pos: p.pos, foot: p.foot || '', role: p.role || '',
+        ovr: ovr, lane: side, laneKo: LANE_KO[side], threat: Math.round(threat * 10) / 10, x: x2
+      });
+    }
+    cand.sort(function (a, b) { return b.threat - a.threat; });
+    var danger = cand.slice(0, 2);
+    /* 카운터 팁 — 실제 수치에서만 나온다 */
+    var tips = [];
+    if (main !== 'center') {
+      tips.push('상대 ' + LANE_KO[main] + ' 측면 비중 ' + share[main] + '% · ' + (main === 'left' ? '오른쪽' : '왼쪽') + ' 윙백을 내려 그쪽을 닫아라');
+    } else {
+      tips.push('상대 중앙 비중 ' + share.center + '% · DM 두 줄로 하프스페이스를 먼저 막아라');
+    }
+    if (st.counterPress >= 3) { tips.push('상대 ' + st.name + ' · 후방 짧은 패스 대신 GK 롱킥·직선 롤로 1선을 건너뛰어라'); }
+    else if (st.key === 'counter') { tips.push('상대 두 줄 블록 · 라인을 올려 조르되 탈취 직후 역습 대비 2명은 남겨라'); }
+    else if (st.crossBias >= 1.8) { tips.push('상대 크로스 성향 ' + st.crossBias.toFixed(1) + ' · 겹쳐 오는 풀백과 윙어의 터치라인을 먼저 지워라'); }
+    else if (st.key === 'tikitaka') { tips.push('상대 짧은 패스 위주 · 지시 "압박 강도: 전방 압박"으로 후방 빌드업을 끊어라'); }
+    else if (st.key === 'direct') { tips.push('상대 직선 롱볼 · 수비 라인을 내리고 세컨볼을 선점해라'); }
+    else { tips.push('상대 균형형 · 초반 15분은 라인을 지키며 패턴을 읽어라'); }
+    if (danger[0]) {
+      tips.push('경계: ' + danger[0].name + '(' + danger[0].pos + '·' + danger[0].laneKo + '·OVR ' + danger[0].ovr + ') — ' +
+        ((danger[0].pos === 'LWF' || danger[0].pos === 'RWF') ? '풀백 1:1과 안쪽 커버를 겹쳐라' : '볼을 받기 전에 몸을 붙여라'));
+    }
+    var press = clamp((f.metrics ? f.metrics.press : 70) + st.press, 20, 99);
+    var depth = clamp((f.metrics ? f.metrics.line : 65) + st.line, 15, 99);
+    return {
+      formation: key, formationTag: f.tag || '', formationDesc: f.desc || '',
+      styleKey: st.key, styleName: st.name, styleLine: st.line, manager: opt.managerName || '',
+      lanes: share, mainLane: main, mainLaneKo: LANE_KO[main],
+      danger: danger, press: press, depth: depth,
+      highLine: depth >= 72, lowBlock: depth <= 54,
+      tips: tips.slice(0, 2)
+    };
+  };
+
   /* ─────────────────────────  현대 롤  ───────────────────────── */
   var ROLES = [
     { key: 'poacher',   name: '포처',            en: 'Poacher',        pos: ['ST', 'CF'],          need: 3, desc: '골문 앞에서만 산다. 슈팅·결정력 급상승.', gain: { atk: 7, s: 1 } },
@@ -1432,525 +1512,29 @@
     g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   }
 
-  /* ── 초상화 도트 (20 × 26, 2.5등신) ── */
-  var PW = 20, PH = 26;
-  var FIG_CACHE = {};
-  var FIG_N = 0;
-
-  var HEAD_ROWS = [
-    [6, 13], [5, 14], [4, 15], [4, 15], [4, 15], [4, 15],
-    [4, 15], [5, 14], [5, 14], [6, 13], [7, 12]
-  ];
-
-  /* 3×5 픽셀 숫자 */
-  var DIGIT = {
-    '0': [1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1],
-    '1': [0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1],
-    '2': [1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1],
-    '3': [1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1],
-    '4': [1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1],
-    '5': [1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1],
-    '6': [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1],
-    '7': [1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
-    '8': [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1],
-    '9': [1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1]
-  };
-  function drawNumber(g, cx, y, text, color) {
-    var chars = String(text).split(''), i, j, k, ox;
-    var w = chars.length * 4 - 1;
-    ox = Math.round(cx - w / 2);
-    for (i = 0; i < chars.length; i++) {
-      var d = DIGIT[chars[i]];
-      if (!d) { continue; }
-      for (j = 0; j < 5; j++) {
-        for (k = 0; k < 3; k++) {
-          if (d[j * 3 + k]) { fill(g, ox + i * 4 + k, y + j, 1, 1, color); }
-        }
-      }
-    }
-  }
-
-  function drawHairBack(g, style, hair, hairD) {
-    if (style === 'long') {
-      fill(g, 3, 3, 2, 8, hairD);
-      fill(g, 15, 3, 2, 8, hairD);
-      fill(g, 3, 10, 3, 3, hairD);
-      fill(g, 14, 10, 3, 3, hairD);
-    } else if (style === 'ponytail') {
-      fill(g, 16, 3, 2, 6, hairD);
-      fill(g, 17, 8, 2, 3, shade(hair, -14));
-      fill(g, 15, 3, 1, 2, hair);
-    } else if (style === 'afro') {
-      fill(g, 4, 0, 12, 1, hairD);
-      fill(g, 2, 2, 16, 4, hairD);
-      fill(g, 2, 5, 2, 3, hairD);
-      fill(g, 16, 5, 2, 3, hairD);
-    } else if (style === 'curly') {
-      fill(g, 3, 2, 1, 3, hairD);
-      fill(g, 16, 2, 1, 3, hairD);
-    }
-  }
-
-  function drawHairFront(g, style, hair, hairD, hairL) {
-    switch (style) {
-      case 'buzz':
-        fill(g, 7, 0, 6, 1, hair);
-        fill(g, 6, 1, 8, 1, hair);
-        fill(g, 5, 2, 10, 1, hair);
-        fill(g, 6, 3, 3, 1, hairD);
-        fill(g, 12, 3, 3, 1, hairD);
-        break;
-      case 'long':
-        fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 1, hair);
-        fill(g, 3, 2, 14, 1, hair);
-        fill(g, 4, 3, 4, 1, hair);
-        fill(g, 12, 3, 4, 1, hair);
-        fill(g, 3, 3, 2, 7, hair);
-        fill(g, 15, 3, 2, 7, hair);
-        fill(g, 5, 1, 4, 1, hairL);
-        break;
-      case 'afro':
-        fill(g, 4, 0, 12, 1, hair);
-        fill(g, 3, 1, 14, 2, hair);
-        fill(g, 2, 3, 3, 3, hair);
-        fill(g, 15, 3, 3, 3, hair);
-        fill(g, 5, 2, 3, 1, hair);
-        fill(g, 12, 2, 3, 1, hair);
-        fill(g, 7, 1, 3, 1, hairL);
-        break;
-      case 'slick':
-        fill(g, 6, 0, 8, 1, hair);
-        fill(g, 5, 1, 10, 1, hair);
-        fill(g, 4, 2, 6, 1, hair);
-        fill(g, 11, 2, 5, 1, hairD);
-        fill(g, 4, 3, 7, 1, hair);
-        fill(g, 13, 3, 2, 1, hairD);
-        fill(g, 4, 4, 1, 1, hair);
-        fill(g, 15, 4, 1, 1, hair);
-        fill(g, 6, 1, 4, 1, hairL);
-        break;
-      case 'twoblock':
-        fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 2, hair);
-        fill(g, 4, 3, 1, 2, hairD);
-        fill(g, 15, 3, 1, 2, hairD);
-        fill(g, 4, 3, 12, 1, hairD);
-        fill(g, 6, 1, 5, 1, hairL);
-        break;
-      case 'curly':
-        fill(g, 5, 0, 2, 1, hair); fill(g, 8, 0, 2, 1, hair); fill(g, 11, 0, 3, 1, hair);
-        fill(g, 4, 1, 12, 2, hair);
-        fill(g, 3, 2, 2, 2, hair); fill(g, 15, 2, 2, 2, hair);
-        fill(g, 5, 3, 3, 1, hairD); fill(g, 12, 3, 3, 1, hairD);
-        fill(g, 6, 1, 1, 1, hairL); fill(g, 10, 1, 1, 1, hairL);
-        break;
-      case 'mohawk':
-        fill(g, 8, 0, 4, 1, hair);
-        fill(g, 8, 1, 4, 2, hair);
-        fill(g, 9, 1, 1, 2, hairL);
-        fill(g, 5, 2, 3, 1, hairD);
-        fill(g, 12, 2, 3, 1, hairD);
-        fill(g, 4, 3, 1, 1, hairD);
-        fill(g, 15, 3, 1, 1, hairD);
-        break;
-      case 'ponytail':
-        fill(g, 5, 0, 10, 1, hair);
-        fill(g, 4, 1, 12, 1, hair);
-        fill(g, 4, 2, 12, 1, hair);
-        fill(g, 4, 3, 4, 1, hair);
-        fill(g, 12, 3, 4, 1, hair);
-        fill(g, 4, 4, 1, 2, hairD);
-        fill(g, 15, 4, 1, 2, hairD);
-        fill(g, 5, 1, 4, 1, hairL);
-        break;
-      case 'bald':
-        fill(g, 4, 2, 1, 2, hairD);
-        fill(g, 15, 2, 1, 2, hairD);
-        fill(g, 6, 1, 5, 1, hairL);
-        fill(g, 5, 2, 2, 1, hairL);
-        break;
-      default: /* short */
-        fill(g, 6, 0, 8, 1, hair);
-        fill(g, 5, 1, 10, 1, hair);
-        fill(g, 4, 2, 12, 1, hair);
-        fill(g, 4, 3, 3, 1, hair);
-        fill(g, 8, 3, 4, 1, hair);
-        fill(g, 13, 3, 3, 1, hair);
-        fill(g, 4, 4, 1, 1, hair);
-        fill(g, 15, 4, 1, 1, hair);
-        fill(g, 6, 1, 5, 1, hairL);
-        break;
-    }
-  }
-
-  function drawEyes(g, style, dark, white) {
-    var xs = [6, 11], i, ex;
-    for (i = 0; i < 2; i++) {
-      ex = xs[i];
-      if (style === 'sleepy') {
-        fill(g, ex, 7, 2, 1, dark);
-        fill(g, ex, 6, 2, 1, hexAlpha(dark, 0.25));
-        continue;
-      }
-      if (style === 'happy') {
-        fill(g, ex, 7, 1, 1, dark);
-        fill(g, ex + 1, 6, 1, 1, dark);
-        fill(g, ex + 2, 7, 1, 1, dark);
-        continue;
-      }
-      if (style === 'sharp') {
-        fill(g, ex, 6, 2, 1, dark);
-        fill(g, ex, 7, 2, 1, hexAlpha(dark, 0.35));
-        fill(g, ex + 1, 6, 1, 1, white);
-        continue;
-      }
-      fill(g, ex, 6, 2, 2, dark);
-      fill(g, ex, 6, 1, 1, white);
-      if (style === 'wide') { fill(g, ex + 1, 6, 1, 1, white); }
-    }
-  }
-
-  function drawBrows(g, style, color, dark) {
-    var y = 4, i, xs = [5, 12];
-    if (style === 'raised') { y = 3; }
-    for (i = 0; i < 2; i++) {
-      var x = xs[i];
-      if (style === 'thin') {
-        fill(g, x + 1, y, 2, 1, color);
-      } else if (style === 'angry') {
-        if (i === 0) { fill(g, x, y - 1, 2, 1, color); fill(g, x + 2, y, 1, 1, color); }
-        else { fill(g, x + 1, y, 2, 1, color); fill(g, x - 1, y - 1, 1, 1, color); }
-      } else if (style === 'flat') {
-        fill(g, x, y, 3, 1, color);
-      } else {
-        fill(g, x, y, 3, 1, color);
-        if (style === 'thick') { fill(g, x + 1, y + 1, 2, 1, dark); }
-      }
-    }
-  }
-
-  function drawMouth(g, style, dark, lip) {
-    if (style === 'flat') {
-      fill(g, 9, 9, 2, 1, dark);
-    } else if (style === 'smirk') {
-      fill(g, 9, 9, 2, 1, dark);
-      fill(g, 11, 8, 1, 1, dark);
-    } else if (style === 'open') {
-      fill(g, 9, 9, 2, 2, dark);
-      fill(g, 9, 9, 2, 1, lip);
-    } else if (style === 'grit') {
-      fill(g, 8, 9, 4, 1, dark);
-      fill(g, 8, 9, 3, 1, lip);
-    } else {
-      fill(g, 8, 9, 1, 1, dark);
-      fill(g, 9, 9, 2, 1, hexAlpha(dark, 0.85));
-      fill(g, 11, 9, 1, 1, dark);
-      fill(g, 7, 8, 1, 1, hexAlpha(dark, 0.5));
-      fill(g, 12, 8, 1, 1, hexAlpha(dark, 0.5));
-    }
-  }
-
-  function drawBeard(g, style, hair, hairD, skin) {
-    if (style === 'stubble') {
-      fill(g, 6, 9, 1, 1, hairD); fill(g, 13, 9, 1, 1, hairD);
-      fill(g, 8, 10, 1, 1, hairD); fill(g, 11, 10, 1, 1, hairD);
-      fill(g, 9, 11, 2, 1, hairD);
-    } else if (style === 'goatee') {
-      fill(g, 8, 10, 4, 1, hair);
-      fill(g, 8, 8, 4, 1, hairD);
-      fill(g, 9, 11, 2, 1, hair);
-    } else if (style === 'mustache') {
-      fill(g, 8, 8, 4, 1, hair);
-      fill(g, 7, 8, 1, 1, hairD);
-      fill(g, 12, 8, 1, 1, hairD);
-    } else if (style === 'full') {
-      fill(g, 5, 8, 1, 4, hair);
-      fill(g, 14, 8, 1, 4, hair);
-      fill(g, 6, 9, 8, 2, hair);
-      fill(g, 8, 8, 4, 1, hair);
-      fill(g, 9, 9, 2, 1, skin);
-      fill(g, 8, 10, 4, 1, skin);
-    }
-  }
-
-  function drawFigure(g, p, kit, opt) {
-    var F = p.face || {};
-    var skin = F.skin || '#f0c49a';
-    var skinD = shade(skin, -24);
-    var skinD2 = shade(skin, -44);
-    var skinL = shade(skin, 16);
-    var hair = F.hairColor || '#2b1d14';
-    var hairD = shade(hair, -22);
-    var hairL = shade(hair, 26);
-    var shirt = kit.shirt || '#c8432f';
-    var shirtD = shade(shirt, -38);
-    var shirtL = shade(shirt, 22);
-    var trim = kit.trim || '#f2e6c4';
-    var shorts = kit.shorts || '#f2e6c4';
-    var shortsD = shade(shorts, -30);
-    var dark = '#2a2018';
-    var isGk = p.pos === 'GK' || opt.gk;
-    var i, y, row;
-
-    /* 그림자 */
-    g.fillStyle = 'rgba(40,24,8,0.22)';
-    g.beginPath();
-    g.ellipse(10, 25, 6.2, 1.5, 0, 0, Math.PI * 2);
-    g.fill();
-
-    /* 다리 · 양말 · 축구화 */
-    fill(g, 6, 20, 2, 3, skin);
-    fill(g, 12, 20, 2, 3, skin);
-    fill(g, 6, 20, 1, 3, skinD);
-    fill(g, 12, 20, 1, 3, skinD);
-    fill(g, 5, 22, 3, 2, shirt);
-    fill(g, 12, 22, 3, 2, shirt);
-    fill(g, 5, 22, 3, 1, trim);
-    fill(g, 12, 22, 3, 1, trim);
-    fill(g, 5, 22, 1, 2, shade(shirt, 18));
-    fill(g, 14, 22, 1, 2, shade(shirt, -30));
-    fill(g, 4, 24, 4, 2, '#3a2c22');
-    fill(g, 12, 24, 4, 2, '#3a2c22');
-    fill(g, 4, 24, 4, 1, '#5a4634');
-    fill(g, 12, 24, 4, 1, '#5a4634');
-
-    /* 뒤머리 */
-    drawHairBack(g, F.hair || 'short', hair, hairD);
-
-    /* 반바지 */
-    fill(g, 5, 18, 10, 3, shorts);
-    fill(g, 5, 18, 10, 1, shade(shorts, 16));
-    fill(g, 9, 18, 2, 3, shortsD);
-    fill(g, 5, 20, 10, 1, shortsD);
-
-    /* 몸통 */
-    fill(g, 4, 12, 12, 7, shirt);
-    fill(g, 4, 12, 2, 7, shirtL);
-    fill(g, 14, 12, 2, 7, shirtD);
-    fill(g, 4, 18, 12, 1, shirtD);
-
-    /* 목 */
-    fill(g, 8, 10, 4, 2, skinD);
-
-    /* 머리 */
-    for (i = 0; i < HEAD_ROWS.length; i++) {
-      y = i + 1;
-      row = HEAD_ROWS[i];
-      fill(g, row[0], y, row[1] - row[0] + 1, 1, skin);
-      if (row[0] > 4) { fill(g, row[0], y, 1, 1, skinD); }
-      if (row[1] < 15) { fill(g, row[1], y, 1, 1, skinD); }
-    }
-    fill(g, 4, 7, 1, 3, hexAlpha(skinD, 0.5));
-    fill(g, 15, 7, 1, 3, hexAlpha(skinD, 0.5));
-    fill(g, 6, 2, 4, 1, skinL);
-    /* 귀 */
-    fill(g, 3, 6, 1, 2, skin);
-    fill(g, 16, 6, 1, 2, skin);
-
-    /* 앞머리 */
-    drawHairFront(g, F.hair || 'short', hair, hairD, hairL);
-
-    /* 얼굴 */
-    var browCol = hex2rgb(hair)[0] + hex2rgb(hair)[1] + hex2rgb(hair)[2] < 210 ? '#5a3a24' : shade(hair, -12);
-    drawBrows(g, F.brow || 'thick', browCol, shade(hairD, -10));
-    drawEyes(g, F.eye || 'round', dark, '#fffdf5');
-    if (F.nose === 'wide') { fill(g, 8, 8, 3, 1, skinD); }
-    else if (F.nose === 'point') { fill(g, 9, 8, 1, 2, skinD); }
-    else if (F.nose === 'flat') { fill(g, 9, 8, 2, 1, skinD); }
-    else { fill(g, 9, 8, 1, 1, skinD); fill(g, 10, 8, 1, 1, hexAlpha(skinD, 0.6)); }
-    drawBeard(g, F.beard || 'none', hair, hairD, skin);
-    drawMouth(g, F.mouth || 'smile', dark, '#fff6e6');
-    fill(g, 5, 8, 1, 1, hexAlpha('#d4674f', 0.4));
-    fill(g, 14, 8, 1, 1, hexAlpha('#d4674f', 0.4));
-
-    /* 팔 */
-    var sleeveEnd = isGk ? 16 : 14;
-    fill(g, 2, 12, 2, sleeveEnd - 12, shirt);
-    fill(g, 16, 12, 2, sleeveEnd - 12, shirt);
-    fill(g, 2, 12, 1, sleeveEnd - 12, shirtL);
-    fill(g, 17, 12, 1, sleeveEnd - 12, shirtD);
-    fill(g, 2, sleeveEnd - 1, 2, 1, trim);
-    fill(g, 16, sleeveEnd - 1, 2, 1, trim);
-    fill(g, 2, sleeveEnd, 2, 20 - sleeveEnd, skin);
-    fill(g, 16, sleeveEnd, 2, 20 - sleeveEnd, skin);
-    fill(g, 2, 20, 2, 1, skinD);
-    fill(g, 16, 20, 2, 1, skinD);
-
-    /* 칼라 */
-    var collar = F.collar || 'v';
-    if (collar === 'round') {
-      fill(g, 7, 12, 6, 1, trim);
-      fill(g, 9, 12, 2, 1, skinD2);
-    } else if (collar === 'polo') {
-      fill(g, 7, 12, 1, 1, trim);
-      fill(g, 12, 12, 1, 1, trim);
-      fill(g, 8, 12, 4, 1, shirtD);
-      fill(g, 9, 13, 2, 1, trim);
-    } else {
-      fill(g, 7, 12, 6, 1, trim);
-      fill(g, 7, 13, 1, 1, trim);
-      fill(g, 12, 13, 1, 1, trim);
-      fill(g, 8, 12, 4, 1, skinD2);
-      fill(g, 9, 13, 2, 1, skinD2);
-    }
-
-    /* 등번호 */
-    if (opt.number) { drawNumber(g, 10, 14, opt.number, '#fff6e4'); }
-    /* 주장 완장 */
-    if (opt.captain) {
-      fill(g, 2, 15, 2, 1, '#e8b62c');
-      fill(g, 2, 16, 2, 1, '#a87a10');
-    }
-    /* 골키퍼 장갑 */
-    if (isGk) {
-      fill(g, 2, 19, 2, 2, '#f6f2e4');
-      fill(g, 16, 19, 2, 2, '#f6f2e4');
-    }
-  }
-
-  function figKey(p, kit, opt) {
-    var F = p.face || {};
-    return [p.id, p.pos, p.rarity, F.hair, F.hairColor, F.skin, F.brow, F.eye, F.nose, F.mouth, F.beard, F.collar,
-      kit.shirt, kit.shorts, kit.trim, opt.number || 0, opt.captain ? 1 : 0, opt.gk ? 1 : 0].join('|');
-  }
-
-  function addOutline(g, w, h, color) {
-    var img = g.getImageData(0, 0, w, h);
-    var d = img.data;
-    var out = new Uint8ClampedArray(d);
-    var c = hex2rgb(color);
-    function op(x, y) {
-      return x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 40;
-    }
-    var x, y;
-    for (y = 0; y < h; y++) {
-      for (x = 0; x < w; x++) {
-        if (op(x, y)) { continue; }
-        if (op(x - 1, y) || op(x + 1, y) || op(x, y - 1) || op(x, y + 1)) {
-          var o = (y * w + x) * 4;
-          out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = 235;
-        }
-      }
-    }
-    img.data.set(out);
-    g.putImageData(img, 0, 0);
-  }
-
+  /* ── 초상화 (v20 — 도트 폴백 제거: 고해상도 SD 스프라이트를 그대로 쓴다) ──
+     예전 20×26 픽셀 도트는 쓰이지 않게 되어 없앴다. 폴백 초상화가 필요하면
+     Art.chibi()의 SD 스프라이트(외곽선·명암이 살아 있는 벡터풍)를 돌려준다. */
   Art.portrait = function (p, kit, opt) {
     opt = opt || {};
-    if (!p || !p.face) { p = { id: 'x', pos: 'MF', face: {}, name: '' }; }
-    var key = figKey(p, kit, opt);
-    if (FIG_CACHE[key]) { return FIG_CACHE[key]; }
-    var c = makeCanvas(PW, PH);
-    var g = c.getContext('2d');
-    g.imageSmoothingEnabled = false;
-    drawFigure(g, p, kit, opt);
-    addOutline(g, PW, PH, '#3a2a18');
-    FIG_N++;
-    if (FIG_N > 240) { FIG_CACHE = {}; FIG_N = 0; }
-    FIG_CACHE[key] = c;
-    return c;
+    var fig = Art.chibi(p || { id: 'x', pos: 'CM', pic: 1 }, kit || { shirt: '#c8432f', shorts: '#1c2a25', trim: '#f1e7cf' }, opt.frame || 0, 1);
+    return fig;
   };
 
-  /* 캔버스에 선수 도트 그리기 (정수 배율 · 픽셀 유지) */
+  /* 캔버스에 선수 전신 그리기 (고해상도 · 부드러운 축소) */
   Art.paint = function (canvas, p, kit, opt) {
     if (!canvas) { return; }
     opt = opt || {};
-    if (opt.number === true) { opt = { k: opt.k, number: p.number, captain: opt.captain, gk: opt.gk }; }
     var fig = Art.portrait(p, kit, opt);
-    var k = opt.k || 2;
-    var cw = fig.width * k, ch = fig.height * k;
+    var k = opt.k || 1;
+    var cw = Math.round(fig.width * k), ch = Math.round(fig.height * k);
     if (canvas.width !== cw || canvas.height !== ch) {
       canvas.width = cw; canvas.height = ch;
     }
     var g = canvas.getContext('2d');
     g.clearRect(0, 0, cw, ch);
-    g.imageSmoothingEnabled = false;
+    g.imageSmoothingEnabled = true;
     g.drawImage(fig, 0, 0, cw, ch);
-  };
-
-  /* ── 경기장 스프라이트 (14 × 19) ── */
-  var MATCH_CACHE = {};
-  Art.matchFig = function (p, kit, frame, face) {
-    var F = p.face || {};
-    var key = [p.id, F.hair, F.hairColor, F.skin, kit.shirt, kit.shorts, kit.trim, frame % 4, face > 0 ? 1 : 0].join('|');
-    if (MATCH_CACHE[key]) { return MATCH_CACHE[key]; }
-    var W = 16, H = 20;
-    var c = makeCanvas(W, H);
-    var g = c.getContext('2d');
-    var skin = F.skin || '#f0c49a';
-    var skinD = shade(skin, -24);
-    var hair = F.hairColor || '#2b1d14';
-    var hairD = shade(hair, -24);
-    var shirt = kit.shirt, shirtD = shade(shirt, -36), trim = kit.trim || '#f2e6c4';
-    var shorts = kit.shorts || '#f2e6c4', shortsD = shade(shorts, -28);
-    var swing = [0, 1, 0, -1][frame % 4];
-    var ey = 0;
-
-    /* 다리 */
-    fill(g, 5, 15 - Math.max(0, swing), 2, 3, skin);
-    fill(g, 9, 15 + Math.min(0, swing), 2, 3, skin);
-    fill(g, 4, 17 - Math.max(0, swing), 3, 2, '#3a2c22');
-    fill(g, 9, 17 + Math.min(0, swing), 3, 2, '#3a2c22');
-    fill(g, 5, 14, 2, 1, trim);
-    fill(g, 9, 14, 2, 1, trim);
-    /* 반바지 */
-    fill(g, 4, 12, 8, 3, shorts);
-    fill(g, 7, 12, 2, 3, shortsD);
-    /* 몸통 */
-    fill(g, 4, 7, 8, 5, shirt);
-    fill(g, 4, 7, 2, 5, shade(shirt, 22));
-    fill(g, 11, 7, 1, 5, shirtD);
-    fill(g, 4, 7, 8, 1, trim);
-    /* 팔 */
-    fill(g, 2, 7, 2, 4, shirt);
-    fill(g, 12, 7, 2, 4, shirt);
-    fill(g, 2, 11, 2, 2, skin);
-    fill(g, 12, 11, 2, 2, skin);
-    /* 목 */
-    fill(g, 6, 6, 4, 1, skinD);
-    /* 머리 */
-    fill(g, 4, 1, 8, 5, skin);
-    fill(g, 4, 6, 8, 1, skin);
-    fill(g, 3, 3, 1, 2, skin);
-    fill(g, 12, 3, 1, 2, skin);
-    /* 머리카락 */
-    var st = F.hair || 'short';
-    if (st === 'afro') {
-      fill(g, 2, 0, 12, 3, hair);
-      fill(g, 2, 3, 2, 2, hair);
-      fill(g, 12, 3, 2, 2, hair);
-    } else if (st === 'long' || st === 'ponytail') {
-      fill(g, 4, 0, 8, 2, hair);
-      fill(g, 3, 1, 2, 5, hair);
-      fill(g, 11, 1, 2, 5, hair);
-    } else if (st === 'bald') {
-      fill(g, 3, 2, 1, 2, hairD);
-      fill(g, 12, 2, 1, 2, hairD);
-    } else if (st === 'mohawk') {
-      fill(g, 6, 0, 4, 2, hair);
-      fill(g, 4, 1, 2, 1, hairD);
-      fill(g, 10, 1, 2, 1, hairD);
-    } else if (st === 'slick') {
-      fill(g, 4, 0, 8, 2, hair);
-      fill(g, 4, 2, 3, 1, hair);
-      fill(g, 9, 2, 3, 1, hairD);
-    } else {
-      fill(g, 4, 0, 8, 2, hair);
-      fill(g, 3, 2, 1, 2, hair);
-      fill(g, 12, 2, 1, 2, hair);
-      fill(g, 4, 2, 2, 1, hairD);
-      fill(g, 10, 2, 2, 1, hairD);
-    }
-    /* 얼굴 */
-    var ex1 = face > 0 ? 6 : 5, ex2 = face > 0 ? 9 : 8;
-    fill(g, ex1, 3, 1, 1, '#2a2018');
-    fill(g, ex2, 3, 1, 1, '#2a2018');
-    fill(g, 7, 5, 2, 1, shade(skin, -40));
-    MATCH_CACHE[key] = c;
-    void ey;
-    return c;
   };
 
   /* ── 공 ── */
@@ -2329,182 +1913,439 @@
     }
   };
 
-  /* ── 시설 도트 일러스트 (26 × 22) ── */
+  /* ═════════════════════════  v20 — SD 일러스트 (깔끔한 외곽선 · 곡선 · 그라데이션) ═════════════════════════
+     도트(픽셀) 흔적을 걷어낸 고해상도 벡터풍 캔버스 아트. 시설 · 스태프 · 초상화 폴백이 모두
+     같은 규칙을 쓴다: 위에서 내려오는 빛, 왼쪽의 밝은 면, 오른쪽의 어두운 면, 짙은 잉크 외곽선. */
+  var SD_INK = '#1c2a23';
+  function sdRR(g, x, y, w, h, r) {
+    var rr = Math.min(r == null ? 6 : r, Math.min(w, h) / 2);
+    g.beginPath();
+    g.moveTo(x + rr, y);
+    g.lineTo(x + w - rr, y);
+    g.quadraticCurveTo(x + w, y, x + w, y + rr);
+    g.lineTo(x + w, y + h - rr);
+    g.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    g.lineTo(x + rr, y + h);
+    g.quadraticCurveTo(x, y + h, x, y + h - rr);
+    g.lineTo(x, y + rr);
+    g.quadraticCurveTo(x, y, x + rr, y);
+    g.closePath();
+  }
+  function sdBox(g, x, y, w, h, r, col, stroke, lw) {
+    sdRR(g, x, y, w, h, r);
+    if (col) { g.fillStyle = col; g.fill(); }
+    if (stroke !== false) {
+      g.lineWidth = lw || 1.7;
+      g.strokeStyle = stroke || SD_INK;
+      g.stroke();
+    }
+  }
+  function sdGrad(g, x0, y0, x1, y1, c0, c1) {
+    var gr = g.createLinearGradient(x0, y0, x1, y1);
+    gr.addColorStop(0, c0);
+    gr.addColorStop(1, c1);
+    return gr;
+  }
+  function sdShine(g, x, y, w, h, r, a) {
+    sdRR(g, x, y, w, h, r);
+    var gr = g.createLinearGradient(x, y, x, y + h);
+    gr.addColorStop(0, 'rgba(255,255,255,' + (a || 0.42) + ')');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.fill();
+  }
+  function sdScallops(g, x0, x1, y, h, colA, colB, n) {
+    var w = (x1 - x0) / n, i;
+    for (i = 0; i < n; i++) {
+      g.fillStyle = i % 2 ? colB : colA;
+      g.beginPath();
+      g.moveTo(x0 + i * w, y);
+      g.lineTo(x0 + (i + 1) * w, y);
+      g.lineTo(x0 + (i + 1) * w, y + h * 0.45);
+      g.quadraticCurveTo(x0 + i * w + w / 2, y + h * 1.15, x0 + i * w, y + h * 0.45);
+      g.closePath();
+      g.fill();
+    }
+  }
+  function sdCone(g, x, y, s) {
+    g.save();
+    g.translate(x, y);
+    g.scale(s, s);
+    g.fillStyle = 'rgba(16,28,20,0.18)';
+    g.beginPath(); g.ellipse(0, 4, 7, 2.2, 0, 0, Math.PI * 2); g.fill();
+    var gr = g.createLinearGradient(-6, 0, 6, 0);
+    gr.addColorStop(0, '#ffb066');
+    gr.addColorStop(0.55, '#f2761f');
+    gr.addColorStop(1, '#c1510d');
+    g.fillStyle = gr;
+    g.beginPath();
+    g.moveTo(0, -13);
+    g.quadraticCurveTo(3.6, -4, 6, 3.2);
+    g.lineTo(-6, 3.2);
+    g.quadraticCurveTo(-3.6, -4, 0, -13);
+    g.closePath();
+    g.fill();
+    g.lineWidth = 1.1; g.strokeStyle = SD_INK; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+    g.fillRect(-2.6, -6.6, 5.2, 1.6);
+    g.restore();
+  }
+  function sdFlag(g, x, y, h, col, flutter) {
+    g.strokeStyle = '#6b5334'; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - h); g.stroke();
+    g.fillStyle = col;
+    g.beginPath();
+    g.moveTo(x, y - h);
+    g.quadraticCurveTo(x + 7, y - h + 1, x + 13 + (flutter || 0), y - h + 4);
+    g.quadraticCurveTo(x + 7, y - h + 7, x, y - h + 8);
+    g.closePath();
+    g.fill();
+    g.lineWidth = 1; g.strokeStyle = SD_INK; g.stroke();
+  }
+
+  /* ── 시설 SD 일러스트 (124 × 100 고해상도) ── */
   Art.facilityFig = function (kind, level) {
-    var W = 26, H = 22;
+    var W = 124, H = 100;
     var c = makeCanvas(W, H);
     var g = c.getContext('2d');
-    var i;
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+    g.clearRect(0, 0, W, H);
+    var i, j;
+
+    /* 바닥 그림자 */
+    g.fillStyle = 'rgba(18,30,22,0.15)';
+    g.beginPath(); g.ellipse(62, 91, 46, 6, 0, 0, Math.PI * 2); g.fill();
+
     if (kind === 'training') {
-      fill(g, 1, 8, 24, 12, '#3a6a2a');
-      for (i = 0; i < 6; i++) { fill(g, 1 + i * 4, 8, 2, 12, '#427631'); }
-      g.strokeStyle = 'rgba(247,244,226,0.9)'; g.lineWidth = 1;
-      g.strokeRect(3.5, 10.5, 19, 8);
-      g.beginPath(); g.moveTo(3.5, 14.5); g.lineTo(22.5, 14.5); g.stroke();
+      /* 잔디 판 */
+      sdBox(g, 14, 52, 96, 37, 9, sdGrad(g, 0, 52, 0, 89, '#8ecb62', '#45873a'));
+      g.save();
+      sdRR(g, 14, 52, 96, 37, 9);
+      g.clip();
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      for (i = 0; i < 4; i++) { g.fillRect(14 + i * 25, 52, 12, 37); }
+      g.restore();
+      /* 하프라인 · 센터서클 */
+      g.strokeStyle = 'rgba(255,255,255,0.5)';
+      g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(62, 60); g.lineTo(62, 86); g.stroke();
+      g.beginPath(); g.arc(62, 73, 9, 0, Math.PI * 2); g.stroke();
       /* 골대 */
-      fill(g, 9, 4, 8, 1, '#f4efdc');
-      fill(g, 9, 5, 1, 4, '#f4efdc');
-      fill(g, 16, 5, 1, 4, '#f4efdc');
-      for (i = 0; i < 5; i++) { fill(g, 9 + i * 1.8, 5, 0.6, 4, 'rgba(247,244,226,0.5)'); }
+      g.strokeStyle = '#f7f4e8';
+      g.lineWidth = 3;
+      g.beginPath(); g.moveTo(38, 74); g.lineTo(38, 36); g.lineTo(86, 36); g.lineTo(86, 74); g.stroke();
+      g.strokeStyle = 'rgba(247,244,232,0.40)';
+      g.lineWidth = 0.9;
+      for (i = 1; i < 9; i++) { g.beginPath(); g.moveTo(38 + i * 6, 36); g.lineTo(38 + i * 6, 74); g.stroke(); }
+      for (i = 1; i < 7; i++) { g.beginPath(); g.moveTo(38, 36 + i * 5.4); g.lineTo(86, 36 + i * 5.4); g.stroke(); }
+      /* 골 라인 */
+      g.strokeStyle = '#fbf9ee';
+      g.lineWidth = 2.2;
+      g.beginPath(); g.moveTo(34, 74.5); g.lineTo(90, 74.5); g.stroke();
       /* 콘 */
-      fill(g, 6, 16, 2, 2, '#e0822c'); fill(g, 6, 16, 1, 1, '#f6a04a');
-      fill(g, 18, 12, 2, 2, '#e0822c'); fill(g, 18, 12, 1, 1, '#f6a04a');
+      sdCone(g, 28, 76, 1.15);
+      sdCone(g, 96, 68, 0.95);
       /* 공 */
-      Art.drawBall(g, 13, 18, 1.9);
+      Art.drawBall(g, 62, 82, 4.6);
     } else if (kind === 'medical') {
-      fill(g, 3, 6, 20, 15, '#efe6cf');
-      fill(g, 3, 6, 20, 2, '#d8cbb0');
-      fill(g, 3, 20, 20, 1, '#c3b596');
-      fill(g, 9, 13, 8, 6, '#f7f2e2');
-      fill(g, 10, 11, 6, 2, '#f7f2e2');
-      fill(g, 12, 8, 3, 7, '#c8432f');
-      fill(g, 10, 10, 7, 3, '#c8432f');
-      fill(g, 5, 9, 3, 3, '#8fc4e0');
-      fill(g, 18, 9, 3, 3, '#8fc4e0');
-      fill(g, 7, 15, 6, 1, '#d8cbb0');
+      /* 본관 */
+      sdBox(g, 26, 36, 72, 49, 8, sdGrad(g, 0, 36, 0, 85, '#fdfbf1', '#e4dcc6'));
+      sdShine(g, 30, 39, 26, 30, 6, 0.55);
+      /* 지붕 띠 */
+      sdBox(g, 21, 28, 82, 13, 6, sdGrad(g, 0, 28, 0, 41, '#e7dfc8', '#cabd9f'));
+      /* 적십자 간판 */
+      sdBox(g, 52, 8, 22, 22, 7, '#ffffff', '#ded6c0', 1.5);
+      sdBox(g, 61.4, 12.5, 3.2, 13, 1.4, '#d8432c', false);
+      sdBox(g, 56.6, 17.3, 13, 3.2, 1.4, '#d8432c', false);
+      /* 문 */
+      sdBox(g, 53, 60, 18, 25, 3.5, sdGrad(g, 0, 60, 0, 85, '#cfe2ea', '#9dc0cf'));
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(62, 60); g.lineTo(62, 85); g.stroke();
+      /* 창문 */
+      sdBox(g, 33, 50, 13, 11, 3, '#c7e6f2', '#b6cfd9', 1.2);
+      sdBox(g, 78, 50, 13, 11, 3, '#c7e6f2', '#b6cfd9', 1.2);
+      g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(33, 55.5); g.lineTo(46, 55.5); g.stroke();
+      g.beginPath(); g.moveTo(78, 55.5); g.lineTo(91, 55.5); g.stroke();
+      /* 구급 가방 */
+      sdBox(g, 93, 68, 24, 17, 5, sdGrad(g, 0, 68, 0, 85, '#f7f4e7', '#ddd5be'));
+      sdBox(g, 100.5, 64, 9, 4.5, 2, '#c9bfa4', SD_INK, 1.1);
+      sdBox(g, 104.6, 72, 2.6, 8, 1.1, '#c8432f', false);
+      sdBox(g, 101.8, 74.7, 8.2, 2.6, 1.1, '#c8432f', false);
     } else if (kind === 'shop') {
-      fill(g, 3, 8, 20, 13, '#e8dcc0');
-      fill(g, 3, 8, 20, 2, '#c9b793');
-      fill(g, 2, 4, 22, 4, '#c8432f');
-      for (i = 0; i < 7; i++) { fill(g, 2 + i * 3, 4, 2, 4, '#f2e6c4'); }
-      fill(g, 6, 12, 14, 9, '#b8d8ea');
-      fill(g, 6, 12, 14, 1, '#8fb8d0');
-      fill(g, 8, 14, 5, 3, '#f7f2e2');
-      Art.drawBall(g, 16, 16, 2);
-      fill(g, 11, 19, 4, 2, '#8a6a3a');
+      /* 건물 */
+      sdBox(g, 18, 44, 88, 44, 7, sdGrad(g, 0, 44, 0, 88, '#fbf4e0', '#e3d5b6'));
+      /* 처마 */
+      sdBox(g, 14, 31, 96, 12, 5, sdGrad(g, 0, 31, 0, 43, '#3f7050', '#2a4f38'));
+      /* 차양 */
+      sdScallops(g, 15, 109, 42, 11, '#e8563f', '#f6ecd6', 6);
+      g.strokeStyle = SD_INK; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(15, 42); g.lineTo(109, 42); g.stroke();
+      /* 쇼윈도 */
+      sdBox(g, 26, 58, 40, 25, 4, sdGrad(g, 0, 58, 0, 83, '#d6eef6', '#a7cfdd'));
+      sdShine(g, 28, 60, 36, 12, 3, 0.5);
+      /* 진열: 유니폼 + 공 */
+      g.fillStyle = '#c8432f';
+      g.beginPath();
+      g.moveTo(36, 66); g.lineTo(42, 63); g.lineTo(47, 66); g.lineTo(47, 78); g.lineTo(36, 78);
+      g.closePath(); g.fill();
+      g.strokeStyle = '#f2e6c4'; g.lineWidth = 1.4;
+      g.beginPath(); g.moveTo(36, 66); g.lineTo(47, 66); g.stroke();
+      Art.drawBall(g, 58, 74, 3.4);
+      /* 문 */
+      sdBox(g, 76, 56, 22, 32, 4, sdGrad(g, 0, 56, 0, 88, '#d8b483', '#b88f5c'));
+      sdBox(g, 84, 56, 1.8, 32, 0.8, 'rgba(70,45,20,0.5)', false);
+      /* 간판 공 */
+      sdBox(g, 55, 12, 14, 14, 7, '#f7f4e8', '#d9d1bb', 1.3);
+      Art.drawBall(g, 62, 19, 4.2);
+      /* 화분 */
+      sdBox(g, 22, 78, 9, 10, 2.4, '#b9754a');
+      g.fillStyle = '#4f9a4a';
+      g.beginPath(); g.ellipse(26.5, 74, 6, 4.5, 0, 0, Math.PI * 2); g.fill();
     } else if (kind === 'fanclub') {
-      fill(g, 4, 7, 18, 14, '#e6d9b8');
-      fill(g, 3, 5, 20, 3, '#2f5fa8');
-      fill(g, 5, 6, 2, 2, '#f2e6c4');
-      /* 깃발 */
-      fill(g, 12, 1, 1, 6, '#8a6a3a');
-      fill(g, 13, 1, 7, 4, '#c8432f');
-      fill(g, 14, 2, 4, 2, '#f6d968');
-      /* 관중 */
-      var cols = ['#c8432f', '#2f5fa8', '#d8a419', '#2a7a45', '#8a5a3a'];
-      for (i = 0; i < 5; i++) {
-        fill(g, 6 + i * 3, 12, 2, 2, cols[i % cols.length]);
-        fill(g, 6 + i * 3, 14, 2, 5, cols[(i + 2) % cols.length]);
+      /* 스탠드 */
+      sdBox(g, 16, 50, 92, 36, 8, sdGrad(g, 0, 50, 0, 86, '#e7dcc0', '#c9b998'));
+      for (i = 0; i < 3; i++) {
+        sdBox(g, 20 + i * 3, 55 + i * 8, 84 - i * 6, 7, 3, i % 2 ? '#d5c8a6' : '#ded2b3', 'rgba(60,70,50,0.35)', 1);
       }
-      fill(g, 5, 19, 16, 1, '#b8a582');
+      /* 관중 */
+      var crowdCols = ['#e2553f', '#2f6fbf', '#f0b429', '#3d8f5c', '#8a5cd6', '#e0e6d8'];
+      for (i = 0; i < 9; i++) {
+        var cx = 26 + i * 9.4, cy = 56 + (i % 3) * 8;
+        var cc = crowdCols[i % crowdCols.length];
+        g.fillStyle = cc;
+        g.beginPath(); g.arc(cx, cy, 2.6, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(cx, cy + 5, 3.4, 3.2, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(28,42,35,0.55)'; g.lineWidth = 0.7;
+        g.beginPath(); g.arc(cx, cy, 2.6, 0, Math.PI * 2); g.stroke();
+      }
+      /* 깃발 */
+      sdFlag(g, 34, 50, 34, '#e2553f', 1.5);
+      sdFlag(g, 62, 50, 40, '#2f6fbf', -1);
+      sdFlag(g, 90, 50, 32, '#f0b429', 2);
+      /* 배너 */
+      sdBox(g, 44, 26, 36, 11, 4, '#f7f2e0', '#cfc5a8', 1.2);
+      g.fillStyle = '#c8432f';
+      g.beginPath(); g.arc(52, 31.5, 3.2, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#3d6b48';
+      for (i = 0; i < 3; i++) { sdBox(g, 59 + i * 6, 29.5, 4.4, 2, 1, '#3d6b48', false); }
+      g.fillStyle = '#3d6b48';
+      for (i = 0; i < 3; i++) { sdBox(g, 59 + i * 6, 32.5, 4.4, 1.6, 0.8, 'rgba(60,110,70,0.5)', false); }
     } else {
-      /* cafe */
-      fill(g, 3, 7, 20, 14, '#efe2c6');
-      fill(g, 2, 4, 22, 3, '#2a7a45');
-      fill(g, 3, 5, 2, 2, '#f2e6c4');
-      fill(g, 4, 11, 18, 8, '#c9a97a');
-      fill(g, 4, 10, 18, 1, '#8a6134');
+      /* 카페 */
+      sdBox(g, 20, 44, 84, 44, 8, sdGrad(g, 0, 44, 0, 88, '#fbf1dd', '#e5d3b2'));
+      /* 차양 */
+      sdBox(g, 16, 33, 92, 11, 5, sdGrad(g, 0, 33, 0, 44, '#3f7050', '#2a4f38'));
+      sdScallops(g, 17, 107, 43, 10, '#f6ecd6', '#3f7050', 6);
+      /* 창 */
+      sdBox(g, 27, 56, 42, 26, 5, sdGrad(g, 0, 56, 0, 82, '#e8f4ea', '#bcd9cd'));
+      sdShine(g, 29, 58, 38, 12, 4, 0.55);
       /* 컵 */
-      fill(g, 9, 10, 5, 5, '#f7f2e2');
-      fill(g, 9, 10, 5, 1, '#6b4a2a');
-      fill(g, 14, 11, 1, 3, '#f7f2e2');
-      fill(g, 11, 7, 1, 2, 'rgba(255,255,255,0.5)');
-      fill(g, 13, 8, 1, 1, 'rgba(255,255,255,0.4)');
-      /* 의자 */
-      fill(g, 6, 15, 2, 5, '#8a5a3a');
-      fill(g, 15, 15, 2, 5, '#8a5a3a');
+      sdBox(g, 37, 66, 14, 11, 3, '#fdfcf6', '#cfc7b2', 1.3);
+      sdBox(g, 50, 68, 4, 6, 2, 'rgba(253,252,246,0.9)', '#cfc7b2', 1.1);
+      g.fillStyle = '#8a5a34';
+      g.beginPath(); g.ellipse(44, 67.2, 6, 1.8, 0, 0, Math.PI * 2); g.fill();
+      /* 김 */
+      g.strokeStyle = 'rgba(255,255,255,0.75)';
+      g.lineWidth = 1.5;
+      for (i = 0; i < 2; i++) {
+        g.beginPath();
+        g.moveTo(41 + i * 6, 63);
+        g.quadraticCurveTo(38 + i * 6, 58, 42 + i * 6, 54);
+        g.stroke();
+      }
+      /* 문 */
+      sdBox(g, 78, 56, 20, 32, 4, sdGrad(g, 0, 56, 0, 88, '#c9a97a', '#a8845a'));
+      sdBox(g, 86, 56, 1.6, 32, 0.8, 'rgba(80,52,24,0.45)', false);
+      /* 테이블 · 의자 */
+      sdBox(g, 96, 72, 20, 3.4, 1.6, '#8a5a3a');
+      sdBox(g, 98, 75, 2.6, 9, 1.2, '#6b4529', false);
+      sdBox(g, 112, 75, 2.6, 9, 1.2, '#6b4529', false);
     }
-    /* 레벨 핍 */
+
+    /* 레벨 핍 (5칸) */
     var lv = level || 0;
     for (i = 0; i < 5; i++) {
-      fill(g, 3 + i * 4, 20.5, 3, 1, i < lv ? '#e8b62c' : 'rgba(60,40,20,0.20)');
+      sdRR(g, 82 + i * 8, 91.5, 5.4, 4.2, 2);
+      g.fillStyle = i < lv ? '#f0b429' : 'rgba(28,42,35,0.18)';
+      g.fill();
+      if (i < lv) { g.strokeStyle = '#a87513'; g.lineWidth = 0.8; g.stroke(); }
     }
     return c;
   };
 
   Art.paintFacility = function (canvas, kind, level) {
     var fig = Art.facilityFig(kind, level);
-    var k = 2;
-    canvas.width = fig.width * k;
-    canvas.height = fig.height * k;
+    var dpr = Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2);
+    var w = 124, h = 100;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
     var g = canvas.getContext('2d');
-    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.imageSmoothingEnabled = true;
     g.drawImage(fig, 0, 0, canvas.width, canvas.height);
   };
 
-  /* ── 스태프 (스카우터 안내원 등) ── */
+  /* ── 스태프 SD 초상 (스카우터 안내원 · 코치 · 메디컬) ── */
+  var STAFF_DEF = {
+    scout: { skin: '#f0c8a0', hair: '#3a2a1a', uniform: '#2f8fc4', accent: '#f2e6c4', cap: 'scout', prop: 'clip' },
+    coach: { skin: '#e8bd92', hair: '#4a3423', uniform: '#2b3a4a', accent: '#c8f169', cap: 'coach', prop: 'board' },
+    medic: { skin: '#f7d3ae', hair: '#5a4632', uniform: '#f6f4ea', accent: '#d8432c', cap: 'medic', prop: 'cross' }
+  };
   Art.staffFig = function (kind) {
-    var W = 20, H = 26;
+    var d = STAFF_DEF[kind] || STAFF_DEF.scout;
+    var W = 96, H = 112;
     var c = makeCanvas(W, H);
     var g = c.getContext('2d');
-    var skin = kind === 'medic' ? '#f7d3ae' : '#f0c49a';
-    var hair = kind === 'scout' ? '#d8b45a' : (kind === 'coach' ? '#4a3423' : '#3a2a1c');
-    /* 다리 */
-    fill(g, 6, 20, 2, 5, kind === 'scout' ? '#3a4a6a' : '#4a4a4a');
-    fill(g, 12, 20, 2, 5, kind === 'scout' ? '#3a4a6a' : '#4a4a4a');
-    fill(g, 4, 24, 4, 2, '#3a2c22');
-    fill(g, 12, 24, 4, 2, '#3a2c22');
-    /* 몸통 */
-    var uniform = kind === 'scout' ? '#2f8fc4' : (kind === 'medic' ? '#f2efe4' : '#2a2a2a');
-    fill(g, 4, 12, 12, 9, uniform);
-    fill(g, 4, 12, 2, 9, shade(uniform, 24));
-    fill(g, 14, 12, 2, 9, shade(uniform, -30));
-    fill(g, 4, 19, 12, 1, shade(uniform, -26));
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+    g.clearRect(0, 0, W, H);
+    var skin = d.skin || '#f0c8a0';
+    var skinD = shade(skin, -26);
+    var skinL = shade(skin, 14);
+    var hair = d.hair || '#3a2a1a';
+    var hairD = shade(hair, -26);
+    var uni = d.uniform || '#2f8fc4';
+    var uniD = shade(uni, -34);
+
+    /* 어깨 · 몸통 */
+    g.beginPath();
+    g.moveTo(10, 112);
+    g.quadraticCurveTo(12, 82, 48, 78);
+    g.quadraticCurveTo(84, 82, 86, 112);
+    g.closePath();
+    g.fillStyle = sdGrad(g, 0, 78, 0, 112, shade(uni, 16), uniD);
+    g.fill();
+    g.lineWidth = 1.9; g.strokeStyle = SD_INK; g.stroke();
+    /* 셔츠 깃 */
+    g.fillStyle = d.accent || '#f2e6c4';
+    g.beginPath();
+    g.moveTo(38, 79); g.lineTo(48, 92); g.lineTo(58, 79);
+    g.lineTo(52, 77); g.lineTo(48, 84); g.lineTo(44, 77);
+    g.closePath();
+    g.fill();
+    g.lineWidth = 1.1; g.strokeStyle = 'rgba(28,42,35,0.55)'; g.stroke();
     /* 목 */
-    fill(g, 8, 10, 4, 2, skin);
-    /* 머리 */
-    var i;
-    for (i = 0; i < HEAD_ROWS.length; i++) {
-      fill(g, HEAD_ROWS[i][0], i + 1, HEAD_ROWS[i][1] - HEAD_ROWS[i][0] + 1, 1, skin);
+    sdBox(g, 40, 66, 16, 16, 7, skin, SD_INK, 1.7);
+    g.fillStyle = skinD;
+    g.beginPath(); g.ellipse(48, 79, 8, 3.4, 0, 0, Math.PI * 2); g.fill();
+    /* 귀 */
+    g.fillStyle = skin;
+    g.beginPath(); g.ellipse(24, 44, 4.2, 6, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(72, 44, 4.2, 6, 0, 0, Math.PI * 2); g.fill();
+    g.lineWidth = 1.6; g.strokeStyle = SD_INK;
+    g.beginPath(); g.ellipse(24, 44, 4.2, 6, 0, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.ellipse(72, 44, 4.2, 6, 0, 0, Math.PI * 2); g.stroke();
+    /* 얼굴 */
+    sdBox(g, 27, 22, 42, 46, 19, sdGrad(g, 27, 22, 69, 68, skinL, skin));
+    g.save();
+    sdRR(g, 27, 22, 42, 46, 19);
+    g.clip();
+    g.fillStyle = 'rgba(255,255,255,0.20)';
+    g.beginPath(); g.ellipse(38, 34, 8, 11, -0.35, 0, Math.PI * 2); g.fill();
+    g.fillStyle = skinD;
+    g.beginPath(); g.ellipse(66, 46, 9, 14, 0.2, 0, Math.PI * 2); g.fill();
+    g.restore();
+    /* 눈썹 · 눈 */
+    g.strokeStyle = hairD;
+    g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(35, 40); g.quadraticCurveTo(39, 37.6, 43, 39.4); g.stroke();
+    g.beginPath(); g.moveTo(53, 39.4); g.quadraticCurveTo(57, 37.6, 61, 40); g.stroke();
+    var eyes = [[39, 47], [57, 47]];
+    for (var e = 0; e < 2; e++) {
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.ellipse(eyes[e][0], eyes[e][1], 4.4, 4.9, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#243029';
+      g.beginPath(); g.arc(eyes[e][0] + 0.4, eyes[e][1] + 0.5, 2.5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.95)';
+      g.beginPath(); g.arc(eyes[e][0] + 1.5, eyes[e][1] - 1.3, 0.85, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = SD_INK; g.lineWidth = 0.9;
+      g.beginPath(); g.ellipse(eyes[e][0], eyes[e][1], 4.4, 4.9, 0, 0, Math.PI * 2); g.stroke();
     }
-    if (kind === 'scout') {
-      fill(g, 5, 0, 10, 1, hair);
-      fill(g, 4, 1, 12, 3, hair);
-      fill(g, 4, 4, 2, 5, hair);
-      fill(g, 14, 4, 2, 5, hair);
-      fill(g, 6, 2, 4, 1, shade(hair, 24));
-      fill(g, 6, 6, 1, 1, '#2a2018');
-      fill(g, 9, 6, 1, 1, '#2a2018');
-      fill(g, 8, 8, 2, 1, shade(skin, -40));
-      fill(g, 7, 9, 4, 1, '#a8442e');
-    } else if (kind === 'coach') {
-      fill(g, 4, 0, 12, 3, hair);
-      fill(g, 4, 2, 12, 1, shade(hair, -20));
-      fill(g, 6, 5, 2, 1, '#2a2018'); fill(g, 10, 5, 2, 1, '#2a2018');
-      fill(g, 8, 7, 2, 1, shade(skin, -40));
-      fill(g, 7, 9, 4, 1, '#8a4a3a');
-      /* 모자 */
-      fill(g, 4, 0, 12, 2, '#2a3a5a');
-      fill(g, 3, 2, 14, 1, '#3a4a6a');
+    /* 코 · 입 */
+    g.strokeStyle = shade(skin, -52);
+    g.lineWidth = 1.3;
+    g.beginPath(); g.moveTo(48, 52); g.quadraticCurveTo(49.4, 56, 47.4, 57.2); g.stroke();
+    g.strokeStyle = '#a8442e';
+    g.lineWidth = 1.7;
+    g.beginPath(); g.moveTo(44, 61); g.quadraticCurveTo(48, 63.4, 52, 61); g.stroke();
+    /* 볼터치 */
+    g.fillStyle = 'rgba(226,120,96,0.20)';
+    g.beginPath(); g.ellipse(35, 55, 4.6, 2.8, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(61, 55, 4.6, 2.8, 0, 0, Math.PI * 2); g.fill();
+    /* 헤어 */
+    g.fillStyle = hair;
+    g.beginPath();
+    g.moveTo(26, 40);
+    g.quadraticCurveTo(24, 16, 48, 15);
+    g.quadraticCurveTo(72, 16, 70, 40);
+    g.quadraticCurveTo(66, 30, 56, 28);
+    g.quadraticCurveTo(44, 26, 34, 31);
+    g.quadraticCurveTo(28, 33, 26, 40);
+    g.closePath();
+    g.fill();
+    g.lineWidth = 1.7; g.strokeStyle = SD_INK; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.16)';
+    g.beginPath(); g.ellipse(38, 24, 8, 4, -0.5, 0, Math.PI * 2); g.fill();
+    /* 모자 */
+    if (d.cap === 'scout') {
+      g.fillStyle = '#23445c';
+      g.beginPath();
+      g.moveTo(26, 30); g.quadraticCurveTo(28, 12, 48, 11); g.quadraticCurveTo(68, 12, 70, 30);
+      g.closePath(); g.fill();
+      g.lineWidth = 1.7; g.strokeStyle = SD_INK; g.stroke();
+      sdBox(g, 22, 28, 52, 6, 3, '#2f5d7d', SD_INK, 1.6);
+      g.fillStyle = d.accent; g.beginPath(); g.arc(48, 19, 3.4, 0, Math.PI * 2); g.fill();
+    } else if (d.cap === 'coach') {
+      g.fillStyle = '#2b3a4a';
+      g.beginPath();
+      g.moveTo(27, 28); g.quadraticCurveTo(30, 14, 48, 13); g.quadraticCurveTo(66, 14, 69, 28);
+      g.closePath(); g.fill();
+      g.lineWidth = 1.7; g.strokeStyle = SD_INK; g.stroke();
+      sdBox(g, 20, 26, 56, 5.5, 2.6, '#3d5266', SD_INK, 1.5);
+      g.fillStyle = d.accent; g.fillRect(46, 15, 5, 2.4);
     } else {
-      fill(g, 5, 0, 10, 2, hair);
-      fill(g, 4, 1, 2, 4, hair);
-      fill(g, 14, 1, 2, 4, hair);
-      fill(g, 6, 5, 2, 1, '#2a2018'); fill(g, 10, 5, 2, 1, '#2a2018');
-      fill(g, 8, 7, 2, 1, shade(skin, -40));
-      fill(g, 7, 9, 4, 1, '#a8442e');
-      /* 간호 모자 */
-      fill(g, 7, 0, 6, 2, '#f7f2e2');
-      fill(g, 9, 0, 2, 2, '#c8432f');
+      g.fillStyle = '#fbfaf4';
+      sdBox(g, 30, 12, 36, 13, 5, '#fbfaf4', SD_INK, 1.5);
+      sdBox(g, 45.4, 14.6, 5.2, 8, 1.6, '#d8432c', false);
+      sdBox(g, 41.4, 18.2, 13.2, 2.8, 1.2, '#d8432c', false);
     }
-    /* 팔 */
-    fill(g, 2, 12, 2, 5, uniform);
-    fill(g, 16, 12, 2, 5, uniform);
-    fill(g, 2, 17, 2, 3, skin);
-    fill(g, 16, 17, 2, 3, skin);
-    /* 넥타이 / 목걸이 */
-    if (kind === 'scout') {
-      fill(g, 9, 12, 2, 6, '#f2e6c4');
-      fill(g, 8, 12, 4, 1, '#e8b62c');
-    }
-    /* 소품 */
-    if (kind === 'scout') {
-      /* 돋보기 */
-      fill(g, 16, 18, 2, 2, '#c9a227');
-      fill(g, 17, 19, 2, 2, '#8a6a3a');
-    } else if (kind === 'coach') {
-      fill(g, 16, 16, 2, 2, '#f2e6c4');
+    /* 가슴 소품 */
+    if (d.prop === 'clip') {
+      sdBox(g, 52, 88, 26, 22, 3, '#f7f4e8', SD_INK, 1.5);
+      g.fillStyle = '#b9c4c9';
+      for (var r = 0; r < 4; r++) { sdBox(g, 56, 92 + r * 4, 18, 1.6, 0.8, r === 0 ? '#c8432f' : 'rgba(90,105,100,0.55)', false); }
+      sdBox(g, 56, 84, 12, 6, 2, '#c9d2d6', SD_INK, 1.2);
+    } else if (d.prop === 'board') {
+      sdBox(g, 54, 88, 28, 20, 3, '#2f6b4a', SD_INK, 1.5);
+      g.strokeStyle = 'rgba(255,255,255,0.78)'; g.lineWidth = 1.1;
+      g.beginPath(); g.moveTo(58, 104); g.lineTo(78, 104); g.stroke();
+      g.beginPath(); g.arc(68, 96, 4.4, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(68, 90); g.lineTo(68, 102); g.stroke();
+      g.fillStyle = '#ffe28a';
+      for (var q = 0; q < 3; q++) { g.beginPath(); g.arc(60 + q * 6, 93 + (q % 2) * 5, 1.5, 0, Math.PI * 2); g.fill(); }
+    } else {
+      sdBox(g, 53, 86, 24, 24, 4, '#fbfaf4', SD_INK, 1.5);
+      sdBox(g, 63.4, 90, 3.2, 15, 1.3, '#d8432c', false);
+      sdBox(g, 57.6, 95.9, 15, 3.2, 1.3, '#d8432c', false);
+      /* 청진기 */
+      g.strokeStyle = '#3d4a55'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(40, 84); g.quadraticCurveTo(34, 96, 44, 100); g.stroke();
+      g.fillStyle = '#9fb4c0';
+      g.beginPath(); g.arc(44, 100, 2.6, 0, Math.PI * 2); g.fill();
     }
     return c;
   };
 
   Art.paintStaff = function (canvas, kind) {
     var fig = Art.staffFig(kind);
-    var k = 3;
-    canvas.width = fig.width * k;
-    canvas.height = fig.height * k;
+    var dpr = Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2);
+    canvas.width = Math.round(96 * dpr);
+    canvas.height = Math.round(112 * dpr);
     var g = canvas.getContext('2d');
-    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.imageSmoothingEnabled = true;
     g.drawImage(fig, 0, 0, canvas.width, canvas.height);
   };
 

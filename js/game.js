@@ -876,8 +876,11 @@
       lv = S.facilities[fac.key] || 0;
       cost = DS.facilityCost(fac, lv);
       var ficon = { training: '🏋️', medical: '🚑', shop: '🛍️', fanclub: '📣', cafe: '☕' }[fac.key] || '🏟️';
+      void ficon;
       facHTML += '<div class="fac">' +
-        '<div class="row between"><div class="row" style="gap:5px;min-width:0"><span class="ico">' + ficon + '</span><span class="fac-name">' + fac.name + '</span></div><span class="fac-lv">Lv.' + lv + '/5</span></div>' +
+        '<div class="row between"><div class="row" style="gap:6px;min-width:0">' +
+        '<canvas class="fac-art" data-fac="' + fac.key + '" data-lv="' + lv + '" width="62" height="50"></canvas>' +
+        '<span class="fac-name">' + fac.name + '</span></div><span class="fac-lv">Lv.' + lv + '/5</span></div>' +
         '<div class="bar" style="margin:4px 0 3px"><i style="width:' + (lv / 5 * 100) + '%"></i></div>' +
         '<div class="eff">' + fac.target + ' ' + (lv > 0 ? '+' + facEffect(fac, lv) + fac.unit : '—') + '</div>' +
         '<button class="btn sm wide" data-act="facility" data-k="' + fac.key + '" ' + (lv >= 5 || S.money < cost ? 'disabled' : '') + '>' +
@@ -965,6 +968,21 @@
       '<span class="tiny muted">저장 데이터가 삭제됩니다</span></div></div>';
 
     paintEmblems(box);
+    paintFacilities(box);
+  }
+
+  /* v20 — 시설 SD 일러스트 캔버스 페이팅 */
+  function paintFacilities(root) {
+    var list = (root || document).querySelectorAll('canvas[data-fac]'), i;
+    for (i = 0; i < list.length; i++) {
+      DS.Art.paintFacility(list[i], list[i].getAttribute('data-fac'), parseInt(list[i].getAttribute('data-lv'), 10) || 0);
+    }
+  }
+  function paintStaffs(root) {
+    var list = (root || document).querySelectorAll('canvas[data-staff]'), i;
+    for (i = 0; i < list.length; i++) {
+      DS.Art.paintStaff(list[i], list[i].getAttribute('data-staff'));
+    }
   }
 
   function playerOptions(sel) {
@@ -1046,7 +1064,10 @@
     box.innerHTML =
       '<div class="card dark">' +
       '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">스페셜 스카우트</b><span class="meta">4인 후보 · 천장 ' + pity + '/30</span></div>' +
-      '<div class="tiny" style="color:rgba(233,244,221,.62);margin-bottom:7px">영입 비용 ' + fmt(CAND_COST) + ' · 방출할 선수를 고르면 바로 교환됩니다.</div>' +
+      '<div class="scout-desk">' +
+      '<canvas class="staff-art" data-staff="scout" width="96" height="112"></canvas>' +
+      '<div class="sd-copy"><b>스카우터 안내원</b><span>4인 후보를 직접 보고 고르세요 · 영입 비용 ' + fmt(CAND_COST) + '</span>' +
+      '<em>방출할 선수를 고르면 바로 교환됩니다.</em></div></div>' +
       '<div class="scout-grid">' + cards + '</div>' +
       '<div class="row between" style="margin-top:6px">' +
       '<button class="btn ghost sm" data-act="reroll" ' + (S.money < REROLL_COST ? 'disabled' : '') + '>리스트 갱신 · ' + fmt(REROLL_COST) + '</button>' +
@@ -1068,6 +1089,7 @@
       '<div class="row between"><span class="tiny muted">응원단 파티 · 사기 +12</span><button class="btn sm" data-act="item" data-k="party" ' + (S.money < 900 ? 'disabled' : '') + '>900</button></div></div>';
 
     paintEmblems(box);
+    paintStaffs(box);
   }
 
   /* ═════════════════  모달 ═════════════════ */
@@ -1616,28 +1638,91 @@
     return out;
   }
 
+  /* ── v20 ③ — 상대 준비 · 스카우팅 : 킥오프에 실제로 스폰되는 그 스쿼드/감독을 미리 만든다 ── */
+  var pendingOpp = null;
+  function oppFor(kind, opt) {
+    opt = opt || {};
+    var out = { kind: kind, team: null, id: null, venueHome: true };
+    var i, best, o;
+    if (kind === 'smatch') {
+      out.id = opt.teamId;
+      out.team = opponentTeam(out.id);
+    } else if (kind === 'challenge') {
+      best = DS.TEAMS[0];
+      for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].strength > best.strength) { best = DS.TEAMS[i]; } }
+      out.team = best;
+      out.id = best.id;
+    } else {
+      o = currentOpponent();
+      if (!o) { return null; }
+      out.team = opponentTeam(o.id);
+      out.id = o.id;
+      out.venueHome = !!o.home;
+    }
+    out.formation = oppFormation(out.team);
+    out.mgr = oppManager(out.team);
+    return out;
+  }
+  function prepareOpp(kind, opt) {
+    var key = [kind, (opt && opt.teamId) || '', S.round, S.season, S.formation].join('|');
+    if (pendingOpp && pendingOpp.key === key) { return pendingOpp; }
+    var o = oppFor(kind, opt);
+    if (!o) { return null; }
+    o.key = key;
+    o.squad = buildAwaySquad(o.team, o.formation);
+    o.scout = DS.scoutReport({
+      formation: o.formation, style: o.mgr.tacticStyle, players: o.squad, managerName: o.mgr.name
+    });
+    pendingOpp = o;
+    return o;
+  }
+  /* 스카우팅 리포트 카드 — 포메이션 · 감독 철학 · 위험 선수 · 카운터 팁 */
+  function scoutHTML(prep, cls) {
+    if (!prep || !prep.scout) { return ''; }
+    var sc = prep.scout, i, lanes = '', lg = [['left', '좌'], ['center', '중'], ['right', '우']];
+    for (i = 0; i < lg.length; i++) {
+      lanes += '<div class="sc-lane"><span>' + lg[i][1] + '</span>' +
+        '<i style="width:' + Math.max(3, sc.lanes[lg[i][0]]) + '%"></i><b>' + sc.lanes[lg[i][0]] + '</b></div>';
+    }
+    var dg = '', d;
+    for (i = 0; i < sc.danger.length; i++) {
+      d = sc.danger[i];
+      dg += '<div class="sc-danger-row"><span class="sc-rank">' + (i + 1) + '</span>' +
+        '<b>' + esc(shortName(d.name)) + '</b><span class="sc-pos">' + d.pos + ' · ' + d.laneKo + '</span>' +
+        (d.foot ? '<span class="sc-foot">' + d.foot + '</span>' : '') +
+        '<em>' + d.ovr + '</em></div>';
+    }
+    var tips = '', t;
+    for (i = 0; i < sc.tips.length; i++) {
+      t = sc.tips[i];
+      tips += '<li>' + esc(t) + '</li>';
+    }
+    return '<div class="card scout-card ' + (cls || '') + '">' +
+      '<div class="card-head"><b>상대 스카우팅 리포트</b><span class="meta">SCOUTING · ' + esc(prep.team.short) + '</span></div>' +
+      '<div class="sc-head">' +
+      '<canvas class="sc-emblem" data-emblem="' + prep.team.emblem + '" data-kit="' + prep.team.kit.shirt + '|' + prep.team.kit.trim + '" width="26" height="30"></canvas>' +
+      '<div class="sc-id"><b>' + esc(prep.team.name) + '</b><span>' + esc(prep.formation) + ' · ' + esc(sc.styleName) + ' · ' + esc(prep.mgr.name) + '</span></div>' +
+      '<div class="sc-tag"><b>' + sc.press + '</b><span>압박</span></div>' +
+      '<div class="sc-tag"><b>' + sc.depth + '</b><span>라인</span></div>' +
+      '</div>' +
+      '<div class="sc-lanes">' + lanes + '</div>' +
+      '<div class="sc-danger">' + dg + '</div>' +
+      '<ul class="sc-tips">' + tips + '</ul>' +
+      '<div class="sc-note">주 루트 ' + sc.mainLaneKo + ' · ' + (sc.highLine ? '하이 라인' : (sc.lowBlock ? '로우 블록' : '표준 라인')) + ' · ' + esc(sc.styleLine) + '</div>' +
+      '</div>';
+  }
+
   function startMatch(kind, opt) {
     opt = opt || {};
     /* v17 — 경기 시작 클릭(사용자 제스처)에서 오디오 컨텍스트를 연다 */
     if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
-    var oppTeam = null, oppId = null, i, venueHome = true;
-    if (kind === 'smatch') {
-      oppId = opt.teamId;
-      oppTeam = opponentTeam(oppId);
-      if (S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
-      S.smatchTickets--;
-    } else if (kind === 'challenge') {
-      if (S.challengeLeft <= 0) { toast('오늘 챌린지를 모두 소진했습니다.'); return; }
-      oppTeam = DS.TEAMS[0];
-      for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].strength > oppTeam.strength) { oppTeam = DS.TEAMS[i]; } }
-      oppId = oppTeam.id;
-    } else {
-      var o = currentOpponent();
-      if (!o) { toast('이번 시즌 일정이 끝났습니다.'); return; }
-      oppTeam = opponentTeam(o.id);
-      oppId = o.id;
-      venueHome = !!o.home;
-    }
+    if (kind === 'smatch' && S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
+    if (kind === 'challenge' && S.challengeLeft <= 0) { toast('오늘 챌린지를 모두 소진했습니다.'); return; }
+    /* v20 ③ — 미리 만든 상대(스카우팅 리포트의 그 스쿼드)를 그대로 쓴다 */
+    var prep = prepareOpp(kind, opt);
+    if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
+    var oppTeam = prep.team, oppId = prep.id, venueHome = prep.venueHome, i;
+    if (kind === 'smatch') { S.smatchTickets--; }
 
     var f = DS.FORMATIONS[S.formation], lineup = [], k, p;
     for (k = 0; k < S.lineup.length; k++) {
@@ -1655,8 +1740,9 @@
     var benchList = benchPlayers().map(function (b) {
       return { player: b, pos: b.pos, rating: DS.ratingOf(b) };
     });
-    var awayFormation = oppFormation(oppTeam);
-    var oppMgr = oppManager(oppTeam);
+    var awayFormation = prep.formation;
+    var oppMgr = prep.mgr;
+    pendingOpp = null;                       /* 이 상대는 소모됐다 — 다음 경기는 새로 뽑는다 */
 
     var cfg = {
       homeName: S.club.name,
@@ -1670,7 +1756,7 @@
       lineup: lineup,
       bench: benchList,
       homeFormation: S.formation,
-      awayPlayers: buildAwaySquad(oppTeam, awayFormation),
+      awayPlayers: prep.squad,
       awayFormation: awayFormation,
       homeTacticStyle: mgr().tacticStyle,
       awayTacticStyle: oppMgr.tacticStyle,
@@ -1689,6 +1775,7 @@
       kind: kind,
       onHalftime: function () { openSubs(true); },
       onHud: function (st) { updateHud(st); },
+      onTouch: function (st) { updateTouchHud(st); },
       onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind, venueHome); }
     };
     global.setTimeout(function () { if (DS.Match) { DS.Match.start(cfg); } }, 60);
@@ -1855,6 +1942,7 @@
       html += '<div class="card"><div class="card-head"><b>시즌 종료</b></div><div class="tiny muted">공식전 탭에서 새 시즌을 시작하세요.</div></div>';
     } else if (next) {
       var opp = opponentTeam(next.id);
+      var prep = prepareOpp('league');
       html += '<div class="card"><div class="card-head"><b>킥오프 준비</b><span class="meta">' + (S.round + 1) + '라운드</span></div>' +
         '<div class="vs"><div class="vs-team"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="38" height="44"></canvas><span class="nm">' + esc(S.club.name) + '</span></div>' +
         '<div class="vs-mid"><b>VS</b><span>' + oppFormation(opp) + ' · ' + DS.tacticStyle(oppManager(opp).tacticStyle).name + '</span></div>' +
@@ -1862,6 +1950,7 @@
         '<div class="kpis" style="margin-bottom:8px"><div class="kpi"><b class="lime">' + xgEstimate(opp.strength).toFixed(1) + '</b><span>xG</span></div>' +
         '<div class="kpi"><b>' + pressLevel() + '</b><span>압박</span></div><div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력</span></div></div>' +
         '<button class="btn primary wide" data-act="kickoff">킥오프</button></div>';
+      html += scoutHTML(prep);
     }
     html += '<div class="card"><div class="card-head"><b>조작 안내</b></div>' +
       '<div class="tiny muted" style="line-height:1.75">· <b>모멘텀</b> — 패스·태클·슈팅으로 게이지를 채웁니다.<br>' +
@@ -1869,6 +1958,60 @@
       '· <b>배속 · 전술 · 교체</b> — 경기 중 언제든 조작할 수 있습니다.</div></div>';
     box.innerHTML = html;
     paintEmblems(box);
+  }
+
+  /* ── v20 ① — 라이브 터치라인 지시 UI (컴팩트 바 + 드로어) ── */
+  var TOUCH_GROUPS = [
+    { k: 'mentality', label: '공격 성향', opts: [['defensive', '수비적'], ['balanced', '균형'], ['attacking', '공격적'], ['allout', '총공세']] },
+    { k: 'pressing', label: '압박 강도', opts: [['low', '낮음'], ['normal', '보통'], ['high', '전방 압박']] },
+    { k: 'line', label: '수비 라인', opts: [['deep', '내리기'], ['standard', '표준'], ['high', '올리기']] },
+    { k: 'focus', label: '공격 루트', opts: [['balance', '밸런스'], ['left', '좌측'], ['center', '중앙'], ['right', '우측']] }
+  ];
+  function touchInit() {
+    var men = S.tactics === 'defense' ? 'defensive' : (S.tactics === 'attack' ? 'attacking' : (S.tactics === 'allout' ? 'allout' : 'balanced'));
+    return { mentality: men, pressing: 'normal', line: 'standard', focus: 'balance' };
+  }
+  function touchLabelOf(k, v) {
+    var i, j, g;
+    for (i = 0; i < TOUCH_GROUPS.length; i++) {
+      g = TOUCH_GROUPS[i];
+      if (g.k !== k) { continue; }
+      for (j = 0; j < g.opts.length; j++) { if (g.opts[j][0] === v) { return g.opts[j][1]; } }
+    }
+    return v;
+  }
+  function touchSummary(cur) {
+    cur = cur || touchInit();
+    return touchLabelOf('mentality', cur.mentality) + ' · ' + touchLabelOf('pressing', cur.pressing) + ' · ' +
+      touchLabelOf('line', cur.line) + ' · ' + touchLabelOf('focus', cur.focus);
+  }
+  function touchDrawerHTML() {
+    var cur = touchInit(), html = '', i, j, g;
+    html += '<div class="mt-head"><b>터치라인 지시</b><button class="mt-x" data-act="touchdrawer" aria-label="닫기">✕</button></div>';
+    html += '<div class="mt-groups">';
+    for (i = 0; i < TOUCH_GROUPS.length; i++) {
+      g = TOUCH_GROUPS[i];
+      html += '<div class="mt-g"><span class="mt-lbl">' + g.label + '</span><div class="mt-opts">';
+      for (j = 0; j < g.opts.length; j++) {
+        html += '<button data-act="touch" data-k="' + g.k + '" data-v="' + g.opts[j][0] + '" class="' + (cur[g.k] === g.opts[j][0] ? 'on' : '') + '">' + g.opts[j][1] + '</button>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div><div class="mt-foot">바꾸면 즉시 라인 · 압박 · 루트가 달라집니다</div>';
+    return html;
+  }
+  function updateTouchHud(st) {
+    if (!st) { return; }
+    var chips = document.getElementById('m-tl-chips');
+    if (chips) { chips.textContent = touchSummary(st); }
+    var box = document.getElementById('m-touch');
+    if (!box) { return; }
+    var btns = box.querySelectorAll('button[data-act="touch"]'), i, k, v;
+    for (i = 0; i < btns.length; i++) {
+      k = btns[i].getAttribute('data-k');
+      v = btns[i].getAttribute('data-v');
+      btns[i].classList.toggle('on', st[k] === v);
+    }
   }
 
   function renderMatchLive(oppTeam, kind) {
@@ -1915,11 +2058,11 @@
       '<div class="lv-row"><span class="lv-lbl">슈팅</span><b class="lv-shots" id="m-shots">0 <em>:</em> 0</b><span class="lv-min" id="m-min">0\'</span></div>' +
       '<div class="lv-tired none" id="m-tired">체력 40% 이하 없음</div>' +
       '</div>' +
-      '<div class="m-tac"><span class="ctrl-lbl">전술</span><div class="seg" id="m-tactics">' +
-      '<button data-act="tactics" data-v="defense" class="' + (S.tactics === 'defense' ? 'on' : '') + '">수 비</button>' +
-      '<button data-act="tactics" data-v="balanced" class="' + (S.tactics === 'balanced' ? 'on' : '') + '">균 형</button>' +
-      '<button data-act="tactics" data-v="attack" class="' + (S.tactics === 'attack' ? 'on' : '') + '">공 격</button></div></div>' +
+      /* v20 ① — 라이브 터치라인 지시: 한 줄 요약 + 탭하면 열리는 지시판 */
+      '<div class="m-tac"><button class="tl-strip" id="m-tl-strip" data-act="touchdrawer">' +
+      '<span class="tl-lbl">지시</span><span class="tl-chips" id="m-tl-chips">' + esc(touchSummary()) + '</span><span class="tl-go">조작 ›</span></button></div>' +
       '<div class="m-acts"><button class="btn dark sm wide" data-act="subs">선수 교체</button></div>' +
+      '<div class="m-touch" id="m-touch">' + touchDrawerHTML() + '</div>' +
       '</aside></div>' +
 
       '<div class="m-ticker">' +
@@ -2453,6 +2596,24 @@
       if (DS.Match) { DS.Match.setSpeed(v); }
       var sib = document.querySelectorAll('#m-speeds button');
       for (j = 0; j < sib.length; j++) { sib[j].classList.toggle('on', sib[j] === t); }
+      return;
+    }
+    if (act === 'touchdrawer') {
+      var tdr = document.getElementById('m-touch');
+      var tstrip = document.getElementById('m-tl-strip');
+      if (!tdr) { return; }
+      var openNow = !tdr.classList.contains('on');
+      tdr.classList.toggle('on', openNow);
+      if (tstrip) { tstrip.classList.toggle('on', openNow); }
+      return;
+    }
+    if (act === 'touch') {
+      var tk = t.getAttribute('data-k'), tv = t.getAttribute('data-v');
+      if (DS.Match && DS.Match.setTouch) {
+        DS.Match.setTouch(tk, tv);
+        var stT = DS.Match.touchState ? DS.Match.touchState() : null;
+        if (stT) { updateTouchHud(stT); }
+      }
       return;
     }
     if (act === 'tactics') {

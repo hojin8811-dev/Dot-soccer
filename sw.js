@@ -1,12 +1,12 @@
-/*! 도트싸커 v19 — 전술 패턴 · 5초 전환 · AI 맞대응 · 세컨볼 · xG 리포트 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v19b-20261126';
+/*! 도트싸커 v20 — 라이브 터치라인 · 롤·주발 · 스카우팅 · SD 아트 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v20-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=19&b=52', './js/data.js?v=19&b=52', './js/match.js?v=19&b=52', './js/game.js?v=19&b=52',
+        './css/style.css?v=20&b=1', './js/data.js?v=20&b=1', './js/match.js?v=20&b=1', './js/game.js?v=20&b=1',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

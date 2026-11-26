@@ -1,4 +1,4 @@
-/*! 도트싸커 v19 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
+/*! 도트싸커 v20 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
     v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀
     v17: TV 생중계 카메라(패닝·찬스 줌인) · 골 세레모니·Net Ripple·3초 리플레이 ·
          Web Audio 경기장 사운드 · 살아있는 관중석 · 캐스터/해설 2인 중계
@@ -6,7 +6,10 @@
          지속되는 일자 하이 라인 오프사이드 트랩 · 터치라인 교차점 스로인 + 패스 목표 클램프
     v19: 전술 스타일별 공격 패턴 + 탈취 후 5초 전환(Transition) 창 · 원투(월 패스) ·
          AI 감독의 실시간 맞대응(55/70/80분) · 코너·간접 프리킥 세컨볼 경합 ·
-         경기 후 FM식 2D 슈팅 xG맵 + 평균 포지션/패스 연결망 계측 */
+         경기 후 FM식 2D 슈팅 xG맵 + 평균 포지션/패스 연결망 계측
+    v20: 라이브 터치라인 지시(공격 성향·압박 강도·수비 라인·공격 루트) ·
+         포지션/현대 롤/주발이 실제 플레이에 반영(인버티드 윙어 컷인 · 전통 윙어 폭 ·
+         DM 드롭 · B2B 늦은 침투 · CF 폴스나인 vs ST 뒷공간) */
 (function (global) {
   'use strict';
 
@@ -65,6 +68,55 @@
   var fillerTimer = 0;
   var halftimeDone = false;
   var tactic = 'balanced';
+
+  /* ═════════ v20 ① — 라이브 터치라인 지시 ═════════
+     경기 중 감독(사용자)이 터치라인에서 네 가지 지시를 내리고, 그 값이 매 프레임
+     teamShape(shapeOf) · 압박 상한/트리거 거리(pressConfig) · 수비 블록 높이(blockOf→lineYOf)
+     · 공격 루트(attackTarget/passBall/assignRuns)에 바로 반영된다. */
+  var TOUCH_DEF = {
+    mentality: {
+      key: 'mentality', label: '공격 성향', short: '성향',
+      opts: [
+        { v: 'defensive', label: '수비적', short: '수비' },
+        { v: 'balanced', label: '균형', short: '균형' },
+        { v: 'attacking', label: '공격적', short: '공격' },
+        { v: 'allout', label: '총공세', short: '총공세' }
+      ]
+    },
+    pressing: {
+      key: 'pressing', label: '압박 강도', short: '압박',
+      opts: [
+        { v: 'low', label: '낮음', short: '낮음' },
+        { v: 'normal', label: '보통', short: '보통' },
+        { v: 'high', label: '전방 압박', short: '전방' }
+      ]
+    },
+    line: {
+      key: 'line', label: '수비 라인', short: '라인',
+      opts: [
+        { v: 'deep', label: '내리기', short: '내리기' },
+        { v: 'standard', label: '표준', short: '표준' },
+        { v: 'high', label: '올리기', short: '올리기' }
+      ]
+    },
+    focus: {
+      key: 'focus', label: '공격 루트', short: '루트',
+      opts: [
+        { v: 'balance', label: '밸런스', short: '밸런스' },
+        { v: 'left', label: '좌측', short: '좌측' },
+        { v: 'center', label: '중앙', short: '중앙' },
+        { v: 'right', label: '우측', short: '우측' }
+      ]
+    }
+  };
+  /* 성향 → 기존 전술 형태(shape) 토큰. AI 감독 포스처와 같은 어휘를 쓴다. */
+  var TOUCH_SHAPE = { defensive: 'defense', balanced: 'balanced', attacking: 'attack', allout: 'allout' };
+  var TOUCH_PRESSURE = { low: -15, normal: 0, high: 17 };
+  var TOUCH_LINE = { deep: -9, standard: 0, high: 9 };
+  var TOUCH_FOCUS_X = { left: 24, center: 50, right: 76 };
+  var touch = { mentality: 'balanced', pressing: 'normal', line: 'standard', focus: 'balance' };
+  var touchFx = { t: 0, t0: 2.6, label: '', tone: '' };   /* 피치 위 터치라인 콜아웃 */
+  var touchCount = 0;
   var goalStats = { homeShots: 0, awayShots: 0 };
   var stats = { passes: 0, tackles: 0, saves: 0, interceptions: 0 };
   var spriteCache = {};
@@ -193,6 +245,23 @@
     };
   }
   var v19t = blankV19();
+
+  /* ── v20 계측기 — 롤·주발·터치라인 지시가 실제 플레이를 바꿨는지 세는 카운터 ── */
+  function blankV20() {
+    return {
+      touch: { changes: 0, callouts: 0, last: null },
+      invertedCut: { home: 0, away: 0 }, wideHold: { home: 0, away: 0 },
+      dmDrop: { home: 0, away: 0 }, lateBox: { home: 0, away: 0 },
+      cfDrop: { home: 0, away: 0 }, stBehind: { home: 0, away: 0 },
+      ifbIn: { home: 0, away: 0 },
+      shots: { strong: 0, curl: 0, both: 0, weakLong: 0 },
+      focusPass: { left: 0, center: 0, right: 0 },
+      focusRun: { left: 0, center: 0, right: 0 },
+      pressFrames: 0, pressSum: 0, pressMax: 0,
+      roleIds: {}
+    };
+  }
+  var v20t = blankV20();
 
   /* 전술 상황 배너 문구 */
   var SIT = {
@@ -748,6 +817,34 @@
   function isMidGroup(p) { return groupOf(p) === 'MF'; }
   function isFwdGroup(p) { return groupOf(p) === 'FW'; }
 
+  /* ─────────────────────────  v20 ② — 포지션 · 현대 롤 · 주발  ─────────────────────────
+     data.js의 13개 현대 포지션 · 11종 롤 · 주발(왼발/오른발/양발)을 실제 피치 움직임으로 옮긴다.
+     · 인버티드 윙어(주발이 반대 측면)는 하프스페이스로 접어 들어와 강한 발로 슈팅
+     · 전통 윙어·윙백은 폭을 지키고 오버래핑 → 크로스
+     · 레지스타/볼플레잉 수비수(DM)은 빌드업 때 CB 사이로 내려와 안전한 전진 패스 각
+     · B2B·메짤라는 공이 최종 3분의 1에 들어오면 늦게 박스로 쇄도
+     · CF(폴스나인)는 라인 사이로 내려와 연결, ST는 CB를 붙잡고 뒷공간을 노린다 */
+  function footSideOf(p) {
+    var f = p.foot || (p.player && p.player.foot) || '오른발';
+    return f === '왼발' ? 'L' : (f === '오른발' ? 'R' : 'B');
+  }
+  function posSideOf(p) {
+    var c = p.pos ? p.pos.charAt(0) : '';
+    return c === 'L' ? 'L' : (c === 'R' ? 'R' : '');
+  }
+  function mroleOf(p) { return (p.player && p.player.role) || ''; }
+  function isWingerPos(p) { return p.pos === 'LWF' || p.pos === 'RWF'; }
+  function isWingbackPos(p) { return p.pos === 'LWB' || p.pos === 'RWB'; }
+  /* 인버티드 윙어 — 롤이 '인버티드'이거나, 주발이 자기 측면의 반대 발인 윙어 */
+  function isInverted(p) {
+    if (!isWingerPos(p)) { return false; }
+    if (mroleOf(p) === 'inverted') { return true; }
+    var fs = footSideOf(p), ps = posSideOf(p);
+    if (fs === 'B' || !ps) { return false; }
+    return fs !== ps;
+  }
+  function isTraditionalWinger(p) { return isWingerPos(p) && !isInverted(p); }
+
   function goalkeeper(side) {
     var i;
     for (i = 0; i < players.length; i++) {
@@ -807,6 +904,9 @@
     if (t === 'attack') {
       return { name: 'attack', bank: 16.2, bankW: 0.22, width: 1.10, press: 12, runs: 2, runMin: 1.1, runMax: 2.5, fbPush: 16, secondLine: 1 };
     }
+    if (t === 'allout') {
+      return { name: 'allout', bank: 20.4, bankW: 0.14, width: 1.18, press: 22, runs: 3, runMin: 0.9, runMax: 2.1, fbPush: 24, secondLine: 1.35 };
+    }
     return { name: 'balanced', bank: 12.6, bankW: 0.42, width: 1.0, press: 0, runs: 1, runMin: 2.0, runMax: 4.2, fbPush: 8, secondLine: 0.45 };
   }
   /* 두 줄 블록의 기준선 — 수비 라인 바로 앞에 중원 라인을 세운다 */
@@ -850,7 +950,10 @@
   function styleOf(side) { return DS.tacticStyle(styleKeyOf(side)); }
   /* v19 ② — 그 팀에 지금 적용되는 전술 버튼.
      홈은 사용자가 누르는 수비/균형/공격, 원정은 AI 감독이 경기 중에 바꾸는 포스처. */
-  function effTactic(side) { return side === 'home' ? tactic : aiPosture; }
+  /* 홈팀은 터치라인 지시(성향)가 곧 전술 형태다. setTactics(수비/균형/공격)도 같은 값을 쓴다. */
+  function effTactic(side) {
+    return side === 'home' ? (TOUCH_SHAPE[touch.mentality] || 'balanced') : aiPosture;
+  }
   function morphOf(side) {
     var f = DS.FORMATIONS[formationOf(side)];
     return (f && f.morph) || null;
@@ -870,13 +973,16 @@
     var depth = 12 + m.line * 0.44 + stl.line;
     var t = effTactic(side);
     if (t === 'attack') { depth += 10; }
+    else if (t === 'allout') { depth += 17; }
     else if (t === 'defense') { depth -= 12; }
+    /* v20 ① — 수비 라인 지시(내리기/표준/올리기)는 홈팀 라인·블록 높이를 직접 민다 */
+    if (side === 'home') { depth += TOUCH_LINE[touch.line] || 0; }
     if (side === 'home' && buffOf('offside') > 0) { depth += 6; }
     if (side === 'home' && buffOf('press') > 0) { depth += 5; }
     if (side === 'home' && buffOf('def') > 0) { depth -= 6; }
     if (play.counterT > 0 && play.counterSide !== side) { depth -= 6; }
     if (play.recoverT > 0 && play.recoverSide === side) { depth -= 4; }
-    depth = clamp(depth, 7, 56);
+    depth = clamp(depth, 5, 62);
     return ownGoalY(side) + (side === 'home' ? -depth : depth);
   }
   function blockShift(side) { return lineYOf(side) - dfBaseAvg(side); }
@@ -913,11 +1019,14 @@
     if (side === 'home') {
       if (buffOf('press') > 0) { press += 26; }
       press += mfx('press') * 1.2;
+      /* v20 ① — 압박 강도 지시: 트리거 반경과 붙는 인원이 함께 달라진다 */
+      press += TOUCH_PRESSURE[touch.pressing] || 0;
     }
     /* v18 ② — 존 디펜스: 공 소유자에게 붙는 인원은 최대 2명(압박 1 + 커버 1).
-       나머지 8~9명은 3줄 블록과 좌우 폭을 그대로 지킨다. */
+       v20 — 홈이 '총공세 + 전방 압박'을 직접 지시했을 때만 3명까지 허용한다. */
     var n = press >= 62 ? 2 : 1;
-    return { n: Math.min(2, n), radius: 9 + press * 0.16, press: press };
+    if (side === 'home' && touch.mentality === 'allout' && touch.pressing === 'high') { n = 3; }
+    return { n: Math.min(3, n), radius: 8.2 + press * 0.165, press: press };
   }
 
   /* ─────────────────────────  포지션 구역 · 생성  ───────────────────────── */
@@ -997,7 +1106,9 @@
       popT: 0, popT0: 0.3,
       support: null, runTo: null, runT: 0, supportT: 0,
       mark: null, zone: zoneFor(pos, by, side), homeX: bx, homeY: by,
-      boxSlot: null, stam: 100, kind: 'keep'
+      boxSlot: null, stam: 100, kind: 'keep',
+      foot: (DS.ensureFoot ? DS.ensureFoot(player) : '오른발'),
+      mrole: (player && player.role) || ''
     };
   }
 
@@ -1326,6 +1437,14 @@
     halfScore = [[0, 0], [0, 0]];
     halftimeDone = false;
     tactic = cfg.tactics || 'balanced';
+    /* v20 ① — 새 경기는 저장된 전술(S.tactics)에서 출발하고, 나머지 지시는 기본값 */
+    touch = {
+      mentality: LEGACY_MENT[tactic] || 'balanced',
+      pressing: 'normal', line: 'standard', focus: 'balance'
+    };
+    touchFx = { t: 0, t0: 2.6, label: '', tone: '' };
+    v20t = blankV20();
+    touchCount = 0;
     mgrFx = cfg.managerFx || {};
     buildHomeMetrics(cfg.homeFormation);
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
@@ -1376,8 +1495,16 @@
   };
 
   M.setSpeed = function (n) { M.speed = clamp(n, 1, 3); };
+  var LEGACY_MENT = { defense: 'defensive', defensive: 'defensive', balanced: 'balanced', attack: 'attacking', attacking: 'attacking', allout: 'allout' };
   M.setTactics = function (t) {
     tactic = t;
+    /* v20 ① — 기존 3단 전술 버튼도 터치라인 성향 지시와 같은 상태를 쓴다 */
+    var ment = LEGACY_MENT[t];
+    if (ment && touch.mentality !== ment) {
+      touch.mentality = ment;
+      touchCount += 1;
+      if (cfg && cfg.onTouch) { cfg.onTouch(M.touchState()); }
+    }
     var line = t === 'attack' ? '전술을 공격적으로! 라인을 끌어올립니다!' :
       (t === 'defense' ? '전술을 수비적으로! 라인을 내립니다.' : '균형 전술로 안정을 찾습니다.');
     say(line, 'tactic');
@@ -1725,7 +1852,9 @@
     var row = table[stage] || table.build;
     var v = g === 'DF' ? row.DF : (g === 'MF' ? row.MF : row.FW);
     var tac = effTactic(p.side);
-    if (tac === 'attack') { v += 3; } else if (tac === 'defense') { v -= 2; }
+    if (tac === 'attack') { v += 3; }
+    else if (tac === 'allout') { v += 6; }
+    else if (tac === 'defense') { v -= 2; }
     return v;
   }
   function lineDrop(p) {
@@ -1749,9 +1878,10 @@
     cand.sort(function (a, b) { return a.d - b.d; });
     /* 압박 반경 밖이면 아무도 따라붙지 않고, 가장 가까운 1명만 나선다 */
     if (!cand.length && near) { cand.push(near); }
-    /* v18 ② — 1~2인 압박 제한: 가장 가까운 압박자 1 + 커버 1, 나머지는 존을 지킨다 */
-    var maxN = 2;
-    for (i = 0; i < cand.length && i < maxN && i < pc.n; i++) { out.push(cand[i].p); }
+    /* v18 ② — 1~2인 압박 제한: 가장 가까운 압박자 1 + 커버 1, 나머지는 존을 지킨다.
+       v20 — 지시(총공세+전방 압박)로 상한을 3까지 올렸을 때는 그만큼 나선다. */
+    var maxN = pc.n || 2;
+    for (i = 0; i < cand.length && i < maxN; i++) { out.push(cand[i].p); }
     return out;
   }
 
@@ -1860,6 +1990,14 @@
         if (prog > 0.80) { continue; }
         if (Math.hypot(p.x - carrier.x, p.y - carrier.y) < 12) { continue; }
         var v = (isFwdGroup(p) ? 20 : 0) + prog * 20 + Math.random() * 10;
+        /* v20 ① — 고른 공격 루트 쪽 침투를 우선한다 */
+        if (carrier.side === 'home' && touch.focus !== 'balance') {
+          var fdist = Math.abs(p.x - TOUCH_FOCUS_X[touch.focus]);
+          v += (fdist < 16 ? 14 : (fdist < 30 ? 4 : -6));
+        }
+        /* v20 ② — 포처(ST)는 뒷공간 침투가 잦고, 폴스나인(CF)은 내려오는 역할이라 덜는다 */
+        if (p.pos === 'ST') { v += 8; }
+        else if (p.pos === 'CF') { v -= 4; }
         if (v > bv) { bv = v; best = p; }
       }
       if (!best) { return; }
@@ -1869,6 +2007,12 @@
         y: clamp(line - dir * range(3, sh.name === 'attack' ? 10 : 8), 4, 116)
       };
       best.runT = sh.name === 'attack' ? 1.9 : 1.5;
+      /* v20 ① — 지시한 루트로 침투 방향을 당긴다 */
+      if (best.side === 'home' && touch.focus !== 'balance') {
+        var fxRun = TOUCH_FOCUS_X[touch.focus];
+        best.runTo.x = clamp(best.runTo.x * 0.45 + fxRun * 0.55, 6, 94);
+        v20t.focusRun[touch.focus] += 1;
+      }
       if (t === 0 && chance(0.5)) { bubbleUnique(best, '🏃 침투!', '#c3a6ff', 1.1); }
     }
   }
@@ -1917,6 +2061,12 @@
     }
     /* v18 ② 계측: 한 프레임에 공 소유자에게 붙는 수비 인원 (목표 1~2명) */
     if (pressers.length > v18t.pressMax[def]) { v18t.pressMax[def] = pressers.length; }
+    /* v20 ① 계측: 홈팀이 공 소유자에게 붙이는 압박 인원 (지시 변경의 효과) */
+    if (def === 'home') {
+      v20t.pressFrames += 1;
+      v20t.pressSum += pressers.length;
+      if (pressers.length > v20t.pressMax) { v20t.pressMax = pressers.length; }
+    }
     if (pressers.length > 2) { v19t.press3 += 1; }     /* v19: 게겐프레싱 3초 버스트 프레임만 */
     var i, p;
     for (i = 0; i < players.length; i++) {
@@ -2237,6 +2387,60 @@
       }
     }
 
+    /* ── v20 ② 롤·주발 최종 보정 — 스타일·변칙 포메이션이 덮어쓴 마지막 목표를
+       선수 자신의 포지션·현대 롤·주발로 다시 잡는다. (패스·지원·침투 블렌딩 뒤에 적용) ── */
+    if (isWingerPos(p) && st !== 'build') {
+      if (isInverted(p)) {
+        /* 반대 발 윙어: 터치라인 대신 하프스페이스 / 박스 앞으로 접어 들어온다 */
+        tx = sideX(p, p.pos === 'LWF' ? (st === 'final' ? 39 : 33) : (st === 'final' ? 61 : 67));
+        if (st === 'wide' || st === 'final') { ty = attackGoalY(p.side) - z.dir * (st === 'final' ? 15 : 21); }
+        v20t.invertedCut[p.side] += 1;
+      } else {
+        /* 같은 발 윙어: 폭을 끝까지 지키고 크로스 지점으로 간다 */
+        tx = sideX(p, p.pos === 'LWF' ? 3.2 : 96.8);
+        v20t.wideHold[p.side] += 1;
+      }
+    }
+    if (p.pos === 'DM' && st === 'build') {
+      var deepDM = (mroleOf(p) === 'regista' || mroleOf(p) === 'bpd');
+      tx = 50 + (a.x - 50) * (deepDM ? 0.55 : 0.7);
+      ty = a.y - z.dir * (deepDM ? 7.5 : 4.5);
+      if (deepDM) { v20t.dmDrop[p.side] += 1; }
+    }
+    if ((p.pos === 'LB' || p.pos === 'RB') && mroleOf(p) === 'ifb' && (st === 'build' || st === 'mid')) {
+      tx = 50 + (p.baseX < 50 ? -8 : 8);
+      v20t.ifbIn[p.side] += 1;
+    }
+    if ((p.pos === 'CM' || p.pos === 'AM') && (mroleOf(p) === 'b2b' || mroleOf(p) === 'mezzala') &&
+      p !== carrierV && (st === 'final' || (st === 'wide' && progressOf(p.side, ball.y) > 0.62))) {
+      tx = 50 + (p.baseX < 50 ? -7.5 : 7.5);
+      ty = attackGoalY(p.side) - z.dir * 13.5;
+      v20t.lateBox[p.side] += 1;
+    }
+    if (p.pos === 'CF') {
+      if (p !== carrierV && (st === 'build' || st === 'mid')) {
+        /* 폴스나인: 라인 사이로 내려와 연결 패스를 받는다 */
+        tx = 50 + (a.x - 50) * 0.55;
+        ty = a.y - z.dir * 7;
+        v20t.cfDrop[p.side] += 1;
+      }
+    } else if (p.pos === 'ST') {
+      if (p !== carrierV && carrierV && (st === 'mid' || st === 'wide')) {
+        /* 포처·타겟: CB를 붙잡고 오프사이드 라인 끝자락에서 뒷공간을 노린다 */
+        tx = 50 + (a.x - 50) * 0.8;
+        ty = supportLineY(p.side) - z.dir * 1.2;
+        v20t.stBehind[p.side] += 1;
+      }
+    }
+
+    /* ── v20 ① 공격 루트 지시: 고른 레인으로 목표를 당기고 그쪽에서 한 발 더 전진한다 ── */
+    if (p.side === 'home' && touch.focus !== 'balance' && p !== carrierV) {
+      var fx0 = TOUCH_FOCUS_X[touch.focus];
+      var wF = g === 'DF' ? 0.10 : (g === 'MF' ? 0.22 : 0.34);
+      tx = tx * (1 - wF) + fx0 * wF;
+      ty = ty - z.dir * (g === 'DF' ? 0 : (g === 'MF' ? 1.6 : 2.4));
+    }
+
     /* ④ 전술 버튼(수비/군형/공격): 누르면 라인·폭이 눈앞에서 확 달라진다 */
     if (p.side === 'home') {
       var shpV = shapeOf('home').name;
@@ -2274,7 +2478,7 @@
     var depth = Math.abs(lineYOf(side) - ownY);
     /* 공이 우리 골문 쪽으로 깊이 들어올수록 블록 전체가 내려서고, 멀어지면 올라선다 */
     var threat = progressOf(atkSide, ball.y);        /* 1 = 우리 골문 앞 */
-    depth = clamp(depth + (0.34 - threat) * 11, 7, 50);
+    depth = clamp(depth + (0.34 - threat) * 11, 6, 56);
     if (play.counterT > 0 && play.counterSide !== side) { depth -= 4; }      /* 역습 대비 라인 하강 */
     if (play.recoverT > 0 && play.recoverSide === side) { depth -= 3; }     /* 볼을 잃고 되돌아오는 중 */
     /* ③ 오프사이드 트랩 — 카드가 살아 있는 동안 4백을 계속 하이 라인으로 민다 (일회성 push 금지) */
@@ -2892,6 +3096,17 @@
       if (trans.side === p.side && trans.kind === 'vertical' && fwd > 0) {
         score += fwd * 0.9 + (isFwdGroup(q) ? 8 : 0);
       }
+      /* v20 ② — 드롭형 DM(레지스타·볼플레잉)과 폴스나인은 빌드업의 안전한 전진 패스 각 */
+      if (play.stage === 'build' && d < 28 && (mroleOf(q) === 'regista' || mroleOf(q) === 'bpd' || q.pos === 'CF')) {
+        score += 7;
+      }
+      /* v20 ② — 인버티드 윙어를 향한 패스는 안쪽 발 앞 슈팅 각으로 */
+      if (isInverted(q) && (play.stage === 'wide' || play.stage === 'final')) { score += 5; }
+      /* v20 ① — 공격 루트 지시: 고른 레인의 동료에게 가중치, 반대쪽은 감점 */
+      if (p.side === 'home' && touch.focus !== 'balance') {
+        var fdel = Math.abs(q.x - TOUCH_FOCUS_X[touch.focus]);
+        score += (fdel < 14 ? 11 : (fdel < 28 ? 4 : -4));
+      }
       score += Math.random() * 5;
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
     }
@@ -2971,6 +3186,11 @@
       var pkey = p.player.id + '|' + q.player.id;
       if (pn[pkey]) { pn[pkey].n += 1; pn[pkey].from = p.name; pn[pkey].to = q.name; }
       else { pn[pkey] = { from: p.name, to: q.name, fromId: p.player.id, toId: q.player.id, n: 1 }; }
+    }
+    /* v20 ① 계측: 공이 실제로 어느 레인으로 갔는가 */
+    if (p.side === 'home' && q) {
+      var laneKey = q.x < 40 ? 'left' : (q.x > 60 ? 'right' : 'center');
+      v20t.focusPass[laneKey] += 1;
     }
     /* v15 — 패스 출발 순간 오프사이드 판정 (스로인·골킥·코너 재개 패스는 면제) */
     if (ball.exempt) { ball.exempt = false; }
@@ -3157,8 +3377,12 @@
     var pressure = opp.player ? opp.dist : 40;
     var tac = effTactic(p.side);
     var sty = styleOf(p.side);
+    /* v20 ② — 윙어의 롤·주발: 인버티드는 안으로 접어 슛, 전통 윙어는 폭을 지켜 크로스 */
+    var invW = isInverted(p);
+    var tradW = isTraditionalWinger(p);
     var shootRange = 22 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
     if (p.side === 'home' && buffOf('atk') > 0) { shootRange += 2; }
+    if (invW) { shootRange += 5; }                       /* 하프스페이스에서 바로 때릴 수 있다 */
 
     /* 1) 슛 */
     if (dist < shootRange) {
@@ -3166,6 +3390,7 @@
       pShot *= sty.shootBias;
       if (pressure < 2.2 && dist > 10) { pShot *= 0.45; }
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
+      if (invW && dist < 21) { pShot += 0.10; }           /* 컷인 후 강한 발 슈팅 */
       if (chance(pShot)) { shoot(p, dist); return; }
     }
     /* 1.2) v19 ① — 전환 창: 역습·직선 팀은 탈취 직후 한 번 더 세로로 찌른다 */
@@ -3177,14 +3402,16 @@
       if (backPass(p)) { actionTimer = 0.14; return; }
     }
 
-    /* 2) 측면 크로스 · 컷백 — 크로스 성향이 강한 감독은 더 넓고 더 자주 올린다 */
-    if ((play.stage === 'wide' || play.stage === 'final') && (p.x < 22 + (sty.crossBias - 1) * 6 || p.x > 78 - (sty.crossBias - 1) * 6) && dist < 34 + Math.max(0, sty.crossBias - 1) * 4) {
+    /* 2) 측면 크로스 · 컷백 — 크로스 성향이 강한 감독은 더 넓고 더 자주 올린다
+       v20 ② — 전통 윙어는 더 자주 올리고, 인버티드 윙어는 안으로 접어 연결한다 */
+    var xBias = sty.crossBias * (tradW ? 1.3 : (invW ? 0.45 : 1));
+    if ((play.stage === 'wide' || play.stage === 'final') && (p.x < 22 + (xBias - 1) * 6 || p.x > 78 - (xBias - 1) * 6) && dist < 34 + Math.max(0, xBias - 1) * 4) {
       var box = bestBoxTarget(p.side);
       /* v19 ① — 측면 오버래핑 팀의 컷백: 터치라인 끝에서 골문 앞으로 낮게 자른다 */
       if (box && sty.key === 'wingplay' && chance(0.45)) {
         if (kickPass(p, box, 'cutback')) { v19t.cutback += 1; return; }
       }
-      if (box && dist < 28 + Math.max(0, sty.crossBias - 1) * 4 && chance(clamp(0.72 * sty.crossBias, 0.18, 0.98))) {
+      if (box && dist < 28 + Math.max(0, xBias - 1) * 4 && chance(clamp(0.72 * xBias, 0.18, 0.98))) {
         bubble(p, p.x < 22 ? '→ 컷백!' : '← 컷백!', '#ffd98a', 1.2);
         if (kickPass(p, box, 'cross')) { return; }
       }
@@ -3208,11 +3435,22 @@
     var gy = attackGoalY(p.side);
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
     var acc = 0.46 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
+    /* v20 ② — 주발: 강발 쪽에서 치면 파워, 반대쪽에서는 감아차기(정확·약간 느림) */
+    var fs = footSideOf(p);
+    var sideNow = p.x >= 50 ? 'R' : 'L';
+    var fit = fs === 'B' ? 'both' : (fs === sideNow ? 'strong' : 'curl');
+    if (fit === 'strong') { acc += 0.05; }
+    else if (fit === 'curl') { acc += 0.015 - (longshot ? 0.045 : 0); }
+    else { acc += 0.025; }
+    if (fit === 'curl' && longshot) { v20t.shots.weakLong += 1; }
     if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09; }
     if (p.side === 'home') { acc += mfx('shoot') * 0.008 + mfx('atk') * 0.004; }
     acc -= dist * 0.005;
     var onTarget = chance(clamp(acc, 0.2, 0.86));
     var xg = clamp(0.32 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.42);
+    if (fit === 'strong') { xg += 0.015; }
+    else if (fit === 'curl') { xg += 0.005; }
+    v20t.shots[fit] += 1;
     if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05; }
     if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035; }
     if (p.side === 'away' && buffOf('def') > 0) { xg -= 0.045; }
@@ -3220,7 +3458,7 @@
     else { xg -= mfx('def') * 0.005 + mfx('press') * 0.001; }
     if (!onTarget) { xg *= 0.12; }
     var isGoal = chance(clamp(xg, 0.01, 0.66));
-    var tx = onTarget ? clamp(50 + range(-8, 8), 38, 62) : (chance(0.5) ? range(28, 42) : range(58, 72));
+    var tx = onTarget ? clamp(50 + range(-8, 8) + (fit === 'curl' ? (fs === 'R' ? 4.5 : -4.5) : 0), 38, 62) : (chance(0.5) ? range(28, 42) : range(58, 72));
     var travel = Math.hypot(tx - p.x, gy - p.y);
     var sdur = clamp(travel / 46, 0.34, 0.95);      /* v15 — 슛 궤적이 눈으로 읽히게 */
     var speed = travel / sdur;
@@ -4372,6 +4610,7 @@
     }
     if (shake.t > 0) { shake.t -= dt; if (shake.t < 0) { shake.t = 0; } }
     if (flash.t > 0) { flash.t -= dt; if (flash.t < 0) { flash.t = 0; } }
+    if (touchFx.t > 0) { touchFx.t -= dt; if (touchFx.t < 0) { touchFx.t = 0; } }
     if (netFx.t > 0) { netFx.t -= dt; if (netFx.t < 0) { netFx.t = 0; } }
     if (flagShow.t > 0) { flagShow.t -= dt; if (flagShow.t < 0) { flagShow.t = 0; } }
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) { bannerT = 0; clearBanner(); } }
@@ -5406,6 +5645,35 @@
     flashSprite = c;
     return c;
   }
+  /* v20 ① — 터치라인 지시 콜아웃: 피치 위에 짧게 뜨는 감독 지시 보드 (화면 고정) */
+  function drawTouchCallout() {
+    if (touchFx.t <= 0 || !touchFx.label) { return; }
+    var k = clamp(touchFx.t / touchFx.t0, 0, 1);
+    var a = k > 0.8 ? (1 - k) / 0.2 : Math.min(1, k / 0.22);
+    var w = Math.min(258, W * 0.44), h = 29;
+    var x = 8, y = H - h - 9;
+    ctx.save();
+    ctx.globalAlpha = clamp(a, 0, 1);
+    var g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, 'rgba(9,31,24,0.94)');
+    g.addColorStop(1, 'rgba(20,58,42,0.88)');
+    ctx.fillStyle = g;
+    roundRect(x, y, w, h, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,241,105,0.6)'; ctx.lineWidth = 1;
+    roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 8); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,241,105,0.9)';
+    roundRect(x + 6, y + 7, 3, h - 14, 2); ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(200,241,105,0.72)';
+    ctx.font = '900 7px system-ui, sans-serif';
+    ctx.fillText('TOUCHLINE', x + 15, y + 8.5);
+    ctx.fillStyle = '#f4fce6';
+    ctx.font = '900 12px system-ui, sans-serif';
+    ctx.fillText(touchFx.label, x + 15, y + 19.5);
+    ctx.restore();
+  }
+
   function drawCrowdFx() {
     var i, f, a, band = Math.max(9, H * 0.115);
     if (crowd.energy > 0.22) {
@@ -5593,6 +5861,9 @@
 
     /* v17 — 관중석 반짝임·깃발 (화면 고정 레이어) */
     drawCrowdFx();
+
+    /* v20 ① — 터치라인 지시 콜아웃 (피치 위 짧은 지시 보드) */
+    drawTouchCallout();
 
     /* 골 전광판 — 짧게 슬라이드 인/아웃 */
     if (flash.t > 0) { drawScoreboard(); }
@@ -5891,6 +6162,93 @@
       buffs: (function () { var o = [], k; for (k in buffs) { if (buffs[k] > 0) { o.push(k); } } return o; })(),
       tele: { pass: tele.pass, press: tele.press, swarm: tele.swarm, longwin: tele.longwin },
       home: h, away: a
+    };
+  };
+
+  /* ─────────────── v20 ① — 라이브 터치라인 지시 API ─────────────── */
+  function touchLabel(key, val) {
+    var d = TOUCH_DEF[key], i;
+    if (!d) { return ''; }
+    for (i = 0; i < d.opts.length; i++) { if (d.opts[i].v === val) { return d.opts[i].short; } }
+    return val;
+  }
+  function touchExplain(key, val) {
+    if (key === 'mentality') {
+      return val === 'defensive' ? '블록을 내리고 안전하게.' : val === 'attacking' ? '라인을 올리고 전진 인원을 늘립니다.'
+        : val === 'allout' ? '전원 전진, 마지막 승부수!' : '간격을 지키며 상황을 봅니다.';
+    }
+    if (key === 'pressing') {
+      return val === 'low' ? '압박선을 내리고 지칠 때까지 기다립니다.' : val === 'high' ? '상대 후방 빌드업부터 물어뜯습니다.'
+        : '반경과 인원을 평소대로.';
+    }
+    if (key === 'line') {
+      return val === 'deep' ? '수비 라인을 내려 뒷공간을 지웁니다.' : val === 'high' ? '하이 라인으로 압축합니다.'
+        : '표준 높이를 유지합니다.';
+    }
+    return val === 'left' ? '왼쪽 측면으로 수를 모읍니다.' : val === 'right' ? '오른쪽 측면으로 수를 모읍니다.'
+      : '중앙 하프스페이스로 찌릅니다.';
+  }
+
+  M.touchDef = TOUCH_DEF;
+  M.touchState = function () {
+    var sh = shapeOf('home'), pc = pressConfig('home'), b = blockOf('home');
+    return {
+      mentality: touch.mentality, pressing: touch.pressing, line: touch.line, focus: touch.focus,
+      labels: { mentality: touchLabel('mentality', touch.mentality), pressing: touchLabel('pressing', touch.pressing), line: touchLabel('line', touch.line), focus: touchLabel('focus', touch.focus) },
+      shape: { name: sh.name, bank: sh.bank, bankW: sh.bankW, width: sh.width, press: sh.press, runs: sh.runs, fbPush: sh.fbPush },
+      lineY: Math.round(lineYOf('home') * 10) / 10,
+      block: { dfY: Math.round(b.dfY * 10) / 10, mfY: Math.round(b.mfY * 10) / 10, fwY: Math.round(b.fwY * 10) / 10, widthK: Math.round(b.widthK * 100) / 100, pull: b.pull },
+      press: { n: pc.n, radius: Math.round(pc.radius * 10) / 10, value: Math.round(pc.press) },
+      focusX: touch.focus === 'balance' ? 50 : TOUCH_FOCUS_X[touch.focus],
+      changes: v20t.touch.changes, callout: Math.round(touchFx.t * 100) / 100,
+      last: v20t.touch.last
+    };
+  };
+  M.setTouch = function (key, val) {
+    var d = TOUCH_DEF[key], ok = false, i, p, cap = null;
+    if (!d) { return false; }
+    for (i = 0; i < d.opts.length; i++) { if (d.opts[i].v === val) { ok = true; } }
+    if (!ok || touch[key] === val) { return false; }
+    var from = touch[key];
+    touch[key] = val;
+    touchCount += 1;
+    blockCache.frame = -1;                     /* 다음 프레임에 새 대형을 바로 계산 */
+    v20t.touch.changes += 1;
+    v20t.touch.last = { min: minute(), key: key, from: from, to: val };
+    v20t.touch.callouts += 1;
+    touchFx = { t: touchFx.t0, t0: 2.6, label: d.label + ' · ' + touchLabel(key, val), tone: key };
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side === 'home' && !isGK(p) && !p.off) { cap = p; break; }
+    }
+    if (cap) { bubbleUnique(cap, '📋 ' + touchLabel(key, val), '#c8f169', 1.4); fxRing(cap, '#c8f169', 0.7); }
+    say('📋 터치라인 지시 — ' + d.label + ' ' + touchLabel(key, val) + '. ' + touchExplain(key, val), 'tactic');
+    if (cfg && cfg.onTouch) { cfg.onTouch(M.touchState()); }
+    return true;
+  };
+  /* v20 계측 (롤·주발·터치라인) */
+  M.v20 = function () {
+    var i, p, prof = { inverted: 0, traditional: 0, wingers: [] };
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (!isWingerPos(p)) { continue; }
+      if (isInverted(p)) { prof.inverted += 1; } else { prof.traditional += 1; }
+      prof.wingers.push({ side: p.side, name: p.name, pos: p.pos, foot: p.foot, role: mroleOf(p), inverted: isInverted(p) });
+    }
+    return {
+      touch: M.touchState(),
+      roles: {
+        invertedCut: v20t.invertedCut, wideHold: v20t.wideHold, dmDrop: v20t.dmDrop,
+        lateBox: v20t.lateBox, cfDrop: v20t.cfDrop, stBehind: v20t.stBehind, ifbIn: v20t.ifbIn
+      },
+      wingers: prof,
+      shots: v20t.shots,
+      focusPass: v20t.focusPass, focusRun: v20t.focusRun,
+      press: {
+        frames: v20t.pressFrames,
+        avg: v20t.pressFrames ? Math.round(v20t.pressSum / v20t.pressFrames * 100) / 100 : 0,
+        max: v20t.pressMax
+      }
     };
   };
 
