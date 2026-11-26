@@ -879,9 +879,10 @@
       var ficon = { training: '🏋️', medical: '🚑', shop: '🛍️', fanclub: '📣', cafe: '☕' }[fac.key] || '🏟️';
       void ficon;
       facHTML += '<div class="fac">' +
-        '<div class="row between"><div class="row" style="gap:6px;min-width:0">' +
+        '<div class="fac-top">' +
         '<canvas class="fac-art" data-fac="' + fac.key + '" data-lv="' + lv + '" width="62" height="50"></canvas>' +
-        '<span class="fac-name">' + fac.name + '</span></div><span class="fac-lv">Lv.' + lv + '/5</span></div>' +
+        '<div class="fac-tt"><span class="fac-name">' + fac.name + '</span>' +
+        '<span class="fac-lv">Lv.' + lv + '/5</span></div></div>' +
         '<div class="bar" style="margin:4px 0 3px"><i style="width:' + (lv / 5 * 100) + '%"></i></div>' +
         '<div class="eff">' + fac.target + ' ' + (lv > 0 ? '+' + facEffect(fac, lv) + fac.unit : '—') + '</div>' +
         '<button class="btn sm wide" data-act="facility" data-k="' + fac.key + '" ' + (lv >= 5 || S.money < cost ? 'disabled' : '') + '>' +

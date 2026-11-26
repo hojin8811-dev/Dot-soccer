@@ -5649,20 +5649,26 @@
   function drawTouchCallout() {
     if (touchFx.t <= 0 || !touchFx.label) { return; }
     var k = clamp(touchFx.t / touchFx.t0, 0, 1);
-    var a = k > 0.8 ? (1 - k) / 0.2 : Math.min(1, k / 0.22);
     var w = Math.min(258, W * 0.44), h = 29;
     var x = 8, y = H - h - 9;
+    var a = clamp(k / 0.22, 0, 1);
+    v20t.calloutDraw = (v20t.calloutDraw || 0) + 1;
+    v20t.calloutRect = [Math.round(x), Math.round(y), Math.round(w), Math.round(H), Math.round(a * 100)];
     ctx.save();
     ctx.globalAlpha = clamp(a, 0, 1);
     var g = ctx.createLinearGradient(x, y, x + w, y + h);
     g.addColorStop(0, 'rgba(9,31,24,0.94)');
     g.addColorStop(1, 'rgba(20,58,42,0.88)');
     ctx.fillStyle = g;
-    roundRect(x, y, w, h, 8); ctx.fill();
-    ctx.strokeStyle = 'rgba(200,241,105,0.6)'; ctx.lineWidth = 1;
-    roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 8); ctx.stroke();
+    roundRect(x, y, w, h, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,241,105,0.6)';
+    ctx.lineWidth = 1;
+    roundRect(x + 0.5, y + 0.5, w - 1, h - 1, 8);
+    ctx.stroke();
     ctx.fillStyle = 'rgba(200,241,105,0.9)';
-    roundRect(x + 6, y + 7, 3, h - 14, 2); ctx.fill();
+    roundRect(x + 6, y + 7, 3, h - 14, 2);
+    ctx.fill();
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(200,241,105,0.72)';
@@ -6201,6 +6207,7 @@
       press: { n: pc.n, radius: Math.round(pc.radius * 10) / 10, value: Math.round(pc.press) },
       focusX: touch.focus === 'balance' ? 50 : TOUCH_FOCUS_X[touch.focus],
       changes: v20t.touch.changes, callout: Math.round(touchFx.t * 100) / 100,
+      draw: v20t.calloutDraw || 0, rect: v20t.calloutRect || null,
       last: v20t.touch.last
     };
   };

@@ -15,27 +15,22 @@ iframe{width:844px;height:390px;border:0;background:#061a16;border-radius:10px;b
   <iframe id="pv"></iframe>
 </div>
 <script>
-/* 개발용 미리보기 하네스 — CDN 캐시를 피해 raw.githubusercontent의 최신 소스를 그대로 주입한다.
-   (저장소에 남기지 않는 QA 전용 파일) */
+/* QA 전용 미리보기 하네스 — 같은 오리진의 배포본을 b 값으로 캐시를 피해 불러오고,
+   사용자 저장 프로필을 건드리지 않도록 메모리 저장소를 씌운다. (배포본에 남기지 않는다) */
 (async function () {
   var q = new URLSearchParams(location.search);
-  var BR = q.get('br') || 'v20';
-  var ROOT = 'https://raw.githubusercontent.com/hojin8811-dev/Dot-soccer/' + BR + '/';
-  var BASE = 'https://rawcdn.githack.com/hojin8811-dev/Dot-soccer/' + BR + '/';
+  var b = q.get('b') || '1';
+  var VER = '?v=20&b=' + b;
   var st = document.getElementById('st'), errEl = document.getElementById('err');
-  function stamp() { return '?t=' + Date.now() + Math.random().toString(36).slice(2, 6); }
   function fail(e) { errEl.textContent = 'ERR ' + (e && e.message ? e.message : e); st.textContent = '실패'; }
   try {
-    var idx = await (await fetch(ROOT + 'index.html' + stamp())).text();
-    var css = await (await fetch(ROOT + 'css/style.css' + stamp())).text();
-    idx = idx.replace(/<link rel="stylesheet"[^>]*>/g, '');
+    var idx = await (await fetch('../index.html' + VER + '&t=' + Date.now())).text();
+    var css = await (await fetch('../css/style.css' + VER + '&t=' + Date.now())).text();
     idx = idx.replace(/<script src="js\/[^"]*"><\/script>/g, '');
     idx = idx.replace(/<script>[\s\S]*?serviceWorker[\s\S]*?<\/script>/g, '');
-    idx = idx.replace('<head>', '<head><base href="' + BASE + '">');
     var f = document.getElementById('pv');
     var d = f.contentDocument;
     d.open(); d.write(idx); d.close();
-    /* QA 세이브 격리 — 사용자의 저장 프로필을 건드리지 않도록 메모리 저장소를 씌운다 */
     if (q.get('fresh') !== '0') {
       var mem = {};
       Object.defineProperty(f.contentWindow, 'localStorage', {
@@ -53,13 +48,13 @@ iframe{width:844px;height:390px;border:0;background:#061a16;border-radius:10px;b
     d.head.appendChild(style);
     var files = ['js/data.js', 'js/match.js', 'js/game.js'];
     for (var i = 0; i < files.length; i++) {
-      var src = await (await fetch(ROOT + files[i] + stamp())).text();
+      var src = await (await fetch('../' + files[i] + VER + '&t=' + Date.now())).text();
       var s = d.createElement('script');
       s.textContent = src;
       d.body.appendChild(s);
     }
     var ok = !!(f.contentWindow.DS && f.contentWindow.DS.game);
-    st.textContent = (ok ? '최신 소스 OK' : '로드 실패') + ' · ' + BR;
+    st.textContent = (ok ? '배포본 b=' + b + ' OK' : '로드 실패 b=' + b);
     f.contentWindow.addEventListener('error', function (e) { errEl.textContent = 'ERR ' + e.message; });
   } catch (e) { fail(e); }
 })();

@@ -1574,3 +1574,10 @@ body.rot-off .rotate { display: none; }
 .sq-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), var(--shadow2); }
 .sq-pitch { box-shadow: inset 0 0 0 1px rgba(200, 241, 105, .10), 0 8px 18px rgba(0, 0, 0, .28); }
 .mgr-wrap { border-radius: 13px; }
+
+/* v20 보정 — 시설 카드 헤더: 일러스트 + 이름/레벨을 한 줄에 (이름 세로 줄바꿈 방지) */
+.fac-top { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.fac-art { width: 44px; height: 36px; border-radius: 8px; }
+.fac-tt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fac-name { font-size: 10px; font-weight: 900; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fac-lv { font-size: 8px; font-weight: 800; color: var(--ink3); white-space: nowrap; }
