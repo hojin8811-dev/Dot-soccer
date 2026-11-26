@@ -2793,17 +2793,17 @@
       ctx.clip();
       if (iw > 0 && ih > 0) {
         var base = Math.min(iw, ih);
-        var S = base * 0.94;                            /* 머리 영역 정사각 크롭 (살짝 당겨 얼굴을 크게) */
+        var S = base * 0.86;                            /* 머리 영역 정사각 크롭 (얼굴을 크게) */
         var sx = clamp(iw * (headRec.fx || 0.5) - S / 2, 0, Math.max(0, iw - S));
-        var sy = clamp(base * 0.10, 0, Math.max(0, ih - S));   /* 정수리 끝만 살짝 자르고 얼굴을 가운데로 */
+        var sy = clamp(base * 0.17, 0, Math.max(0, ih - S));   /* 눈·얼굴을 원 가운데로 */
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(headRec.img, sx, sy, S, S, -r, -r, r * 2, r * 2);
       }
       /* 원 안쪽 입체 음영 */
       var sh = ctx.createLinearGradient(0, -r, 0, r);
-      sh.addColorStop(0, 'rgba(255,255,255,0.10)');
-      sh.addColorStop(0.55, 'rgba(0,0,0,0)');
-      sh.addColorStop(1, 'rgba(0,0,0,0.34)');
+      sh.addColorStop(0, 'rgba(255,255,255,0.12)');
+      sh.addColorStop(0.58, 'rgba(0,0,0,0)');
+      sh.addColorStop(1, 'rgba(0,0,0,0.24)');
       ctx.fillStyle = sh;
       ctx.beginPath(); ctx.arc(0, 0, r, 0, PI2); ctx.fill();
       ctx.restore();
