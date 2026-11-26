@@ -119,7 +119,7 @@
   var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
   var pitchImg = null;
   /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링 */
-  var TOKEN_R = 0.58;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 1.16 × SPR_H) */
+  var TOKEN_R = 0.55;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 1.1 × SPR_H) */
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
   var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
@@ -1408,7 +1408,7 @@
           dpx = Math.hypot(sx, sy);
           sa = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(a.x / WORLD_W, 0, 1);
           sb = PROJ.s0 + (PROJ.s1 - PROJ.s0) * clamp(b.x / WORLD_W, 0, 1);
-          minPx = SPR_H * 0.56 * (sa + sb) / 2;
+          minPx = SPR_H * 0.70 * (sa + sb) / 2;
           if (dpx > 0.01 && dpx < minPx) {
             push = (minPx - dpx) * 0.5 * 0.86;
             ux = sx / dpx; uy = sy / dpx;
@@ -2728,7 +2728,7 @@
 
     var cx = g.x + slide;
     var cy = g.y - r * 0.96 + hop;             /* 원 아래가 잔디에 닿는다 */
-    var ringW = Math.max(2.4, r * 0.30);       /* 팀 링 두께 */
+    var ringW = Math.max(2.2, r * 0.26);       /* 팀 링 두께 */
     var PI2 = Math.PI * 2;
 
     /* ── 지면 그림자 (떠 있는 높이만큼 짙고 넓게) ── */
@@ -2833,7 +2833,7 @@
     ctx.lineWidth = ringW;
     ctx.strokeStyle = ringGrad;
     ctx.shadowColor = tf.glow;
-    ctx.shadowBlur = isCarrier ? r * 0.95 : (p.skillT > 0 || p.glow > 0 ? r * 0.8 : r * 0.45);
+    ctx.shadowBlur = isCarrier ? r * 0.7 : (p.skillT > 0 || p.glow > 0 ? r * 0.55 : r * 0.30);
     ctx.stroke();
     ctx.restore();
     /* 바깥 경계선 — 밝은 잔디·관중 위에서도 원이 또렷하게 */
@@ -2956,9 +2956,9 @@
     var outT = clamp(k / 0.16, 0, 1);           /* 퇴장 */
     var e = inT * inT * (3 - 2 * inT);
     var a = Math.min(e, outT);
-    var w = Math.min(268, W * 0.56), h = 50;
+    var w = Math.min(238, W * 0.50), h = 34;
     var x = W / 2 - w / 2;
-    var y = -h + (h + 12) * e;
+    var y = -h + (h + 10) * e;
     var home = flash.side === 'home';
     ctx.save();
     ctx.globalAlpha = clamp(a, 0, 1);
@@ -2974,21 +2974,21 @@
     ctx.stroke();
     /* 왼쪽 골드 바 */
     ctx.fillStyle = '#f6c945';
-    roundRect(x + 6, y + 8, 4, h - 16, 2);
+    roundRect(x + 6, y + 7, 4, h - 14, 2);
     ctx.fill();
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffe98a';
-    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
-    ctx.fillText('GOAL', x + 18, y + 18);
-    ctx.fillStyle = 'rgba(233,244,221,0.9)';
-    ctx.font = '700 10px system-ui, -apple-system, sans-serif';
-    ctx.fillText((flash.name || '') + ' · ' + (flash.side === 'home' ? cfg.homeShort : cfg.awayShort), x + 18, y + 34);
+    ctx.font = '900 14px system-ui, -apple-system, sans-serif';
+    ctx.fillText('GOAL', x + 17, y + h / 2 + 0.5);
+    ctx.fillStyle = 'rgba(233,244,221,0.92)';
+    ctx.font = '700 10.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(home ? cfg.homeShort : cfg.awayShort, x + 60, y + h / 2 + 0.5);
     /* 오른쪽 스코어 */
     ctx.textAlign = 'right';
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 21px system-ui, -apple-system, sans-serif';
-    ctx.fillText(flash.score, x + w - 14, y + h / 2 + 1);
+    ctx.font = '900 19px system-ui, -apple-system, sans-serif';
+    ctx.fillText(flash.score, x + w - 13, y + h / 2 + 1);
     ctx.textAlign = 'left';
     ctx.restore();
   }

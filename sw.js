@@ -1,12 +1,12 @@
 /*! 도트싸커 v10 — 원형 초상화 토큰 · 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v10c-20261126';
+var CACHE = 'dot-soccer-v10d-20261126';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=10&b=31', './js/data.js?v=10&b=31', './js/match.js?v=10&b=31', './js/game.js?v=10&b=31',
+        './css/style.css?v=10&b=32', './js/data.js?v=10&b=32', './js/match.js?v=10&b=32', './js/game.js?v=10&b=32',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
