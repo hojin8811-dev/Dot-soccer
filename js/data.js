@@ -2188,7 +2188,8 @@
 
   Art.paintFacility = function (canvas, kind, level) {
     var fig = Art.facilityFig(kind, level);
-    var dpr = Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2);
+    /* 표시 크기(40×33)보다 넉넉한 내부 해상도로 그려 어떤 화면에서도 또렷하게 */
+    var dpr = Math.max(2.4, Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2));
     var w = 124, h = 100;
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -2351,7 +2352,7 @@
 
   Art.paintStaff = function (canvas, kind) {
     var fig = Art.staffFig(kind);
-    var dpr = Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2);
+    var dpr = Math.max(2, Math.min(3, (typeof global !== 'undefined' && global.devicePixelRatio) || 2));
     canvas.width = Math.round(96 * dpr);
     canvas.height = Math.round(112 * dpr);
     var g = canvas.getContext('2d');
