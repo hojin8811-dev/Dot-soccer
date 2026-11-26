@@ -565,7 +565,7 @@
       phase: 'kickoff', timer: 1.0, atkSide: 'home',
       stage: 'build', stageT: 0, counterSide: null, counterT: 0,
       recoverSide: null, recoverT: 0, markT: 0, sitKey: '',
-      setpiece: null, passLine: null, looseT: 0
+      setpiece: null, passLine: null, looseT: 0, supT: 0, runT: 1.5
     };
     ball = {
       x: 50, y: 60, vx: 0, vy: 0, z: 0, vz: 0, carrier: null, from: null, receiver: null,
@@ -2385,6 +2385,7 @@
       var row = {
         pos: p.pos, name: p.name, x: Math.round(p.x), y: Math.round(p.y),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
+        pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
         bubble: p.bubble ? p.bubble.text : null
       };
       if (p.side === 'home') { h.push(row); } else { a.push(row); }
@@ -2392,7 +2393,7 @@
     var pcs = pressConfig('home');
     return {
       clock: minute(), phase: play.phase, stage: play.stage, sit: play.sitKey, paused: M.paused, halftime: M.halftime,
-      ball: { x: Math.round(ball.x), y: Math.round(ball.y), kind: ball.kind, shot: !!ball.shot },
+      ball: { x: Math.round(ball.x), y: Math.round(ball.y), z: Math.round(ball.z * 10) / 10, vz: Math.round(ball.vz), kind: ball.kind, shot: !!ball.shot },
       passLine: play.passLine ? true : false,
       formation: {
         home: formationOf('home'), away: formationOf('away'), tactic: tactic,
