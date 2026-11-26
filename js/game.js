@@ -2153,8 +2153,15 @@
         armGuard();
         return;
       }
-      /* 2) 열린 시트/모달 닫기 */
-      if (anyOverlayOpen()) { closeSubs(); closeModal(); armGuard(); return; }
+      /* 2) 열린 시트/모달 닫기 (하프타임 교체창이면 후반도 함께 시작) */
+      if (anyOverlayOpen()) {
+        var wasHalf = subHalf;
+        closeSubs();
+        closeModal();
+        if (wasHalf && DS.Match && DS.Match.resume) { subHalf = false; DS.Match.resume(); }
+        armGuard();
+        return;
+      }
       /* 3) 다른 탭이면 홈으로 */
       if (currentTab !== 'home') { setTab('home'); armGuard(); return; }
       /* 4) 홈 — 두 번 누르면 종료 */

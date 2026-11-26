@@ -2302,7 +2302,7 @@
   };
 
   /* ───────── 피치용 2.5등신 SD v6 — 일러스트 얼굴 + 유니폼 디테일 + 포즈 애니메이션 ───────── */
-  var SD_W = 60, SD_H = 84, SD_S = 2.6;
+  var SD_W = 60, SD_H = 84, SD_S = 2.0;
   var sdCache = {};
   var headImgCache = {};
 
@@ -2799,7 +2799,7 @@
 
     g.restore();
 
-    if (Object.keys(sdCache).length > 320) { sdCache = {}; }
+    if (Object.keys(sdCache).length > 240) { sdCache = {}; }
     sdCache[key] = cv;
     return cv;
   };
