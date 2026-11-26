@@ -107,6 +107,14 @@
       paintCell(cv);
     })(cvs[i]);
   }
+  /* 데이터 URL 얼굴도 디코드가 비동기 — 준비될 때까지 다시 그린다 */
+  var ticks = 0;
+  var timer = setInterval(function () {
+    var all = host.querySelectorAll('canvas');
+    for (var k = 0; k < all.length; k++) { paintCell(all[k]); }
+    ticks++;
+    if (ticks > 20) { clearInterval(timer); }
+  }, 300);
 })();
 </script>
 </body>
