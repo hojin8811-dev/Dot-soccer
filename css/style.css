@@ -1301,6 +1301,17 @@ body.rot-off .rotate { display: none; }
 .sq-card .fchip.on b { color: #1d3b07; }
 .sq-card .fchip span { color: var(--ink3); }
 .sq-card .fchip.on span { color: #3d6b12; opacity: 1; }
+/* v14 — 마이팀 카드(밝은 양피지) 위에서도 변칙 포메이션 칩은 보라색으로 구분 */
+.sq-card .fchip.anom { background: #ede3ff; border-color: rgba(138, 92, 214, .45); color: #3a2360; }
+.sq-card .fchip.anom b { color: #3a2360; }
+.sq-card .fchip.anom span { color: #6b4fa0; }
+.sq-card .fchip.anom.on {
+  background: linear-gradient(170deg, #e0ccff, #a88cf5);
+  border-color: #8a5cd6; color: #241436;
+  box-shadow: 0 2px 6px rgba(120, 80, 200, .35);
+}
+.sq-card .fchip.anom.on b { color: #241436; }
+.sq-card .fchip.anom.on span { color: #3a2360; opacity: 1; }
 .sq-syn { padding: 5px 9px; }
 .sq-syn .card-head { margin-bottom: 2px; }
 .sq-syn { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow: hidden; }
