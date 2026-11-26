@@ -1911,7 +1911,7 @@
     lastT = t;
     if (artGateOn) {
       artGateT += realDt;
-      if (portraitLeft <= 0 || artGateT > 6) {
+      if (portraitLeft <= 0 || artGateT > 9) {
         artGateOn = false;
         M.paused = false;
         acc = 0;
@@ -2525,15 +2525,30 @@
       ctx.drawImage(rec.img, -S / 2, -S + S * 0.03 + lift, S, S);
       ctx.restore();
     } else {
-      /* 로드 전 폴백 — 팀 컬러 실루엣 */
+      /* 로드 전 폴백 — 팀 컬러 2.5등신 미니 실루엣 (일러스트가 도착하면 바로 교체) */
       ctx.save();
-      ctx.globalAlpha = 0.75;
+      ctx.globalAlpha = 0.82;
+      var fh = sprH;
+      /* 다리 */
+      ctx.fillStyle = tf.plate;
+      ctx.fillRect(g.x - fh * 0.13, g.y - fh * 0.28, fh * 0.10, fh * 0.28);
+      ctx.fillRect(g.x + fh * 0.03, g.y - fh * 0.28, fh * 0.10, fh * 0.28);
+      /* 몸통 */
       ctx.fillStyle = tf.deep;
       ctx.beginPath();
-      ctx.ellipse(g.x, g.y - sprH * 0.42, sprH * 0.16, sprH * 0.40, 0, 0, Math.PI * 2);
+      ctx.ellipse(g.x, g.y - fh * 0.44, fh * 0.19, fh * 0.19, 0, 0, Math.PI * 2);
       ctx.fill();
+      /* 어깨 라인 */
+      ctx.strokeStyle = tf.ring;
+      ctx.lineWidth = Math.max(0.8, fh * 0.045);
       ctx.beginPath();
-      ctx.arc(g.x, g.y - sprH * 0.92, sprH * 0.15, 0, Math.PI * 2);
+      ctx.moveTo(g.x - fh * 0.17, g.y - fh * 0.50);
+      ctx.lineTo(g.x + fh * 0.17, g.y - fh * 0.50);
+      ctx.stroke();
+      /* 머리 */
+      ctx.fillStyle = tf.deep;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y - fh * 0.74, fh * 0.17, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
