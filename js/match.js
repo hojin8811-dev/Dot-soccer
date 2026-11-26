@@ -2732,8 +2732,8 @@
     defList.sort(function (a, b) { return Math.abs(a.y - gy) - Math.abs(b.y - gy); });
     /* v16 — 박스 인원을 3×3 격자에 앉힌다. 토큰 지름(28px) + 18% 간격을 화면에서 지키려면
        가로 15단위·깊이 5.5단위가 필요하다. (골키퍼가 서는 50·6 자리는 비워 둔다) */
-    var atkSlots = [[33, 8.5], [67, 8.5], [50, 14], [50, 19.5]];
-    var defSlots = [[33, 14], [67, 14], [33, 19.5], [67, 19.5]];
+    var atkSlots = [[33, 8.5], [67, 8.5], [50, 14.5], [50, 20.5]];
+    var defSlots = [[33, 14.5], [67, 14.5], [33, 20.5], [67, 20.5]];
     for (i = 0; i < atkList.length && i < atkSlots.length; i++) {
       sendTo(atkList[i], atkSlots[i][0], gy - dir * atkSlots[i][1]);
     }
