@@ -2392,34 +2392,40 @@
   }
 
   function hairFrontPath(g, st, cx, cy, hair, hairD) {
-    if (st === 'bald') {
-      g.fillStyle = hexAlpha(hairD, 0.55);
-      g.beginPath(); g.ellipse(cx, cy - 8.4, 9.6, 3.0, 0, 0, Math.PI * 2); g.fill();
-      return;
-    }
-    g.fillStyle = hair;
-    g.beginPath();
-    g.moveTo(cx - 12.6, cy - 4.4);
-    g.quadraticCurveTo(cx - 11.6, cy - 14.6, cx - 1.0, cy - 15.0);
-    g.quadraticCurveTo(cx + 10.6, cy - 15.0, cx + 12.4, cy - 5.2);
-    g.quadraticCurveTo(cx + 6.6, cy - 9.6, cx + 1.2, cy - 9.0);
-    g.quadraticCurveTo(cx - 5.4, cy - 8.4, cx - 8.4, cy - 4.6);
-    g.quadraticCurveTo(cx - 10.6, cy - 2.6, cx - 12.6, cy - 4.4);
-    g.closePath(); g.fill();
-    /* 머리카락 하이라이트 */
-    g.strokeStyle = hexAlpha('#ffffff', 0.22);
-    g.lineWidth = 1.1;
-    g.beginPath();
-    g.moveTo(cx - 6.6, cy - 12.2);
-    g.quadraticCurveTo(cx + 0.6, cy - 14.6, cx + 6.8, cy - 10.8);
-    g.stroke();
-    if (st === 'mohawk') {
-      g.fillStyle = hairD;
+    g.save();
+    g.beginPath(); g.ellipse(cx, cy + 0.4, 13.0, 15.0, 0, 0, Math.PI * 2); g.clip();
+    g.fillStyle = hexAlpha(hair, 0.94);
+    g.fillRect(cx - 14, cy - 16.4, 28, 8.0);
+    if (st === 'spiky' || st === 'mohawk' || st === 'swoop' || st === 'undercut') {
       g.beginPath();
-      g.moveTo(cx - 3.4, cy - 13.6);
-      g.quadraticCurveTo(cx, cy - 19.6, cx + 3.6, cy - 13.4);
+      g.moveTo(cx - 12.4, cy - 8.2);
+      g.lineTo(cx - 7.6, cy - 4.4);
+      g.lineTo(cx - 3.4, cy - 8.4);
+      g.lineTo(cx + 1.4, cy - 4.0);
+      g.lineTo(cx + 5.6, cy - 8.2);
+      g.lineTo(cx + 9.8, cy - 4.6);
+      g.lineTo(cx + 12.4, cy - 8.4);
+      g.lineTo(cx + 12.4, cy - 13.0);
+      g.lineTo(cx - 12.4, cy - 13.0);
+      g.closePath(); g.fill();
+    } else if (st === 'wavy' || st === 'long' || st === 'ponytail' || st === 'braids') {
+      g.beginPath();
+      g.moveTo(cx - 12.6, cy - 8.0);
+      g.quadraticCurveTo(cx - 10.0, cy - 5.6, cx - 7.2, cy - 7.8);
+      g.quadraticCurveTo(cx - 3.2, cy - 10.4, cx + 0.6, cy - 8.2);
+      g.quadraticCurveTo(cx + 5.0, cy - 5.8, cx + 8.4, cy - 8.4);
+      g.quadraticCurveTo(cx + 10.8, cy - 10.2, cx + 12.6, cy - 8.4);
+      g.lineTo(cx + 12.6, cy - 13.2);
+      g.lineTo(cx - 12.6, cy - 13.2);
       g.closePath(); g.fill();
     }
+    g.restore();
+    /* 머리카락 하이라이트 */
+    g.strokeStyle = hexAlpha('#ffffff', 0.24);
+    g.lineWidth = 1.0;
+    g.beginPath();
+    g.ellipse(cx, cy - 8.6, 9.6, 4.4, 0, Math.PI * 1.08, Math.PI * 1.94);
+    g.stroke();
   }
 
   /* 포즈별 관절 각도 (라디안, 0 = 아래로 수직) */
