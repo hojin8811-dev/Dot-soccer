@@ -6,7 +6,7 @@ self.addEventListener('install', function (e) {
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=11&b=35', './js/data.js?v=11&b=35', './js/match.js?v=11&b=35', './js/game.js?v=11&b=35',
+        './css/style.css?v=11&b=36', './js/data.js?v=11&b=36', './js/match.js?v=11&b=36', './js/game.js?v=11&b=36',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

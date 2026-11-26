@@ -79,7 +79,7 @@
      중앙축 x=50 한 줄: AM → CM → DM → CB → GK (DM은 CM 뒤쪽), y 16%씩 고르게
      좌우 날개: ST/CF · LWF/RWF · LWB/RWB · LB/RB 는 x=50 기준 정대칭 */
   var APT_LAYOUT = {
-    ST:  { x: 41, y: 10 }, CF: { x: 59, y: 10 },
+    ST:  { x: 41, y: 11 }, CF: { x: 59, y: 11 },
     LWF: { x: 11, y: 25 }, AM: { x: 50, y: 25 }, RWF: { x: 89, y: 25 },
     LWB: { x: 7,  y: 41 }, CM: { x: 50, y: 41 }, RWB: { x: 93, y: 41 },
     DM:  { x: 50, y: 57 },
