@@ -537,6 +537,17 @@
      실제로 스폰될 원정 스쿼드(포지션·주발·롤)와 감독 철학을 그대로 읽어 FM식 리포트를 만든다.
      formation · style · players(그 경기에 뛸 11명)를 넘기면 리포트의 모든 문장이 그 데이터에서 나온다. */
   var LANE_KO = { left: '왼쪽', right: '오른쪽', center: '중앙' };
+  /* 감독 철학 한 줄 요약 — TACTIC_STYLES.line은 수치 보정과 이름이 겹쳐 숫자만 남아 있어
+     리포트용 문구는 여기서 따로 둔다. */
+  var STYLE_DESC = {
+    gegenpress: '잃으면 3명이 즉시 달려들어 되찾는다',
+    tikitaka: '짧은 패스로 삼각을 만들고 점유로 조른다',
+    counter: '낮은 두 줄 블록 뒤 탈취 한 번에 찌른다',
+    wingplay: '풀백·윙백이 터치라인을 타고 박스까지 올라간다',
+    hybrid3241: '공격 시 3-2-4-1로 변형되는 가변 빌드업',
+    direct: '중원을 건너뛰는 직선 롱볼',
+    balanced: '라인과 간격을 지키며 상황에 맞춰 전환한다'
+  };
   DS.scoutReport = function (opt) {
     opt = opt || {};
     var key = opt.formation || '4-4-2';
@@ -605,7 +616,7 @@
     var depth = clamp((f.metrics ? f.metrics.line : 65) + st.line, 15, 99);
     return {
       formation: key, formationTag: f.tag || '', formationDesc: f.desc || '',
-      styleKey: st.key, styleName: st.name, styleLine: st.line, manager: opt.managerName || '',
+      styleKey: st.key, styleName: st.name, styleLine: STYLE_DESC[st.key] || STYLE_DESC.balanced, manager: opt.managerName || '',
       lanes: share, mainLane: main, mainLaneKo: LANE_KO[main],
       danger: danger, press: press, depth: depth,
       highLine: depth >= 72, lowBlock: depth <= 54,

@@ -2436,9 +2436,11 @@
     /* ── v20 ① 공격 루트 지시: 고른 레인으로 목표를 당기고 그쪽에서 한 발 더 전진한다 ── */
     if (p.side === 'home' && touch.focus !== 'balance' && p !== carrierV) {
       var fx0 = TOUCH_FOCUS_X[touch.focus];
-      var wF = g === 'DF' ? 0.10 : (g === 'MF' ? 0.22 : 0.34);
+      var wF = g === 'DF' ? 0.14 : (g === 'MF' ? 0.36 : 0.52);
+      /* 고른 레인에 가까운 선수는 거의 그 자리로, 먼 쪽 선수는 절반만 당긴다 */
+      if (Math.abs(tx - fx0) < 26) { wF = Math.min(0.72, wF * 1.5); }
       tx = tx * (1 - wF) + fx0 * wF;
-      ty = ty - z.dir * (g === 'DF' ? 0 : (g === 'MF' ? 1.6 : 2.4));
+      ty = ty - z.dir * (g === 'DF' ? 0 : (g === 'MF' ? 2.2 : 3.2));
     }
 
     /* ④ 전술 버튼(수비/군형/공격): 누르면 라인·폭이 눈앞에서 확 달라진다 */
@@ -2485,10 +2487,16 @@
     var trap = (side === 'home' && buffOf('offside') > 0);
     if (trap) { depth = clamp(depth + 9, 14, 54); }
     var lineY = ownY + dir * depth;
-    /* 공이 우리 진영이면 DF 라인은 '공과 골문 사이'로 (트랩 중에는 일자 하이 라인을 그대로 둔다) */
+    /* 공이 우리 진영이면 DF 라인은 '공과 골문 사이'로 (트랩 중에는 일자 하이 라인을 그대로 둔다)
+       v20 ① — 다만 지시한 라인 높이만큼은 공보다 앞/뒤로 설 수 있다. 그래야 '올리기/내리기'가
+       공 위치에 묻히지 않고 실제 대형을 바꾼다. */
     if (!trap && threat > 0.5) {
-      if (dir < 0) { lineY = Math.max(lineY, Math.min(ball.y - dir * 2, WORLD_H - 5)); }
-      else { lineY = Math.min(lineY, Math.max(ball.y - dir * 2, 5)); }
+      var lineAdj = (side === 'home' ? (TOUCH_LINE[touch.line] || 0) : 0);
+      var tacNow = effTactic(side);
+      var tacAdj = tacNow === 'allout' ? 6 : (tacNow === 'attack' ? 3 : (tacNow === 'defense' ? -4 : 0));
+      var capY = ball.y - dir * 2 - dir * (lineAdj + tacAdj);
+      if (dir < 0) { lineY = Math.max(lineY, Math.min(capY, WORLD_H - 5)); }
+      else { lineY = Math.min(lineY, Math.max(capY, 5)); }
     }
     lineY = clamp(lineY, 5, WORLD_H - 5);
     var bank = Math.max(6.4, Math.abs(bankYOf(side, 'MF') - lineYOf(side)));      /* DF↔MF 간격 */
@@ -6207,6 +6215,7 @@
       press: { n: pc.n, radius: Math.round(pc.radius * 10) / 10, value: Math.round(pc.press) },
       focusX: touch.focus === 'balance' ? 50 : TOUCH_FOCUS_X[touch.focus],
       changes: v20t.touch.changes, callout: Math.round(touchFx.t * 100) / 100,
+      callouts: v20t.touch.callouts,
       draw: v20t.calloutDraw || 0, rect: v20t.calloutRect || null,
       last: v20t.touch.last
     };
