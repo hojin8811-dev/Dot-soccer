@@ -30,9 +30,9 @@ v10은 호진님이 초상화 시안을 보내며 확정한 **"몸통 그냥 지
 - 구현은 `js/data.js`에 **표시용 슬롯 `APT_MAP_SLOTS`(15칸)** 를 추가하고 `js/game.js`의 `aptMap()`이 그 슬롯을 그리게 했습니다. 오른쪽 자리는 `side:'R'`로 x를 100 기준 뒤집어 그리므로 좌우가 항상 정대칭입니다. **포지션 목록(`APT_LIST`)·적성 계산은 13종 그대로**라 스카우트·포메이션·성장 로직에는 영향이 없습니다.
 - `?v=12` · 캐시 버스터 `b=38` (`index.html`·`sw.js`·`manifest.webmanifest` 동시 갱신).
 
-| 844×390 라이브 — PLAYER DETAIL | 적성 피치맵 확대 |
-| --- | --- |
-| ![선수 상세](preview/v12/v12-01-playerdetail-aptmap-844x390.png) | ![적성 피치맵](preview/v12/v12-02-aptmap-closeup.png) |
+| 844×390 라이브 — CM 강재이 | 적성 피치맵 확대 (CM 2자리·CB 2자리·DM 후방) | CB 백승민 — CB 두 자리 모두 9 |
+| --- | --- | --- |
+| ![선수 상세](preview/v12/v12-01-playerdetail-aptmap-844x390.png) | ![적성 피치맵](preview/v12/v12-02-aptmap-closeup.png) | ![CB 선수](preview/v12/v12-03-cb-playerdetail-844x390.png) |
 
 ## v11 패치 — 선수 상세 적성 피치맵 정렬
 
