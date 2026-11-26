@@ -117,7 +117,6 @@
      → 홈팀은 화면 왼쪽 골대에서 오른쪽 골대로, 원정팀은 오른쪽에서 왼쪽으로 공격한다. */
   var PROJ = DS.Art.PROJ;  /* 먼 쪽 0.85배 ~ 가까운 쪽 1.12배 원근 스케일 포함 */
   var pitchImg = null;
-  var pitchImgTried = false;
   var portraits = {};             /* pic 번호 → { img, ready } */
   var portraitLeft = 0;
   var portraitNeed = 0;
@@ -786,18 +785,24 @@
     buildPitchLayer();
   }
 
+  var pitchTries = 0;
   function loadPitchImage() {
-    if (pitchImgTried) { return; }
-    pitchImgTried = true;
+    if (pitchImg || pitchTries >= 2) { return; }
+    pitchTries++;
     var img = new global.Image();
     img.onload = function () {
       pitchImg = img;
       buildPitchLayer();
       if (M.running) { draw(); }
     };
-    img.onerror = function () { pitchImg = null; };
+    img.onerror = function () {
+      pitchImg = null;
+      if (pitchTries < 2) { global.setTimeout(loadPitchImage, 1500); }
+    };
     img.src = 'assets/stadium-pitch.png';
   }
+  /* 페이지가 뜨자마자 피치 이미지를 미리 받아 둔다 (경기 시작 시 대기 없음) */
+  loadPitchImage();
 
   function buildPitchLayer() {
     pitchLayer = document.createElement('canvas');

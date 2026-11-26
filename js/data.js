@@ -1777,7 +1777,7 @@
       g.globalAlpha = 1;
     }
     var lw = Math.max(1, Math.round(W / 260));
-    g.strokeStyle = 'rgba(228,255,240,0.55)';
+    g.strokeStyle = 'rgba(228,255,240,0.48)';
     g.lineWidth = lw;
     function line(u1, v1, u2, v2) {
       var p1 = pt(u1, v1), p2 = pt(u2, v2);
@@ -1807,14 +1807,24 @@
       line(u0 + e[1] * 0.058, 0.635, u0, 0.635);
       a = pt(u0 + e[1] * 0.11, 0.5);
       g.beginPath(); g.arc(a.x, a.y, Math.max(1.3, lw), 0, Math.PI * 2); g.fill();
-      /* 골대 */
+      /* 골대 + 그물망 */
       g.save();
-      g.strokeStyle = 'rgba(240,255,250,0.9)';
-      g.lineWidth = 2;
-      var gd = (e[1] < 0 ? -1 : 1) * 0.028;
-      line(u0, 0.435, u0 + gd, 0.44);
-      line(u0 + gd, 0.44, u0 + gd, 0.56);
-      line(u0 + gd, 0.56, u0, 0.565);
+      g.strokeStyle = 'rgba(240,255,250,0.92)';
+      g.lineWidth = 1.8;
+      var gd = (e[1] < 0 ? -1 : 1) * 0.026;
+      line(u0 + gd * 0.06, 0.437, u0 + gd, 0.446);
+      line(u0 + gd, 0.446, u0 + gd, 0.554);
+      line(u0 + gd, 0.554, u0 + gd * 0.06, 0.563);
+      g.strokeStyle = 'rgba(235,255,248,0.22)';
+      g.lineWidth = 1;
+      var gi, gu;
+      for (gi = 0; gi <= 6; gi++) {
+        gu = u0 + gd * (0.06 + (0.94 * gi / 6));
+        line(gu, 0.446 + (0.008 * gi), gu, 0.554 - (0.008 * gi) * -1);
+      }
+      for (gi = 0; gi <= 3; gi++) {
+        line(u0 + gd * 0.06, 0.446 + (0.108 * gi / 3), u0 + gd, 0.45 + (0.1 * gi / 3));
+      }
       g.restore();
     });
   };
