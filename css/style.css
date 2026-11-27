@@ -237,8 +237,6 @@ main {
   color: var(--lime); margin-bottom: 9px; opacity: .95;
   text-shadow: 0 1px 6px rgba(0,0,0,.8);
 }
-/* v26 — 게임 이름(브랜드)을 홈 히어로 최상단 kicker에 표기 */
-.hero-kicker .brand { color: #f4fbe9; font-size: 9px; letter-spacing: .2px; }
 .hero-title {
   margin: 0 0 5px;
   font-size: 19px; font-weight: 900; letter-spacing: -1.2px; line-height: 1.05;
@@ -1076,7 +1074,6 @@ main { margin-left: 54px; padding: 7px 8px 8px; }
 .hero-title { font-size: 18px; }
 .hero-in { padding: 8px 12px 9px; }
 .hero-kicker { font-size: 8px; }
-.hero-kicker .brand { font-size: 9.5px; letter-spacing: .3px; }
 .vs { padding: 0 0 4px; }
 .vs-team canvas { width: 30px; height: 35px; }
 .vs-mid b { font-size: 13px; }

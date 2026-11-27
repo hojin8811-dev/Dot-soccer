@@ -935,7 +935,7 @@
       '<img class="hero-img" src="assets/hero-banner.jpg" alt="">' +
       '<div class="hero-badge"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/></svg>' + S.formation + ' · ' + DS.FORMATIONS[S.formation].tag + '</div>' +
       '<div class="hero-in">' +
-      '<div class="hero-kicker"><b class="brand">꼬마일레븐 FC</b> · MODERN TACTICAL SOCCER RPG</div>' +
+      '<div class="hero-kicker">MODERN TACTICAL SOCCER RPG</div>' +
       '<div class="hero-title">' + esc(S.club.name) + '</div>' +
       '<div class="hero-sub">' + divName(S.division) + ' 리그 ' + rank + '위 · 전력 ' + power + ' · 조직력 ' + chem + ' · 시즌 ' + S.season + '</div>' +
       '</div></div>' +
