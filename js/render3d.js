@@ -1442,6 +1442,9 @@
         want.dist = 36 - 6 * inThird;
         want.pitch = 0.545;
       }
+      /* 세로 화면(폰 세로)에서는 화면비에 맞춰 뒤로 물러나 pitch가 잘리지 않게 */
+      var fit = U.clamp(1.5 / Math.max(0.35, camera.aspect || 2), 1, 2.6);
+      want.dist *= fit;
       var k = U.clamp(1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt), 0, 0.95);
       CAM.tx += (want.tx - CAM.tx) * k;
       CAM.ty += (want.ty - CAM.ty) * k;
