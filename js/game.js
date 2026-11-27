@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v28 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
+/*! 꼬마일레븐 FC v29 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
 (function (global) {
   'use strict';
 
@@ -2615,6 +2615,194 @@
       '<div class="tiny muted" style="margin-top:4px">출전·평점·득점·도움으로 EXP가 쌓이고, 가득 차면 자동으로 레벨업합니다.</div></div>';
   }
 
+  /* ═════════════════  v29 — 수석코치 경기 총평 ═════════════════
+     랜덤 문구 금지: 결과·xG·슈팅·점유율·평점·체력·터치라인 지시·전술 카드·
+     세트피스·상성 적중 같은 이번 경기의 실측값만으로 진단과 처방을 만든다. */
+  var OPP_PLAN_KO = {
+    gegenpress: '전방 압박 · 탈취 후 6초 안에 마무리',
+    tikitaka: '짧은 패스 점유 · 중앙 삼각',
+    counter: '낮은 두 줄 블록 · 탈취 후 한 번에 찌르기',
+    wingplay: '풀백·윙백 오버래핑 · 측면 크로스',
+    hybrid3241: '가변 3-2-4-1 빌드업 · 중앙 4각',
+    direct: '직선 롱볼 · 최전방·측면 직송',
+    balanced: '균형 · 간격 유지' 
+  };
+  function avgRating(list) {
+    if (!list.length) { return null; }
+    var s = 0, i;
+    for (i = 0; i < list.length; i++) { s += list[i].rating; }
+    return Math.round(s / list.length * 10) / 10;
+  }
+  function coachReview(r) {
+    var gf = r.homeScore, ga = r.awayScore;
+    var won = gf > ga, drew = gf === ga;
+    var resTxt = won ? '승리' : (drew ? '무승부' : '패배');
+    var xg = r.xg || [0, 0];
+    var shots = r.shots || { home: 0, away: 0 };
+    var poss = (r.possession && r.possession[0]) || 50;
+    var v = r.v29 || null;
+    var touch = r.touch || null;
+    var opp = r.opponent || null;
+    var ours = r.ours || null;
+    var stam = r.stamina || [];
+    var rs = (r.ratings || []).slice();
+    var i, s;
+    var defList = [], midList = [], fwdList = [];
+    var DEFP = { CB: 1, LB: 1, RB: 1, LWB: 1, RWB: 1, DM: 1 };
+    var MIDP = { CM: 1, AM: 1, DM: 1, LWF: 0, RWF: 0 };
+    for (i = 0; i < rs.length; i++) {
+      if (DEFP[rs[i].pos]) { defList.push(rs[i]); }
+      else if (MIDP[rs[i].pos]) { midList.push(rs[i]); }
+      else { fwdList.push(rs[i]); }
+    }
+    var defAvg = avgRating(defList), midAvg = avgRating(midList), fwdAvg = avgRating(fwdList);
+    var byRate = rs.slice().sort(function (a, b) { return a.rating - b.rating; });
+    var worst = byRate[0] || null, best = byRate[byRate.length - 1] || null;
+    var tired = [], j;
+    for (j = 0; j < stam.length; j++) { if (stam[j].stam <= 55) { tired.push(stam[j]); } }
+    tired.sort(function (a, b) { return a.stam - b.stam; });
+    var sw = (v && v.switch) || { tries: 0, done: 0, fail: 0 };
+    var spg = (v && v.setpiece) || null;
+    var hd = (v && v.header) || { contest: 0, onTarget: 0 };
+    var hits = (r.matchup && r.matchup.hits) || (v && v.matchup && v.matchup.hits) || [];
+    var touchCh = touch && typeof touch.changes === 'number' ? touch.changes : 0;
+    var oppKey = (opp && opp.style) || 'balanced';
+    var oppName = (opp && opp.styleName) || '균형';
+    var oppForm = (opp && opp.formation) || '-';
+    var oppPlan = OPP_PLAN_KO[oppKey] || OPP_PLAN_KO.balanced;
+    var cards = r.cards || 0;
+    var lines = [], fixes = [], headline = '';
+    /* 지시 라벨은 화면용 축약값('전방' · '유지' · '양쪽') 대신 읽히는 말로 */
+    var TLBL = {
+      defensive: '수비적', balanced: '균형', attacking: '공격적', allout: '총공세',
+      low: '낮은 압박', normal: '보통 압박', high: '전방 압박',
+      deep: '라인 내리기', standard: '라인 유지', high2: '라인 올리기',
+      balance: '양쪽 루트', left: '좌측 루트', center: '중앙 루트', right: '우측 루트'
+    };
+    function TL(v2) { return TLBL[v2] || v2 || ''; }
+
+    /* ── 상대 계획 ── */
+    var oppLabel = esc(oppName) + (oppForm && oppName.indexOf(oppForm) < 0 ? ' ' + esc(oppForm) : '');
+    lines.push('<b>' + oppLabel + '</b> — ' + esc(oppPlan) +
+      (opp && opp.posture && opp.posture !== 'balanced' ? ' · 경기 중 ' +
+        (opp.posture === 'attack' ? '공격 전환' : (opp.posture === 'defense' ? '수비 전환' : '균형 복귀')) : ''));
+
+    /* ── 우리 계획 ── */
+    var tl = touch && touch.labels ? touch.labels : null;
+    var ourLine = '<b>' + esc((ours && ours.formation) || S.formation) + '</b>';
+    if (tl) {
+      ourLine += ' · 지시 ' + esc(TL(touch.mentality) + ' · ' + TL(touch.pressing) + ' · ' +
+        TL(touch.line) + ' · ' + TL(touch.focus));
+    }
+    ourLine += ' · 지시 변경 ' + touchCh + '회 · 전술 카드 ' + cards + '회';
+    lines.push(ourLine);
+
+    /* ── 진단 ── */
+    var diag = [];
+    var xgDiff = Math.round((xg[0] - xg[1]) * 10) / 10;
+    if (xg[0] >= xg[1] + 0.4 && gf <= ga) {
+      diag.push('xG <b>' + xg[0].toFixed(1) + ' : ' + xg[1].toFixed(1) + '</b>로 앞섰는데 슈팅 ' +
+        shots.home + '개를 ' + gf + '골로 마무리 — <span class="cr-bad">결정력 부족</span>');
+    } else if (xgDiff <= -0.4) {
+      diag.push('상대에 더 좋은 기회를 내줬습니다 (xG <b>' + xg[0].toFixed(1) + ' : ' + xg[1].toFixed(1) + '</b>, 슈팅 ' +
+        shots.home + ' : ' + shots.away + ')');
+    } else {
+      diag.push('기회의 질은 팽팽했습니다 (xG <b>' + xg[0].toFixed(1) + ' : ' + xg[1].toFixed(1) + '</b>, 슈팅 ' +
+        shots.home + ' : ' + shots.away + ')');
+    }
+    if (!won) {
+      if (poss < 45) { diag.push('점유율 <b>' + poss + '%</b> — 중원 주도권을 내줘 두 번째 공을 계속 상대가 잡았습니다'); }
+      if (defAvg !== null && defAvg < 6.2) {
+        diag.push('수비진 평균 평점 <b>' + defAvg.toFixed(1) + '</b>' +
+          (worst ? ' (최저 ' + esc(worst.name) + ' ' + worst.rating.toFixed(1) + ')' : '') +
+          ' — <span class="cr-bad">라인 간격이 벌어졌습니다</span>');
+      }
+      if (tired.length >= 2) {
+        diag.push('체력 55% 이하 <b>' + tired.length + '명</b>' +
+          (tired[0] ? ' (' + esc(tired[0].name) + ' ' + tired[0].stam + '%)' : '') + ' — 막판 집중력 저하 위험');
+      }
+      if (sw.tries >= 3 && sw.done * 3 <= sw.tries) {
+        diag.push('측면 전환 <b>' + sw.done + '/' + sw.tries + '회 성공</b> — 압박 속 전환 패스가 계속 끊겼습니다');
+      }
+      if (spg && (spg.corner || 0) >= 3 && hd.onTarget === 0) {
+        diag.push('세트피스 코너 <b>' + spg.corner + '회</b>에 유효 헤더 0 — 박스 안 경합 열세');
+      }
+      if (touchCh <= 1) {
+        diag.push('터치라인 지시 변경 <b>' + touchCh + '회</b> — 흐름이 기울었는데 감독 개입이 없었습니다');
+      }
+      if (hits.length) {
+        s = hits[hits.length - 1];
+        diag.push('단, ' + esc(s.tag || '') + ' ' + esc(s.text || '') + ' (' + s.min + '분)');
+      }
+    }
+    lines.push(diag.join('<br>'));
+
+    /* ── 무승/패 → 구체 처방 ── */
+    var COUNTER_FIX = {
+      gegenpress: { need: 'pressing', ok: 'low', fix: '압박 강도 <b>낮게</b> — 상대 전방 압박에 말려들지 않고 롱볼로 1선을 건너뛰기' },
+      tikitaka: { need: 'pressing', ok: 'high', fix: '압박 강도 <b>전방 압박</b> — 짧은 빌드업의 첫 패스를 끊기' },
+      counter: { need: 'line', ok: 'high', fix: '수비 라인 <b>올리기</b> — 두 줄 블록 위로 압박하고 후방 2명은 남기기' },
+      wingplay: { need: 'focus', ok: 'center', fix: '공격 루트 <b>중앙</b> — 측면을 비운 상대의 하프스페이스 공략' },
+      hybrid3241: { need: 'pressing', ok: 'high', fix: '압박 강도 <b>전방 압박</b> — 가변 빌드업 첫 줄을 끊기' },
+      direct: { need: 'line', ok: 'deep', fix: '수비 라인 <b>내리기</b> — 롱볼 뒷공간을 지우고 세컨볼 선점' },
+      balanced: null
+    };
+    if (!won) {
+      var cf = COUNTER_FIX[oppKey];
+      if (cf && touch && touch[cf.need] !== cf.ok) { fixes.push(cf.fix); }
+      if (typeof defAvg === 'number' && defAvg < 6.2) { fixes.push('수비 자원 정리 — 풀백&middot;CB 중 평점 낮은 1명을 DM 보강으로 바꾸거나 수비 라인을 내리기'); }
+      if (tired.length >= 2) { fixes.push('하프타임 <b>원클릭 교체</b> 2명 — 체력 55% 이하 ' + tired.length + '명을 먼저 빼기'); }
+      if (xg[0] >= xg[1] + 0.4 && gf <= ga) { fixes.push('박스 안 마무리 — 슈팅 대신 <b>컷백·스루패스</b> 카드로 결정적 기회 만들기'); }
+      if (spg && (spg.corner || 0) >= 3 && hd.onTarget === 0) { fixes.push('세트피스 카드 + <b>장신 CB 니어포스트</b> 고정 — 첫 공 경합에서 이기기'); }
+      if (sw.tries >= 3 && sw.done * 3 <= sw.tries) { fixes.push('전환 패스가 끊기면 측면 돌파 대신 <b>짧은 지원</b>으로 한 번 풀어내기'); }
+      if (!fixes.length) { fixes.push('전반 15분 안에 터치라인 지시를 1회는 바꿔 흐름을 끌어오기 — ' + esc(oppName) + ' 상성 카운터를 미리 걸기'); }
+      if (fixes.length > 3) { fixes = fixes.slice(0, 3); }
+      headline = drew ? '비긴 경기에서 드러난 약점 ' + fixes.length + '가지' : '패인은 지표에 그대로 나와 있습니다';
+    } else {
+      /* ── 승리 → 통한 것 칭찬 + 보완 1줄 ── */
+      if (hits.length) {
+        var keys = hits.map(function (h2) { return h2.tag + ' ' + h2.text; }).slice(-2);
+        fixes.push('통한 것: ' + keys.map(function (t2) { return esc(t2); }).join(' / '));
+      }
+      if (sw.done > 0) { fixes.push('통한 것: 사이드 전환 <b>' + sw.done + '/' + sw.tries + '회 성공</b> — 약측 폭 유지가 압박을 벗겨냈습니다'); }
+      if (hd.onTarget > 0) { fixes.push('통한 것: 세트피스 유효 헤더 <b>' + hd.onTarget + '</b>개 — 장신 CB 니어/파포스트 대형 적중'); }
+      if (poss >= 55) { fixes.push('통한 것: 점유율 <b>' + poss + '%</b> — 중원에서 공을 소유하며 상대를 돌렸습니다'); }
+      if (gf > xg[0]) { fixes.push('통한 것: 결정력 — xG ' + xg[0].toFixed(1) + '보다 ' + (gf - xg[0]).toFixed(1) + '골 더 넣었습니다'); }
+      if (best && best.mvp) { fixes.push('통한 것: <b>' + esc(best.name) + '</b> ' + best.rating.toFixed(1) + ' MVP 활약'); }
+      if (fixes.length > 3) { fixes = fixes.slice(0, 3); }
+      var tip = '';
+      var cfw = COUNTER_FIX[oppKey];
+      if (cfw && touch && touch[cfw.need] !== cfw.ok) { tip = '다음 경기 보완: ' + esc(oppName) + ' 상대로는 ' + cfw.fix.replace('<b>', '').replace('</b>', '') + '.'; }
+      else if (tired.length >= 2) { tip = '다음 경기 보완: 체력 55% 이하 ' + tired.length + '명 — 로테이션 1명은 돌리세요.'; }
+      else if (xgDiff < 0) { tip = '다음 경기 보완: xG ' + xg[0].toFixed(1) + ' : ' + xg[1].toFixed(1) + '로 기회 질은 밀렸습니다 — 수비 라인·압박 밸런스를 한 단계 조정.'; }
+      else { tip = '다음 경기 보완: 지시 변경 ' + touchCh + '회 — 상대 성향을 보고 전반에 한 번은 적극적으로 바꿔보세요.'; }
+      fixes.push('<span class="cr-note">' + tip + '</span>');
+      headline = best ? esc(best.name) + ' ' + best.rating.toFixed(1) + ' 활약 · ' + gf + ':' + ga + ' ' + resTxt : gf + ':' + ga + ' ' + resTxt;
+    }
+
+    /* ── 지표 요약 ── */
+    var note = 'xG ' + xg[0].toFixed(1) + ':' + xg[1].toFixed(1) + ' · 슛 ' + shots.home + ':' + shots.away +
+      ' · 점유 ' + poss + '% · 평점 수비 ' + (defAvg === null ? '-' : defAvg.toFixed(1)) +
+      ' / 중원 ' + (midAvg === null ? '-' : midAvg.toFixed(1)) + ' / 공격 ' + (fwdAvg === null ? '-' : fwdAvg.toFixed(1));
+    if (spg) { note += ' · 코너 ' + (spg.corner || 0) + ' · 세트피스 헤더 ' + hd.onTarget + '/' + hd.contest; }
+
+    var fixesHTML = '';
+    if (fixes.length) {
+      fixesHTML = '<ul class="cr-fix">' + fixes.map(function (t3) {
+        return t3.indexOf('<span') === 0 ? '<li style="list-style:none;margin-left:-12px">' + t3 + '</li>' : '<li>' + t3 + '</li>';
+      }).join('') + '</ul>';
+    }
+    return '<div class="band">수석코치 총평 <span>실측 지표 기반</span></div>' +
+      '<div class="card tight coach-rev" style="margin:0 0 8px">' +
+      '<div class="cr-head">📋 ' + esc(resTxt) + ' — ' + headline + '<em>' + (won ? 'WIN' : (drew ? 'DRAW' : 'LOSS')) + '</em></div>' +
+      '<div class="cr-row"><span class="cr-k">상대</span><span class="cr-v">' + lines[0] + '</span></div>' +
+      '<div class="cr-row"><span class="cr-k">우리</span><span class="cr-v">' + lines[1] + '</span></div>' +
+      '<div class="cr-row"><span class="cr-k">진단</span><span class="cr-v">' + lines[2] + '</span></div>' +
+      fixesHTML +
+      '<div class="cr-note">' + esc(note) + '</div>' +
+      '</div>';
+  }
+
   function reportHTML(r) {
     var i, goals = '', caut = '', pts = '', car = '';
     if (!r.goals.length) { goals = '<div class="rline empty">득점 없음</div>'; }
@@ -2666,6 +2854,7 @@
       '<div class="rline"><span>슛</span><b style="margin-left:auto">' + r.shots.home + ' : ' + r.shots.away + '</b></div>' +
       '<div class="rline"><span>패스 · 태클 · 선방</span><b style="margin-left:auto">' + r.passes + ' · ' + r.tackles + ' · ' + r.saves + '</b></div>' +
       '<div class="rline"><span>MVP</span><b style="margin-left:auto">' + esc(r.mvp.name) + ' (' + r.mvpRating.toFixed(1) + ')</b></div></div>' +
+      coachReview(r) +
       mapCardHTML(r) +
       '<div class="band">GOALS</div><div class="card tight" style="margin:0 0 8px">' + goals + '</div>' +
       (r.manager ? '<div class="band">MANAGER</div><div class="card tight" style="margin:0 0 8px">' +
@@ -3205,6 +3394,13 @@
       cards: res.cards || 0,
       tele: res.tele || null,
       v19: res.v19 || null,
+      /* v29 — 수석코치 총평 재료 */
+      touch: res.touch || null,
+      v29: res.v29 || null,
+      matchup: res.matchup || null,
+      opponent: res.opponent || null,
+      ours: res.ours || null,
+      stamina: res.stamina || null,
       manager: {
         name: mgr().name, style: mgr().style, formation: mgr().formation,
         traits: DS.managerTraitText(mgr()), sync: mgrSync()
@@ -3584,6 +3780,16 @@
     if (!st) { return; }
     var chips = document.getElementById('m-tl-chips');
     if (chips) { chips.textContent = touchSummary(st); }
+    /* v29 ③ — 하단 감독 줄: 감독 성향이 아니라 지금 내가 내린 지시(성향)를 실시간으로 보여 준다 */
+    var cs = document.getElementById('m-tk-style');
+    if (cs && st.mentality) {
+      var lab = touchLabelOf('mentality', st.mentality);
+      if (cs.textContent !== lab) {
+        cs.textContent = lab;
+        cs.className = 'tk-style flash tone-' + st.mentality;
+        global.setTimeout(function () { if (cs) { cs.className = 'tk-style tone-' + st.mentality; } }, 620);
+      }
+    }
     var box = document.getElementById('m-touch');
     if (!box) { return; }
     var btns = box.querySelectorAll('button[data-act="touch"]'), i, k, v;
@@ -3623,6 +3829,8 @@
       '<canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
       '<div id="m-banner" class="goal-banner"></div>' +
+      /* v29 ③ — 전술 상성 적중 피드백 칩 */
+      '<div class="m-matchup" id="m-matchup"></div>' +
       /* v25 — 피치 위 활성 전술카드 스트립 (남은 시간 게이지) */
       '<div class="tac-strip" id="m-tacstrip"></div>' +
       '</div>' +
@@ -3660,7 +3868,8 @@
       '<span class="tk-lbl on" id="m-tk-cast">🎙 캐스터</span>' +
       '<span class="tk-lbl exp" id="m-tk-exp">🎧 해설</span>' +
       '<div class="cmt-body" id="m-comm-body"></div>' +
-      '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · <b class="tk-style">' + esc(DS.tacticStyle(mgr().tacticStyle).name) + '</b> · ' + esc(S.formation) + '</span>' +
+      '<span class="tk-mgr">👔 ' + esc(mgr().name) + ' · <b class="tk-style" id="m-tk-style">' +
+        esc(touchLabelOf('mentality', touchInit().mentality)) + '</b> · ' + esc(S.formation) + '</span>' +
       '</div>';
     paintEmblems(box);
     var hand = document.getElementById('m-hand');
@@ -3715,6 +3924,24 @@
           }
         }
         strip.className = 'tac-strip on';
+      }
+    }
+    /* v29 ③ — 전술 상성 피드백 칩: 적중 순간 4초간 피치 위에 떠 있다 */
+    var mchip = document.getElementById('m-matchup');
+    if (mchip && DS.Match && DS.Match.matchupState) {
+      var mu = DS.Match.matchupState();
+      var mfx2 = mu && mu.fx;
+      if (mfx2 && mfx2.t > 0 && mfx2.tag) {
+        var msig = mfx2.key + '|' + mfx2.tag + '|' + (mfx2.text || '');
+        if (mchip.getAttribute('data-sig') !== msig) {
+          mchip.setAttribute('data-sig', msig);
+          mchip.innerHTML = '<b>' + esc(mfx2.tag) + '</b><span>' + esc(mfx2.text || '') + '</span>';
+        }
+        mchip.className = 'm-matchup on';
+      } else if (mchip.className !== 'm-matchup') {
+        mchip.className = 'm-matchup';
+        mchip.innerHTML = '';
+        mchip.removeAttribute('data-sig');
       }
     }
     var usesEl = document.getElementById('m-uses');
