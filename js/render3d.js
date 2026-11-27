@@ -326,15 +326,15 @@
     var standParts = [], rows = 8, rd = 1.9, rh = 0.92;
     [-1, 1].forEach(function (sz) {
       for (var r = 0; r < rows; r++) {
-        standParts.push([GEO.box, r % 2 ? 0x4b5262 : 0x565e6f, 0, r * rh + rh / 2, sz * (HW + 5.4 + r * rd), 0, 0, 0, 118, rh, rd * 0.97]);
+        standParts.push([GEO.box, r % 2 ? 0x4b5262 : 0x565e6f, 0, r * rh + rh / 2, sz * (HW + 5.4 + r * rd), 0, 0, 0, 130, rh, rd * 0.97]);
       }
-      standParts.push([GEO.box, 0x232832, 0, rows * rh + 2.6, sz * (HW + 5.4 + rows * rd + 0.9), 0, 0, 0, 118, rows * rh + 5.2, 1.6]);
+      standParts.push([GEO.box, 0x232832, 0, rows * rh + 2.6, sz * (HW + 5.4 + rows * rd + 0.9), 0, 0, 0, 130, rows * rh + 5.2, 1.6]);
     });
     [-1, 1].forEach(function (sx) {
       for (var r = 0; r < 6; r++) {
-        standParts.push([GEO.box, r % 2 ? 0x49505f : 0x545c6c, sx * (HL + 6.5 + r * rd), r * rh + rh / 2, 0, 0, 0, 0, rd * 0.97, rh, 58]);
+        standParts.push([GEO.box, r % 2 ? 0x49505f : 0x545c6c, sx * (HL + 6.5 + r * rd), r * rh + rh / 2, 0, 0, 0, 0, rd * 0.97, rh, 74]);
       }
-      standParts.push([GEO.box, 0x232832, sx * (HL + 6.5 + 6 * rd + 0.9), 6 * rh + 2.2, 0, 0, 0, 0, 1.6, 6 * rh + 4.4, 58]);
+      standParts.push([GEO.box, 0x232832, sx * (HL + 6.5 + 6 * rd + 0.9), 6 * rh + 2.2, 0, 0, 0, 0, 1.6, 6 * rh + 4.4, 74]);
     });
     var stands = new THREE.Mesh(mergeParts(standParts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
     stands.receiveShadow = true;
@@ -347,8 +347,8 @@
     var seatList = [];
     [-1, 1].forEach(function (sz) {
       for (var r = 0; r < rows; r++) {
-        for (var x = -55; x <= 55; x += 1.75) {
-          if (Math.abs(x) > 54) continue;
+        for (var x = -62; x <= 62; x += 1.75) {
+          if (Math.abs(x) > 61) continue;
           if (((x * 13 + r * 7 + (sz > 0 ? 3 : 0)) % 11) === 0) continue;   /* 빈자리 */
           seatList.push([x + ((r % 2) ? 0.5 : 0), r * rh + rh + 0.02, sz * (HW + 5.4 + r * rd + 0.1)]);
         }
@@ -356,7 +356,7 @@
     });
     [-1, 1].forEach(function (sx) {
       for (var r = 0; r < 6; r++) {
-        for (var z = -28; z <= 28; z += 1.5) {
+        for (var z = -35; z <= 35; z += 1.5) {
           if (((z * 17 + r * 5) % 9) === 0) continue;
           seatList.push([sx * (HL + 6.5 + r * rd + 0.1), r * rh + rh + 0.02, z]);
         }
