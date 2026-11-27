@@ -240,7 +240,7 @@
     /* 피치 밖 잔디 */
     var outer = new THREE.Mesh(
       new THREE.PlaneGeometry(210, 150),
-      new THREE.MeshStandardMaterial({ color: 0x1d4a26, roughness: 1 })
+      new THREE.MeshStandardMaterial({ color: 0x2b6038, roughness: 1 })
     );
     outer.rotation.x = -Math.PI / 2;
     outer.position.y = -0.03;
@@ -326,13 +326,13 @@
     var standParts = [], rows = 8, rd = 1.9, rh = 0.92;
     [-1, 1].forEach(function (sz) {
       for (var r = 0; r < rows; r++) {
-        standParts.push([GEO.box, r % 2 ? 0x3c424f : 0x474e5d, 0, r * rh + rh / 2, sz * (HW + 5.4 + r * rd), 0, 0, 0, 118, rh, rd * 0.97]);
+        standParts.push([GEO.box, r % 2 ? 0x4b5262 : 0x565e6f, 0, r * rh + rh / 2, sz * (HW + 5.4 + r * rd), 0, 0, 0, 118, rh, rd * 0.97]);
       }
       standParts.push([GEO.box, 0x232832, 0, rows * rh + 2.6, sz * (HW + 5.4 + rows * rd + 0.9), 0, 0, 0, 118, rows * rh + 5.2, 1.6]);
     });
     [-1, 1].forEach(function (sx) {
       for (var r = 0; r < 6; r++) {
-        standParts.push([GEO.box, r % 2 ? 0x3a404c : 0x454c5a, sx * (HL + 6.5 + r * rd), r * rh + rh / 2, 0, 0, 0, 0, rd * 0.97, rh, 58]);
+        standParts.push([GEO.box, r % 2 ? 0x49505f : 0x545c6c, sx * (HL + 6.5 + r * rd), r * rh + rh / 2, 0, 0, 0, 0, rd * 0.97, rh, 58]);
       }
       standParts.push([GEO.box, 0x232832, sx * (HL + 6.5 + 6 * rd + 0.9), 6 * rh + 2.2, 0, 0, 0, 0, 1.6, 6 * rh + 4.4, 58]);
     });
@@ -727,9 +727,9 @@
 
     var camera = new THREE.PerspectiveCamera(38, 2.16, 0.5, 900);
 
-    var hemi = new THREE.HemisphereLight(0xa9c8ff, 0x2b4426, 0.5);
+    var hemi = new THREE.HemisphereLight(0xa9c8ff, 0x2b4426, 0.62);
     scene.add(hemi);
-    var amb = new THREE.AmbientLight(0xffffff, 0.12);
+    var amb = new THREE.AmbientLight(0xffffff, 0.2);
     scene.add(amb);
     var sun = new THREE.DirectionalLight(0xffeed2, 2.7);
     sun.position.set(26, 96, 34);
@@ -743,9 +743,13 @@
     sun.shadow.normalBias = 0.03;
     scene.add(sun);
     scene.add(sun.target);
-    var fill = new THREE.DirectionalLight(0x9fc0ff, 0.55);
+    var fill = new THREE.DirectionalLight(0x9fc0ff, 0.5);
     fill.position.set(-50, 46, 60);
     scene.add(fill);
+    /* 카메라 쪽에서 얼굴을 비추는 보조광(선수 표정이 어둡게 죽지 않게) */
+    var camFill = new THREE.DirectionalLight(0xe6efff, 0.75);
+    scene.add(camFill);
+    scene.add(camFill.target);
 
     var stadium = buildStadium(scene);
     var blobTex = makeBlobTexture();
@@ -1448,6 +1452,9 @@
       CAM.tx = U.clamp(CAM.tx, -80, 80); CAM.ty = U.clamp(CAM.ty, 0, 6);
       CAM.tz = U.clamp(CAM.tz, -20, 20); CAM.dist = U.clamp(CAM.dist, 8, 220);
       CAM.pitch = U.clamp(CAM.pitch, 0.1, 1.25);
+      camFill.position.copy(camera.position);
+      camFill.target.position.set(CAM.tx, CAM.ty + 0.6, CAM.tz);
+      camFill.target.updateMatrixWorld();
       var cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
       camera.position.set(CAM.tx, CAM.ty + CAM.dist * sp, CAM.tz + CAM.dist * cp);
       camera.lookAt(CAM.tx, CAM.ty, CAM.tz);       /* up=(0,1,0) → 좌우 기울기 0 */
