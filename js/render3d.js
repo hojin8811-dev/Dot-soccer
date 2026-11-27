@@ -207,7 +207,7 @@
         g.fillStyle = 'rgba(255,255,255,0.10)';
         g.fillRect(i * pw + 6, 8, pw - 12, 6);
       }
-    }, { repeat: [6, 1] });
+    }, { repeat: [14, 1] });
   }
 
   /* 접지 그림자(부드러운 원형) */
@@ -1424,7 +1424,7 @@
     /* ── 카메라 (완전 수평 · yaw = 0) ── */
     var CAM = {
       mode: 'broadcast',
-      tx: 0, ty: 1.7, tz: 3.2, dist: 41, pitch: 0.545,
+      tx: 0, ty: 1.7, tz: 3.2, dist: 36, pitch: 0.545,
       cx: 0, cy: 36, cz: 64, ready: false
     };
     function updateCamera(dt) {
@@ -1439,7 +1439,7 @@
         want.tx = U.clamp(o.x * 0.92, -30, 30);
         want.tz = U.clamp(o.z * 0.35, -5, 5) + 3.2;
         want.ty = 1.7;
-        want.dist = 41 - 9 * inThird;
+        want.dist = 36 - 6 * inThird;
         want.pitch = 0.545;
       }
       var k = U.clamp(1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt), 0, 0.95);
