@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v27 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
+/*! 꼬마일레븐 FC v28 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
     v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀
     v17: TV 생중계 카메라(패닝·찬스 줌인) · 골 세레모니·Net Ripple(3초 리플레이는 v27에서 삭제) ·
          Web Audio 경기장 사운드 · 살아있는 관중석 · 캐스터/해설 2인 중계
@@ -1770,6 +1770,53 @@
     return {
       onPitch: onPitch, bench: bench, subsLeft: M.subsLeft, subsMax: MAX_SUBS,
       minute: minute(), score: M.homeScore + ' : ' + M.awayScore, halftime: M.paused
+    };
+  };
+
+  /* ── v28 — 수석코치 하프타임 교체 추천서용 스냅샷 ──
+     화면(game.js)이 '왜 바꿔야 하는지'를 판단할 수 있도록 전반 실측값을 그대로 넘긴다:
+     경기 평점(ratings[]의 누적 평점 — OVR과 다르다) · 체력 · 경고 · 슬롯 적성 · 벤치 OVR. */
+  M.adviceState = function () {
+    if (!M.running) { return null; }
+    var onPitch = [], bench = [], i, q, rq, bw, k, best;
+    function bestApt(map) {
+      var v = 0;
+      for (k in map) {
+        if (map.hasOwnProperty(k) && typeof map[k] === 'number' && map[k] > v) { v = map[k]; }
+      }
+      return v || 1;
+    }
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q.side !== 'home' || q.off) { continue; }
+      rq = ratingOf(q);
+      best = bestApt((q.player.apt && typeof q.player.apt === 'object') ? q.player.apt : {});
+      onPitch.push({
+        id: q.player.id, name: q.name, pos: q.pos, role: q.role,
+        number: q.player.number || 0,
+        ovr: DS.ratingOf(q.player),
+        rating: rq ? Math.round(rq.rating * 10) / 10 : 6.0,
+        stam: Math.round(q.stam),
+        yellows: q.yellows || 0,
+        apt: (q.player.apt && typeof q.player.apt === 'object') ? q.player.apt : {},
+        aptSlot: (q.player.apt && typeof q.player.apt[q.pos] === 'number') ? q.player.apt[q.pos] : 5,
+        aptBest: best
+      });
+    }
+    for (i = 0; i < benchState.length; i++) {
+      bw = benchState[i];
+      bench.push({
+        id: bw.player.id, name: bw.player.name, pos: bw.pos,
+        number: bw.player.number || 0,
+        ovr: DS.ratingOf(bw.player),
+        apt: (bw.player.apt && typeof bw.player.apt === 'object') ? bw.player.apt : {},
+        used: !!bw.used
+      });
+    }
+    return {
+      minute: minute(), score: [M.homeScore, M.awayScore],
+      subsLeft: M.subsLeft, subsMax: MAX_SUBS,
+      onPitch: onPitch, bench: bench, halftime: !!M.halftime
     };
   };
 

@@ -2253,3 +2253,98 @@ body.rot-off .rotate { display: none; }
   .m-side .tl-strip { height: 24px; }
   .m-side .m-acts .btn { height: 24px; }
 }
+
+/* ═════════════════ v28 — 수석코치 하프타임 교체 추천서 ═════════════════
+   하프타임(45')에 전반 평점·체력·경고를 근거로 [선발 → 벤치 후보]를 1:1로 붙여 보여주고,
+   [원클릭 교체]로 DS.Match.substitute()를 바로 태워 후반 라인업에 반영하는 패널.
+   가로(844×390)·세로(390×844) 모두 한 화면 안에 들어오도록 행을 grid로 접는다. */
+.adv-panel {
+  position: absolute; left: 50%; right: auto; bottom: 8px; transform: translateX(-50%);
+  width: min(760px, 96%); max-height: 94%;
+  padding: 8px 11px 9px; border-radius: 16px;
+  background: var(--card); border: 1px solid rgba(200, 241, 105, .28);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .55);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.adv-head { display: flex; align-items: center; gap: 6px; }
+.adv-head b { font-size: 12.5px; font-weight: 900; letter-spacing: -.3px; }
+.adv-meta { margin-left: auto; font-size: 9px; font-weight: 800; color: var(--ink3); white-space: nowrap; }
+.adv-sub { font-size: 8.5px; font-weight: 700; color: var(--ink3); margin: 2px 0 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adv-rows { display: flex; flex-direction: column; gap: 4px; }
+.adv-row {
+  display: grid; grid-template-columns: 1.15fr 12px 1fr 98px;
+  grid-template-areas: "out ar in go";
+  align-items: center; gap: 6px;
+  min-height: 40px; padding: 4px 7px; border-radius: 10px;
+  background: var(--card2); border: 1px solid var(--line);
+}
+.adv-row.done { background: rgba(200, 241, 105, .1); border-color: rgba(140, 190, 60, .45); }
+.adv-out { grid-area: out; }
+.adv-in { grid-area: in; }
+.adv-ar { grid-area: ar; font-size: 10px; font-weight: 900; color: var(--ink3); text-align: center; }
+.adv-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.adv-l1 { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.adv-l1 .pb { flex: 0 0 auto; font-size: 7px; height: 13px; line-height: 13px; padding: 0 4px; border-radius: 4px; }
+.adv-name { font-size: 11px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adv-lmeta { margin-left: 6px; display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.adv-lmeta span { font-size: 8px; font-weight: 900; color: var(--ink2); white-space: nowrap; }
+.adv-st.hot { color: #c0392b; }
+.adv-l2 { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.adv-tag {
+  font-size: 7.5px; font-weight: 900; padding: 1px 5px; border-radius: 5px;
+  background: rgba(193, 145, 27, .13); color: #8a6410; border: 1px solid rgba(193, 145, 27, .3);
+  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.adv-tag.t1 { background: rgba(47, 111, 158, .12); color: #24587a; border-color: rgba(47, 111, 158, .3); }
+.adv-tag.t2 { background: rgba(192, 57, 43, .1); color: #98341f; border-color: rgba(192, 57, 43, .28); }
+.adv-tag.t9 { background: rgba(120, 130, 120, .12); color: var(--ink2); border-color: rgba(120, 130, 120, .25); }
+.adv-fit { font-size: 9px; font-weight: 900; padding: 0 4px; border-radius: 4px; }
+.adv-fit.f1 { background: #dff3c0; color: #3f6b12; }
+.adv-fit.f2 { background: #eaf3d2; color: #48631f; }
+.adv-fit.f3 { background: #f6ecc9; color: #7a5a10; }
+.adv-fit.f4 { background: #f6dcd5; color: #96341f; }
+.adv-l2 .adv-ovr { font-size: 8.5px; font-weight: 900; color: #4f7d13; }
+.adv-diff { font-size: 8px; font-weight: 900; }
+.adv-diff.up { color: #2f8f4a; }
+.adv-diff.down { color: #c0392b; }
+.adv-bench { font-size: 7.5px; font-weight: 800; color: var(--ink3); }
+.adv-go {
+  grid-area: go; height: 30px; border-radius: 9px; border: 0;
+  background: linear-gradient(180deg, #d8f57f, #b6e04f); color: #14260c;
+  font-size: 9.5px; font-weight: 900; letter-spacing: -.2px;
+  box-shadow: 0 2px 0 rgba(90, 130, 20, .5);
+}
+.adv-go:active { transform: translateY(1px); }
+.adv-go[disabled] { background: #d9d3c2; color: #8a8474; box-shadow: none; }
+.adv-ok { grid-area: go; text-align: center; font-size: 9px; font-weight: 900; color: #3f6b12; }
+.adv-none {
+  display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center;
+  padding: 10px 8px; border-radius: 10px; text-align: center;
+  background: rgba(200, 241, 105, .1); border: 1px dashed rgba(140, 190, 60, .5);
+}
+.adv-none b { font-size: 10.5px; font-weight: 900; }
+.adv-none span { font-size: 8.5px; font-weight: 700; color: var(--ink2); }
+.adv-warn { margin-top: 4px; font-size: 8.5px; font-weight: 800; color: #98341f; text-align: center; }
+.adv-foot { display: flex; gap: 6px; margin-top: 7px; }
+.adv-foot .btn { flex: 1 1 0; height: 30px; }
+
+/* 세로(390×844): 한 행을 두 줄로 접고 [원클릭 교체]를 오른쪽에 세로로 세운다 */
+@media (orientation: portrait) and (max-width: 700px) {
+  .adv-panel {
+    left: 8px; right: 8px; transform: none; width: auto;
+    bottom: calc(72px + var(--safe-b)); max-height: 84%; padding: 9px 10px 10px;
+  }
+  .adv-head b { font-size: 12px; }
+  .adv-sub { white-space: normal; line-height: 1.35; }
+  .adv-row {
+    grid-template-columns: 1fr 86px;
+    grid-template-areas: "out go" "in go";
+    row-gap: 3px; padding: 6px 7px;
+  }
+  .adv-ar { display: none; }
+  .adv-in .adv-l1::before { content: '→'; font-size: 9px; font-weight: 900; color: var(--ink3); margin-right: 1px; }
+  .adv-go { height: 36px; align-self: center; }
+  .adv-foot { flex-direction: column; }
+  .adv-foot .btn { height: 34px; }
+}

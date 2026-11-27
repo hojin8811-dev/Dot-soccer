@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v27 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
+/*! 꼬마일레븐 FC v28 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
 (function (global) {
   'use strict';
 
@@ -1365,8 +1365,9 @@
     if (!S.youth) { S.youth = { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 }; }
     var y = S.youth;
     if (!y.intake) { y.intake = []; }
-    /* v23 — 시즌이 바뀌면 기존 유망주는 나이를 한 살 먹고 남는다.
-       20세를 넘긴 유망주는 아카데미를 떠나고, 빈자리만 새 후보로 채운다. */
+    /* v28 — 유망주는 '한 시즌 3명 고정'.
+       시즌이 바뀔 때(또는 첫 초기화)만 20세 초과 졸업 처리 뒤 3명까지 채우고,
+       같은 시즌 안에서는 매각·승격으로 빈자리가 생겨도 절대 다시 채우지 않는다(무한 매각 파밍 방지). */
     if (y.season !== S.season) {
       var keep = [], k;
       for (k = 0; k < y.intake.length; k++) {
@@ -1377,10 +1378,6 @@
       if (S.reserve && S.reserve.ids) {
         S.reserve.ids = S.reserve.ids.filter(function (id) { return keep.some(function (q) { return q.id === id; }); });
       }
-    }
-    if (!y.intake.length) {
-      for (var i = 0; i < YOUTH_SIZE; i++) { y.intake.push(DS.makeYouthProspect({})); }
-    } else {
       while (y.intake.length < YOUTH_SIZE) { y.intake.push(DS.makeYouthProspect({})); }
     }
     if (!youthSel.id || !y.intake.some(function (q) { return q.id === youthSel.id; })) {
@@ -1398,16 +1395,22 @@
   function youthCost(p) { return 420 + (p ? (p.level || 0) * 90 : 0); }
 
   function doYouthReroll() {
+    /* v28 — 시즌당 3명 고정을 지키기 위해 '남아 있는 유망주 수'만큼만 새로 뽑는다.
+       이미 매각·승격으로 빠진 자리는 다시 생기지 않는다. */
+    var y = ensureYouth(), n = y.intake.length;
+    if (!n) { toast('이번 시즌 유망주를 모두 승격·매각했습니다. 다음 시즌에 새 유망주가 입단합니다.'); return; }
     if (S.money < YOUTH_REROLL) { toast('자금이 부족합니다.'); return; }
-    var y = ensureYouth();
     S.money -= YOUTH_REROLL;
     y.intake = [];
-    for (var i = 0; i < YOUTH_SIZE; i++) { y.intake.push(DS.makeYouthProspect({})); }
+    for (var i = 0; i < n; i++) { y.intake.push(DS.makeYouthProspect({})); }
+    if (S.reserve && S.reserve.ids) {
+      S.reserve.ids = S.reserve.ids.filter(function (id) { return y.intake.some(function (q) { return q.id === id; }); });
+    }
     youthSel.id = y.intake[0].id;
     youthSel.pos = y.intake[0].pos;
     save();
     renderClub();
-    toast('새 유소년 후보 3명을 불러왔습니다.');
+    toast('새 유소년 후보 ' + n + '명을 불러왔습니다.');
   }
 
   function doYouthCoach() {
@@ -1468,10 +1471,18 @@
     var fee = Math.round(DS.marketValue(p) * 0.8 / 50) * 50;
     S.money += fee;
     y.intake = y.intake.filter(function (q) { return q.id !== p.id; });
+    /* v28 — 팔린 유망주의 2군 등록도 함께 정리하고, 빈자리는 다시 채우지 않는다(시즌당 3명 고정). */
+    if (S.reserve && S.reserve.ids) {
+      S.reserve.ids = S.reserve.ids.filter(function (q) { return q !== p.id; });
+    }
+    if (youthSel.id === p.id) {
+      youthSel.id = y.intake.length ? y.intake[0].id : null;
+      youthSel.pos = y.intake.length ? y.intake[0].pos : null;
+    }
     S.log.push('유소년 ' + p.name + ' 매각 ' + fmt(fee));
     save();
     renderAll();
-    toast(p.name + ' 이적시장 매각 · ' + fmt(fee));
+    toast(p.name + ' 이적시장 매각 · ' + fmt(fee) + (y.intake.length ? '' : ' · 이번 시즌 유망주 소진'));
   }
 
   /* ═════════════════  v23 — 2군 리그 (아카데미 유망주 출전) ═════════════════
@@ -1612,7 +1623,7 @@
         '<span class="mt">' + footChip(p) + '<span class="ov">' + DS.ratingOf(p) + '</span></span>' +
         '<span class="pot">' + youthStars(p) + '</span></button>';
     }
-    if (!cards) { cards = '<div class="tiny muted">이번 시즌 유소년 후보가 없습니다. 새로 불러오세요.</div>'; }
+    if (!cards) { cards = '<div class="tiny muted yth-none">이번 시즌 유망주 모두 승격/매각 완료 — 다음 시즌에 새 유망주가 입단합니다.</div>'; }
 
     var posChips = '', keys = DS.POS_LIST, j;
     for (j = 0; j < keys.length; j++) {
@@ -1634,8 +1645,9 @@
     var inRes = sel ? (ensureReserve().ids.indexOf(sel.id) >= 0) : false;
 
     return '<div class="card">' +
-      '<div class="card-head"><b>유소년 아카데미</b><span class="meta">U-18 · ' + y.intake.length + '명 · 시즌 ' + S.season + '</span></div>' +
+      '<div class="card-head"><b>유소년 아카데미</b><span class="meta">U-18 · ' + y.intake.length + '/' + YOUTH_SIZE + '명 · 시즌 ' + S.season + '</span></div>' +
       '<div class="youth-grid">' + cards + '</div>' +
+      '<div class="tiny muted" style="margin-top:3px">한 시즌 3명 고정 · 매각·승격한 자리는 다음 시즌에만 충원됩니다.</div>' +
       '<div class="youth-coach"><span class="tiny muted" style="flex:0 0 auto">포지션 목표</span><div class="pcwrap">' + posChips + '</div></div>' +
       aptLine +
       '<div class="row" style="gap:4px;margin-top:5px;flex-wrap:wrap">' +
@@ -1644,7 +1656,7 @@
       (inRes ? '2군 출전중' : '2군 출전') + '</button>' +
       '<button class="btn dark sm" data-act="youthpromote" ' + (!sel ? 'disabled' : '') + '>1군 승격</button>' +
       '<button class="btn ghost sm" data-act="youthsell" ' + (!sel ? 'disabled' : '') + '>이적시장 매각</button>' +
-      '<button class="btn ghost sm" data-act="youthreroll" ' + (S.money < YOUTH_REROLL ? 'disabled' : '') + '>새 후보 · ' + fmt(YOUTH_REROLL) + '</button>' +
+      '<button class="btn ghost sm" data-act="youthreroll" ' + (S.money < YOUTH_REROLL || !y.intake.length ? 'disabled' : '') + '>새 후보 · ' + fmt(YOUTH_REROLL) + '</button>' +
       '</div></div>';
   }
 
@@ -3092,7 +3104,12 @@
       managerSync: mgrSync(),
       managerTraits: DS.managerTraitText(mgr()),
       kind: kind,
-      onHalftime: function () { openSubs(true); },
+      onHalftime: function () {
+        /* v28 — 하프타임엔 먼저 수석코치 교체 추천서를 띄우고, 교체 횟수가 없으면 기존 교체창으로 */
+        var adv = DS.Match && DS.Match.adviceState ? DS.Match.adviceState() : null;
+        if (adv && adv.subsLeft > 0 && openAdvice(true)) { return; }
+        openSubs(true);
+      },
       onHud: function (st) { updateHud(st); },
       onTouch: function (st) { updateTouchHud(st); },
       onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind, venueHome); }
@@ -3952,6 +3969,7 @@
       '<div><div class="sub-title">IN · 벤치</div><div class="sub-list">' + inHTML + '</div></div></div>' +
       '<div class="sub-btns"><button class="btn ghost" data-act="subclose">' + (halftime ? '그대로 후반' : '닫기') + '</button>' +
       '<button class="btn primary" data-act="subconfirm" ' + (!subState.inId || !subState.outId ? 'disabled' : '') + '>투입</button></div>' +
+      (halftime ? '<button class="btn ghost wide" style="margin-top:5px" data-act="advopen">📋 수석코치 교체 추천서 보기</button>' : '') +
       (halftime ? '<button class="btn dark wide" style="margin-top:5px" data-act="halftime2">후반 시작</button>' : '') +
       '</div>';
     ov.classList.add('on');
@@ -3960,6 +3978,174 @@
     var ov = document.getElementById('m-overlay');
     if (ov) { ov.classList.remove('on'); }
     subState.inId = null; subState.outId = null;
+  }
+
+  /* ═════════════════  v28 — 수석코치 하프타임 교체 추천서 ═════════════════
+     전반 45분에 엔진이 넘긴 실측값(경기 평점·체력·경고·적성)으로 '왜 바꿔야 하는지'를 정하고,
+     벤치 7명 중 같은/비슷한 포지션이면서 OVR이 가장 높은 미출전 선수를 1:1로 붙인다.
+     [원클릭 교체]는 DS.Match.substitute()를 바로 호출해 후반 라인업에 즉시 반영된다. */
+  var ADV = {
+    formAbs: 5.95,      /* 이 아래면 전반 부진으로 본다 (6.0이 기준 평점) */
+    formRank: 2,        /* 팀 하위 2명 — 팀 평균보다 낮으면 부진으로 함께 본다 */
+    aptGap: 2,          /* 슬롯 적성이 자기 최고 적성보다 2 이상 낮으면 전술 부적응 */
+    stam: 62,           /* 체력 62% 이하 → 고갈 위험 (하프타임 +11 회복 뒤 값) */
+    maxRows: 3
+  };
+  var advDone = [];     /* 이번 하프타임에 원클릭으로 마친 교체 */
+
+  function advFit(benchPos, slotPos) {
+    var f = posFitOf(benchPos, slotPos);
+    if (!f) { return { mark: '△', cls: 'f3', score: 0, label: '적합' }; }
+    return { mark: f.m, cls: f.c, score: f.m === '◎' ? 40 : (f.m === '○' ? 30 : (f.m === '△' ? 15 : 0)), label: f.l };
+  }
+
+  /* 추천 1건에 붙일 '왜' — 부진·체력·경고를 한 사람에 여러 개 붙일 수 있다 */
+  function advTagsOf(p, lowCut, avg) {
+    var tags = [], score = 0;
+    var formLow = (p.rating <= ADV.formAbs) ||
+      (p.rating <= lowCut + 0.001 && p.rating < avg - 0.05);
+    var slotBad = ((p.aptBest || 0) - (p.aptSlot || 0)) >= ADV.aptGap;
+    if (formLow && slotBad) { tags.push('📉 경기력 저하 · 전술 부적응'); }
+    else if (formLow) { tags.push('📉 경기력 저하'); }
+    else if (slotBad) { tags.push('📉 전술 부적응'); }
+    if (formLow) { score += (6.4 - p.rating) * 12; }
+    if (slotBad) { score += 3.5; }
+    if (p.stam <= ADV.stam) { tags.push('😮‍💨 체력 고갈 위험'); score += (ADV.stam + 4 - p.stam) * 0.55; }
+    if (p.yellows >= 1) { tags.push('🟨 경고 누적 · 퇴장 주의'); score += 6.5; }
+    return { tags: tags, score: score };
+  }
+
+  function advBestBench(outP, st, taken) {
+    var best = null, i, b, fit, val;
+    for (i = 0; i < st.bench.length; i++) {
+      b = st.bench[i];
+      if (b.used || taken[b.id]) { continue; }
+      fit = advFit(b.pos, outP.pos);
+      if (!fit.score) { continue; }              /* 골키퍼↔필드플레이어처럼 자리가 안 맞으면 추천하지 않는다 */
+      val = fit.score + b.ovr * 0.9 + ((b.apt && b.apt[outP.pos]) || 1) * 1.2;
+      if (!best || val > best.val) { best = { b: b, fit: fit, val: val }; }
+    }
+    return best;
+  }
+
+  /* 현재 라인업에서 추천 행을 다시 계산한다(교체할 때마다 새로) */
+  function advRows(st) {
+    var on = st.onPitch.slice(), i, p, t, cands = [], rows = [], taken = {}, lowCut = 6, rts = [], avg = 6;
+    for (i = 0; i < on.length; i++) { rts.push(on[i].rating); }
+    if (rts.length) {
+      var sum = 0;
+      for (i = 0; i < rts.length; i++) { sum += rts[i]; }
+      avg = sum / rts.length;
+      rts.sort(function (a, b) { return a - b; });
+      lowCut = rts[Math.min(ADV.formRank, rts.length) - 1];
+    }
+    for (i = 0; i < on.length; i++) {
+      p = on[i];
+      t = advTagsOf(p, lowCut, avg);
+      if (!t.tags.length) { continue; }
+      cands.push({ p: p, tags: t.tags, score: t.score });
+    }
+    cands.sort(function (a, b) {
+      if (b.score !== a.score) { return b.score - a.score; }
+      if (a.p.rating !== b.p.rating) { return a.p.rating - b.p.rating; }
+      return a.p.stam - b.p.stam;
+    });
+    for (i = 0; i < cands.length && rows.length < ADV.maxRows; i++) {
+      var pick = advBestBench(cands[i].p, st, taken);
+      if (!pick) { continue; }
+      taken[pick.b.id] = 1;
+      rows.push({ out: cands[i].p, bench: pick.b, fit: pick.fit, tags: cands[i].tags, score: cands[i].score });
+    }
+    return { rows: rows, blocked: cands.length > 0 && rows.length === 0 };
+  }
+
+  function advTagHTML(tags) {
+    var out = '', i;
+    for (i = 0; i < tags.length; i++) {
+      out += '<span class="adv-tag t' + i + '">' + tags[i] + '</span>';
+    }
+    return out;
+  }
+
+  function advRowHTML(r, st) {
+    var o = r.out, b = r.bench, diff = b.ovr - o.ovr;
+    var canSub = st.subsLeft > 0;
+    return '<div class="adv-row" data-out="' + o.id + '" data-in="' + b.id + '">' +
+      '<div class="adv-who adv-out">' +
+        '<div class="adv-l1">' + posBadge(o.pos) + '<span class="adv-name">' + esc(o.name) + '</span>' +
+          '<span class="adv-lmeta"><span class="adv-st' + (o.stam <= 40 ? ' hot' : '') + '">체력 ' + o.stam + '%</span>' +
+          '<span class="adv-rt">평점 ' + o.rating.toFixed(1) + '</span></span></div>' +
+        '<div class="adv-l2">' + advTagHTML(r.tags) + '</div>' +
+      '</div>' +
+      '<div class="adv-ar">→</div>' +
+      '<div class="adv-who adv-in">' +
+        '<div class="adv-l1">' + posBadge(b.pos) + '<span class="adv-name">' + esc(b.name) + '</span>' +
+          '<span class="adv-fit ' + r.fit.cls + '" title="' + (r.fit.label || '') + '">' + r.fit.mark + '</span></div>' +
+        '<div class="adv-l2"><span class="adv-ovr">OVR ' + b.ovr + '</span>' +
+          '<span class="adv-diff' + (diff >= 0 ? ' up' : ' down') + '">' + (diff >= 0 ? '+' : '') + diff + '</span>' +
+          '<span class="adv-bench">미출전</span></div>' +
+      '</div>' +
+      '<button class="adv-go" data-act="advsub" data-out="' + o.id + '" data-in="' + b.id + '"' +
+        (canSub ? '' : ' disabled') + '>' + (canSub ? '원클릭 교체' : '횟수 소진') + '</button>' +
+      '</div>';
+  }
+
+  function advDoneHTML(d) {
+    return '<div class="adv-row done">' +
+      '<div class="adv-who adv-out"><div class="adv-l1">' + posBadge(d.outPos) +
+        '<span class="adv-name">' + esc(d.outName) + '</span></div>' +
+        '<div class="adv-l2"><span class="adv-tag t9">' + (d.reason || '교체') + '</span></div></div>' +
+      '<div class="adv-ar">→</div>' +
+      '<div class="adv-who adv-in"><div class="adv-l1">' + posBadge(d.inPos) +
+        '<span class="adv-name">' + esc(d.inName) + '</span></div>' +
+        '<div class="adv-l2"><span class="adv-ovr">투입 완료</span></div></div>' +
+      '<span class="adv-ok">✅ 교체 완료</span></div>';
+  }
+
+  function openAdvice(fresh) {
+    var st = DS.Match && DS.Match.adviceState ? DS.Match.adviceState() : null;
+    if (!st) { return false; }
+    if (fresh) { advDone = []; }
+    subHalf = true;             /* 하프타임 오버레이 — 뒤로가기에서도 후반이 시작된다 */
+    renderAdvice(st);
+    return true;
+  }
+
+  function renderAdvice(st) {
+    var ov = document.getElementById('m-overlay');
+    if (!ov) { return; }
+    var plan = advRows(st), rows = plan.rows, html = '', i, weakest = null, wSrc = st.onPitch.slice();
+    wSrc.sort(function (a, b) { return (a.rating - b.rating) || (a.stam - b.stam); });
+    weakest = wSrc.length ? wSrc[0] : null;
+    html += '<div class="adv-panel" role="dialog" aria-label="수석코치 하프타임 교체 추천서">' +
+      '<div class="adv-head"><b>📋 수석코치 하프타임 교체 추천서</b>' +
+        '<span class="adv-meta">전반 ' + st.minute + "' · " + st.score[0] + ' : ' + st.score[1] +
+        ' · 교체 ' + st.subsLeft + '/' + (st.subsMax || 5) + '</span></div>' +
+      '<div class="adv-sub">전반 평점·체력·경고를 기준으로 최대 ' + ADV.maxRows + '명 · 같은 포지션 미출전 벤치를 1:1로 붙였습니다</div>';
+    for (i = 0; i < advDone.length; i++) { html += advDoneHTML(advDone[i]); }
+    if (rows.length) {
+      html += '<div class="adv-rows">';
+      for (i = 0; i < rows.length; i++) { html += advRowHTML(rows[i], st); }
+      html += '</div>';
+    } else if (plan.blocked) {
+      html += '<div class="adv-none"><b>추천할 선발은 있지만 벤치에 맞는 후보가 없습니다</b>' +
+        '<span>직접 교체에서 다른 포지션 선수를 고르거나, 그대로 후반을 시작하세요.</span></div>';
+    } else if (!advDone.length) {
+      html += '<div class="adv-none"><b>전반전 전원 양호 · 교체 추천 없음</b>' +
+        (weakest ? '<span>참고 · ' + esc(weakest.name) + ' (평점 ' + weakest.rating.toFixed(1) + ' · 체력 ' + weakest.stam + '%)</span>' : '') +
+        '</div>';
+    } else {
+      html += '<div class="adv-none"><b>추천 교체를 모두 마쳤습니다</b><span>필요하면 직접 교체로 더 바꿀 수 있습니다.</span></div>';
+    }
+    if (st.subsLeft <= 0) {
+      html += '<div class="adv-warn">교체 횟수를 모두 사용했습니다.</div>';
+    }
+    html += '<div class="adv-foot">' +
+      '<button class="btn primary" data-act="advstart">그대로 후반 시작</button>' +
+      '<button class="btn ghost" data-act="advsubs">직접 선수 교체 열기</button>' +
+      '</div></div>';
+    ov.innerHTML = html;
+    ov.classList.add('on');
   }
 
   /* ═════════════════  탭 · 렌더 ═════════════════ */
@@ -4585,6 +4771,36 @@
       return;
     }
     if (act === 'subs') { openSubs(false); return; }
+    /* ── v28 — 수석코치 하프타임 교체 추천서 ── */
+    if (act === 'advopen') {
+      if (DS.Match && DS.Match.paused) { openAdvice(false); }
+      else { toast('하프타임에만 열 수 있습니다.'); }
+      return;
+    }
+    if (act === 'advstart') {
+      if (DS.Match) { DS.Match.resume(); }
+      subHalf = false; closeSubs(); return;
+    }
+    if (act === 'advsubs') { openSubs(true); return; }
+    if (act === 'advsub') {
+      var aOut = t.getAttribute('data-out'), aIn = t.getAttribute('data-in');
+      var aSt = DS.Match && DS.Match.adviceState ? DS.Match.adviceState() : null;
+      if (!aOut || !aIn || !DS.Match || !aSt) { return; }
+      var aOutP = null, aInB = null, ai;
+      for (ai = 0; ai < aSt.onPitch.length; ai++) { if (aSt.onPitch[ai].id === aOut) { aOutP = aSt.onPitch[ai]; } }
+      for (ai = 0; ai < aSt.bench.length; ai++) { if (aSt.bench[ai].id === aIn) { aInB = aSt.bench[ai]; } }
+      if (!aOutP || !aInB) { return; }
+      if (aSt.subsLeft <= 0) { toast('교체 횟수를 모두 사용했습니다.'); return; }
+      if (!DS.Match.substitute(aIn, aOut)) { toast('교체할 수 없습니다.'); return; }
+      advDone.push({
+        outId: aOutP.id, outName: aOutP.name, outPos: aOutP.pos,
+        inId: aInB.id, inName: aInB.name, inPos: aInB.pos,
+        reason: '전반 ' + aSt.minute + "' 교체"
+      });
+      toast('교체 완료 — ' + aOutP.name + ' OUT · ' + aInB.name + ' IN');
+      renderAdvice(DS.Match.adviceState());
+      return;
+    }
     if (act === 'subclose') {
       if (DS.Match && DS.Match.running) { DS.Match.resume(subHalf ? false : true); }
       subHalf = false; closeSubs(); return;
@@ -4773,6 +4989,13 @@
     playReserveRound: playReserveRound,
     ageSeason: ageSeason,
     youthReserve: doYouthReserve,
+    /* v28 — 하프타임 교체 추천서 렌더 검증용(합성 스냅샷으로 체력·경고·빈 상태 분기 확인) */
+    advicePreview: function (st) {
+      if (!st) { return false; }
+      advDone = [];
+      renderAdvice(st);
+      return true;
+    },
     /* v24 — 비동기 PvP 검증용 */
     pvpExport: function () { return myPvpCode(); },
     pvpImport: function (code) { return DS.Pvp.importSquadCode(code); },
