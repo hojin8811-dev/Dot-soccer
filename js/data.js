@@ -2081,9 +2081,22 @@
     }
     return pot < list[0].min ? list[0] : list[list.length - 1];
   };
+  /* v26c — 잠재 구간과 등급을 1:1로 묶는다.
+       70~78 일반 유망주 → 동 · 79~84 준수한 유망주 → 은
+       85~88 특급 유망주 → 금 · 89~92 초특급 원더키드 → 전설
+     예전에는 등급(동/은)과 잠재(70~92)를 따로 굴려 '동인데 잠재 84' 같은
+     불일치가 나왔다. 이제 잠재를 먼저 뽑고 그 구간에서 등급을 정한다. */
+  DS.YOUTH_RARITY = { normal: 'dong', good: 'eun', elite: 'geum', wonderkid: 'legend' };
+  DS.youthRarityForPot = function (pot) {
+    var t = DS.youthPotTier(pot);
+    return DS.YOUTH_RARITY[t.key] || 'dong';
+  };
   DS.makeYouthProspect = function (opts) {
     opts = opts || {};
-    var p = makePlayer({ rarity: opts.rarity || (Math.random() < 0.16 ? 'eun' : 'dong') });
+    var pot = opts.pot || DS.rollYouthPot();
+    var tier = DS.youthPotTier(pot);
+    var rarity = opts.rarity || DS.youthRarityForPot(pot);
+    var p = makePlayer({ rarity: rarity });
     p.age = opts.age || (15 + Math.floor(Math.random() * 4));
     var keys = ['s', 't', 'p'], i, ovr, guard = 0;
     for (i = 0; i < 3; i++) { p[keys[i]] = clamp(4 + Math.floor(Math.random() * 3), 3, 7); }
@@ -2096,8 +2109,8 @@
     }
     p.level = 0;
     p.exp = 0;
-    p.pot = opts.pot || DS.rollYouthPot();
-    p.potTier = DS.youthPotTier(p.pot).key;
+    p.pot = pot;
+    p.potTier = tier.key;
     p.youth = true;
     p.originYouth = true;
     p.stats = statSheet(p);

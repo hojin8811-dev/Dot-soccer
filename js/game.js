@@ -484,7 +484,15 @@
       var yk;
       for (i2 = 0; i2 < d.youth.intake.length; i2++) {
         yk = d.youth.intake[i2];
-        if (yk) { yk.originYouth = true; if (typeof yk.age !== 'number') { yk.age = 16; } }
+        if (!yk) { continue; }
+        yk.originYouth = true;
+        if (typeof yk.age !== 'number') { yk.age = 16; }
+        /* v26c — 예전 세이브의 아카데미/후보는 등급과 잠재가 따로 굴러 있었다.
+           미승격 후보만 잠재 구간에 맞춰 등급을 정합한다(1군 승격·성장한 선수는 그대로). */
+        if (typeof yk.pot === 'number' && DS.youthRarityForPot) {
+          yk.rarity = DS.youthRarityForPot(yk.pot);
+          yk.potTier = DS.youthPotTier(yk.pot).key;
+        }
       }
       if (!d.expLog) { d.expLog = []; }
       /* v21b ⑥ — 기존 세이브: 이미 경기를 치른 구단에는 가이드를 접어 둔다 */
@@ -1544,13 +1552,16 @@
       '</div>';
   }
 
-  function youthStars(pot) {
-    /* v24 — 잠재 구간 70~92를 티어와 1:1로: 70~78 ★2 · 79~84 ★3 · 85~88 ★4 · 89~92 ★5 */
+  function youthStars(p) {
+    /* v24 — 잠재 구간 70~92를 티어와 1:1로: 70~78 ★2 · 79~84 ★3 · 85~88 ★4 · 89~92 ★5
+       v26c — 잠재 구간과 등급(동/은/금/레전드)을 나란히 보여 준다. 예전엔 등급과 잠재가
+       따로 굴러 '동인데 잠재 84'가 나왔고, 이제 잠재를 먼저 뽑아 그 구간의 등급을 단다. */
+    var pot = (p && typeof p.pot === 'number') ? p.pot : 70;
     var n = pot >= 89 ? 5 : (pot >= 85 ? 4 : (pot >= 79 ? 3 : 2));
-    var t = DS.youthPotTier ? DS.youthPotTier(pot) : null;
+    var rk = (p && p.rarity && DS.RARITY[p.rarity]) ? p.rarity : 'dong';
+    var r = DS.RARITY[rk];
     return stars(n) + '<span class="tiny muted"> 잠재 ' + pot + '</span>' +
-      (t && (t.key === 'elite' || t.key === 'wonderkid')
-        ? '<span class="pot-tag" style="color:' + t.color + ';border-color:' + t.color + '55">' + t.name + '</span>' : '');
+      '<span class="pot-tag" style="color:' + r.color + ';border-color:' + r.color + '55">' + r.name + '</span>';
   }
 
   function youthHTML() {
@@ -1564,7 +1575,7 @@
         '<span class="nm">' + tierDot(p) + ' ' + esc(shortName(p.name)) + (inRv ? '<em class="yth-rv">2군</em>' : '') + '</span>' +
         '<span class="mt">' + posBadge(p.pos) + '<span class="chip">' + p.age + '세</span></span>' +
         '<span class="mt">' + footChip(p) + '<span class="ov">' + DS.ratingOf(p) + '</span></span>' +
-        '<span class="pot">' + youthStars(p.pot || 70) + '</span></button>';
+        '<span class="pot">' + youthStars(p) + '</span></button>';
     }
     if (!cards) { cards = '<div class="tiny muted">이번 시즌 유소년 후보가 없습니다. 새로 불러오세요.</div>'; }
 
@@ -2209,8 +2220,11 @@
     paintEmblems(document.getElementById('modal'));
   }
 
+  /* v26c ① — 덱 편성 모달은 '덱 편성'으로 처음 열 때만 S.deck에서 초기화한다.
+     예전에는 매 렌더마다 deckDraft = S.deck.slice()를 다시 해서, 카드를 눌러
+     deckpick → deckModal() 재렌더로 들어오는 순간 방금 고른 변경이 사라졌다. */
   function deckModal() {
-    deckDraft = S.deck.slice();
+    if (!deckDraft) { deckDraft = S.deck.slice(); }
     var cards = '', i, d, on;
     for (i = 0; i < DS.CARDS.length; i++) {
       d = DS.CARDS[i];
@@ -4167,8 +4181,9 @@
       var sp = byId(id); if (sp) { playerModal(sp); } return;
     }
 
-    if (act === 'deck') { deckModal(); return; }
+    if (act === 'deck') { deckDraft = S.deck.slice(); deckModal(); return; }
     if (act === 'deckpick') {
+      if (!deckDraft) { deckDraft = S.deck.slice(); }
       var dk = t.getAttribute('data-k'), di = deckDraft.indexOf(dk);
       if (di >= 0) { if (deckDraft.length <= 1) { toast('최소 1장은 필요합니다.'); return; } deckDraft.splice(di, 1); }
       else if (deckDraft.length >= 6) { toast('덱은 6장까지입니다. 하나를 빼세요.'); return; }

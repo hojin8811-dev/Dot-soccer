@@ -1333,8 +1333,20 @@
     return best;
   }
 
+  /* v26c ② — 컷인은 이제 loop()에서 실제 시간(realDt)으로만 차감되고,
+     끝나는 순간 여기서 오버레이를 직접 걷는다. 늦게 도착한 예전 타이머가
+     새 컷인을 지우지 않도록 발급 번호(cutinSeq)로 막는다. */
+  var cutinSeq = 0;
+  function hideCutin() {
+    var host = document.getElementById('m-cutin');
+    if (!host) { return; }
+    host.classList.remove('on');
+    host.innerHTML = '';
+  }
+
   function playCutin(def, ace) {
     cutinHold = 1.7;
+    var mySeq = ++cutinSeq;
     try { if (DS.Bgm) { DS.Bgm.duck(1900); } } catch (e) { /* 무시 */ }
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
@@ -1357,11 +1369,13 @@
       '</div></div>';
     host.classList.add('on');
     global.setTimeout(function () {
-      if (host) { host.classList.remove('on'); host.innerHTML = ''; }
+      if (mySeq !== cutinSeq) { return; }
+      hideCutin();
     }, 2400);
   }
 
   function goalCutin(scorer) {
+    var mySeq = ++cutinSeq;
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
     var meta = DS.picMeta(scorer.player);
@@ -1378,7 +1392,8 @@
     host.classList.add('on');
     cutinHold = 1.15;
     global.setTimeout(function () {
-      if (host) { host.classList.remove('on'); host.innerHTML = ''; }
+      if (mySeq !== cutinSeq) { return; }
+      hideCutin();
     }, 1600);
   }
 
@@ -1638,6 +1653,7 @@
     lastGoalXg = 0; lastGoalAssist = '';
     cmtQ = []; cmtT = 0;
     hideReplayOverlay();
+    hideCutin();
     setupDeck(cfg.deck);
     cutinHold = 0;
     play = {
@@ -1703,7 +1719,11 @@
       (t === 'defense' ? '전술을 수비적으로! 라인을 내립니다.' : '균형 전술로 안정을 찾습니다.');
     say(line, 'tactic');
   };
-  M.pause = function () { M.paused = true; };
+  M.pause = function () {
+    M.paused = true;
+    /* 컷인이 떠 있는 채로 일시정지하면 오버레이가 메뉴를 덮으므로 함께 걷는다 */
+    if (cutinHold > 0) { cutinHold = 0; hideCutin(); }
+  };
   M.resume = function (quiet) {
     var wasHalf = !!M.halftime;
     if (M.halftime) { deadTime = 0; }
@@ -5039,6 +5059,14 @@
         replayTick(realDt);
         crowdTick(realDt);
         renderAlpha = 1;
+      } else if (cutinHold > 0) {
+        /* v26c ② — 기술/골 컷인 정지. 배속(×1/×2/×3)과 무관하게 실제 시간으로만 깎고,
+           이 동안 step()은 한 번도 돌지 않아 경기 시계·선수 이동·손패 쿨다운이 모두 멈춘다.
+           ×3 배속에서 1.7초 컷인이 0.57초 만에 끝나 뒤에서 경기 시간이 흘러가던 버그 수정. */
+        cutinHold -= realDt;
+        if (cutinHold <= 0) { cutinHold = 0; hideCutin(); }
+        acc = 0;
+        renderAlpha = 1;
       } else {
         var dt = realDt * M.speed;
         acc += dt;
@@ -5077,7 +5105,8 @@
       return;
     }
 
-    if (cutinHold > 0) { cutinHold -= dt; if (hudDirty) { hudDirty = false; pushHud(); } return; }
+    /* v26c ② — 컷인 중에는 step 자체를 진행하지 않는다(차감은 loop()가 realDt로 담당). */
+    if (cutinHold > 0) { return; }
 
     var i;
     for (i = 0; i < hand.length; i++) { if (hand[i].readyAt > 0) { hand[i].readyAt -= dt; hudDirty = true; } }
