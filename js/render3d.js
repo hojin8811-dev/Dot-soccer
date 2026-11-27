@@ -468,81 +468,84 @@
     var HR = o.headR, k = HR / 0.265;
     var skin = o.skin, hair = o.hair;
     var P = [];
+    /* ── 얼굴(머리) ── */
     P.push([GEO.sph, skin, 0, 0, 0, 0, 0, 0, HR, HR * 0.99, HR * 0.97]);
     /* 귀 */
-    P.push([GEO.sph, skin, -HR * 0.98, -0.01 * k, 0, 0, 0, 0, 0.045 * k, 0.06 * k, 0.035 * k]);
-    P.push([GEO.sph, skin, HR * 0.98, -0.01 * k, 0, 0, 0, 0, 0.045 * k, 0.06 * k, 0.035 * k]);
+    P.push([GEO.sph, skin, -HR * 0.97, -0.02 * k, 0, 0, 0, 0, 0.042 * k, 0.058 * k, 0.03 * k]);
+    P.push([GEO.sph, skin, HR * 0.97, -0.02 * k, 0, 0, 0, 0, 0.042 * k, 0.058 * k, 0.03 * k]);
+    /* 목 */
+    P.push([GEO.cyl, skin, 0, -HR * 0.96, -0.01 * k, 0, 0, 0, 0.075 * k, 0.14 * k, 0.072 * k]);
 
     /* ── 머리카락 ── */
     var hs = o.hairStyle;
-    if (hs !== 4) {
-      P.push([GEO.hairCap, hair, 0, 0.012 * k, -0.006 * k, 0, 0, 0, HR * 1.055, HR * 1.035, HR * 1.045]);
-    }
-    if (hs === 0) {           /* 숏컷 */
-      P.push([GEO.box, hair, 0, HR * 0.78, HR * 0.36, 0.25, 0, 0, HR * 1.5, 0.07 * k, HR * 0.55]);
-    } else if (hs === 1) {    /* 앞머리 뱅 */
-      P.push([GEO.box, hair, 0, HR * 0.66, HR * 0.58, -0.16, 0, 0, HR * 1.62, 0.13 * k, HR * 0.42]);
-      P.push([GEO.box, hair, -HR * 0.52, HR * 0.5, HR * 0.62, -0.1, 0.2, 0.22, HR * 0.5, 0.19 * k, HR * 0.3]);
-      P.push([GEO.box, hair, HR * 0.52, HR * 0.5, HR * 0.62, -0.1, -0.2, -0.22, HR * 0.5, 0.19 * k, HR * 0.3]);
-    } else if (hs === 2) {    /* 스파이크 */
-      var spikes = [[0, 1.02, 0.0, 0.28], [-0.5, 0.86, 0.15, 0.22], [0.5, 0.86, 0.15, 0.22], [-0.3, 0.9, -0.42, 0.22], [0.3, 0.9, -0.42, 0.22], [0, 0.85, 0.5, 0.2]];
+    /* 캡을 뒤로 살짝 눕혀 이마를 드러낸다 */
+    P.push([GEO.hairCap, hair, 0, 0.015 * k, -0.008 * k, 0.17, 0, 0, HR * 1.05, HR * 1.03, HR * 1.05]);
+    if (hs === 0) {                 /* 숏컷: 뒤통수 살짝 */
+      P.push([GEO.sph, hair, 0, HR * 0.1, -HR * 0.18, 0, 0, 0, HR * 1.02, HR * 0.95, HR * 1.0]);
+    } else if (hs === 1) {          /* 뱅 헤어 */
+      P.push([GEO.box, hair, 0, HR * 0.58, HR * 0.5, -0.2, 0, 0, HR * 1.28, 0.17 * k, HR * 0.42]);
+      P.push([GEO.box, hair, -HR * 0.5, HR * 0.52, HR * 0.55, -0.1, 0.1, 0.2, HR * 0.45, 0.2 * k, HR * 0.3]);
+      P.push([GEO.box, hair, HR * 0.5, HR * 0.52, HR * 0.55, -0.1, -0.1, -0.2, HR * 0.45, 0.2 * k, HR * 0.3]);
+    } else if (hs === 2) {          /* 스파이크 */
+      var spikes = [[0, 0.98, 0.02], [-0.42, 0.86, 0.16], [0.42, 0.86, 0.16], [-0.3, 0.86, -0.4], [0.3, 0.86, -0.4], [0, 0.8, 0.5]];
       for (var i = 0; i < spikes.length; i++) {
         var sp = spikes[i];
-        P.push([GEO.cone, hair, sp[0] * HR, sp[1] * HR, sp[2] * HR, 0.35 * (sp[2] < 0 ? -1 : 1), 0, sp[0] * 0.9, sp[3] * HR * 0.55, sp[3] * HR * 1.15, sp[3] * HR * 0.55]);
+        P.push([GEO.cone, hair, sp[0] * HR, sp[1] * HR, sp[2] * HR,
+          sp[2] < 0 ? -0.5 : 0.35, 0, sp[0] * 0.8,
+          0.1 * k, 0.3 * k, 0.1 * k]);
       }
-    } else if (hs === 3) {    /* 포마드 */
-      P.push([GEO.box, hair, 0, HR * 0.85, HR * 0.3, 0.18, 0, 0, HR * 1.42, 0.15 * k, HR * 0.7]);
-      P.push([GEO.box, hair, 0, HR * 0.62, HR * 0.66, -0.3, 0, 0, HR * 1.3, 0.1 * k, HR * 0.3]);
-    } else {                  /* 장발 + 묶음 */
-      P.push([GEO.hairCap, hair, 0, 0.012 * k, -0.006 * k, 0, 0, 0, HR * 1.055, HR * 1.035, HR * 1.045]);
-      P.push([GEO.box, hair, 0, -HR * 0.32, -HR * 0.62, 0.1, 0, 0, HR * 1.7, HR * 1.2, HR * 0.35]);
-      P.push([GEO.sph, hair, 0, -HR * 0.3, -HR * 0.95, 0, 0, 0, 0.13 * k, 0.15 * k, 0.1 * k]);
+    } else if (hs === 3) {          /* 포마드 */
+      P.push([GEO.box, hair, 0, HR * 0.72, HR * 0.22, 0.12, 0, 0, HR * 1.25, 0.2 * k, HR * 0.65]);
+      P.push([GEO.box, hair, 0, HR * 0.5, HR * 0.56, -0.42, 0, 0, HR * 1.1, 0.1 * k, HR * 0.28]);
+    } else {                        /* 장발 */
+      P.push([GEO.box, hair, 0, -HR * 0.3, -HR * 0.62, 0.12, 0, 0, HR * 1.6, HR * 1.15, HR * 0.38]);
+      P.push([GEO.sph, hair, 0, -HR * 0.42, -HR * 0.9, 0, 0, 0, 0.14 * k, 0.17 * k, 0.1 * k]);
     }
-    /* 옆머리 */
-    P.push([GEO.box, hair, -HR * 0.9, HR * 0.28, -0.02 * k, 0, 0, 0.12, 0.07 * k, HR * 0.5, HR * 0.55]);
-    P.push([GEO.box, hair, HR * 0.9, HR * 0.28, -0.02 * k, 0, 0, -0.12, 0.07 * k, HR * 0.5, HR * 0.55]);
 
-    /* ── 눈 ── */
-    var es = o.eyeStyle, ex = 0.086 * k, ey = 0.008 * k, ez = 0.228 * k;
-    var eyeCol = 0x151821;
-    var browCol = new THREE.Color(hair).multiplyScalar(0.85).getHex();
+    /* ── 눈 (얼굴 표면에 앉도록 z를 표면 근처로) ── */
+    var es = o.eyeStyle, ex = 0.086 * k, ey = 0.004 * k;
+    var eyeCol = 0x14161d;
+    var browCol = new THREE.Color(hair).multiplyScalar(0.8).getHex();
+    var ex0 = 0.234 * k;   /* 눈 중심 깊이 */
     if (es === 0 || es === 2) {          /* 큰 왕눈 */
-      var sx = es === 2 ? 1.15 : 1.0;
-      P.push([GEO.sph, eyeCol, -ex, ey, ez, 0, 0, 0, 0.044 * k * sx, 0.056 * k, 0.03 * k]);
-      P.push([GEO.sph, eyeCol, ex, ey, ez, 0, 0, 0, 0.044 * k * sx, 0.056 * k, 0.03 * k]);
-      P.push([GEO.sph, 0xffffff, -ex + 0.014 * k, ey + 0.024 * k, ez + 0.02 * k, 0, 0, 0, 0.016 * k, 0.018 * k, 0.012 * k]);
-      P.push([GEO.sph, 0xffffff, ex - 0.014 * k, ey + 0.024 * k, ez + 0.02 * k, 0, 0, 0, 0.016 * k, 0.018 * k, 0.012 * k]);
+      var sx = es === 2 ? 1.14 : 1.0;
+      P.push([GEO.sph, eyeCol, -ex, ey, ex0, 0, 0, 0, 0.046 * k * sx, 0.058 * k, 0.036 * k]);
+      P.push([GEO.sph, eyeCol, ex, ey, ex0, 0, 0, 0, 0.046 * k * sx, 0.058 * k, 0.036 * k]);
+      P.push([GEO.sph, 0xffffff, -ex + 0.014 * k, ey + 0.026 * k, ex0 + 0.024 * k, 0, 0, 0, 0.015 * k, 0.017 * k, 0.012 * k]);
+      P.push([GEO.sph, 0xffffff, ex - 0.014 * k, ey + 0.026 * k, ex0 + 0.024 * k, 0, 0, 0, 0.015 * k, 0.017 * k, 0.012 * k]);
     } else if (es === 1) {               /* 흰자 + 눈동자 */
-      P.push([GEO.sph, 0xffffff, -ex, ey, ez, 0, 0, 0, 0.052 * k, 0.058 * k, 0.03 * k]);
-      P.push([GEO.sph, 0xffffff, ex, ey, ez, 0, 0, 0, 0.052 * k, 0.058 * k, 0.03 * k]);
-      P.push([GEO.sph, eyeCol, -ex + 0.004, ey - 0.002, ez + 0.016 * k, 0, 0, 0, 0.026 * k, 0.032 * k, 0.02 * k]);
-      P.push([GEO.sph, eyeCol, ex - 0.004, ey - 0.002, ez + 0.016 * k, 0, 0, 0, 0.026 * k, 0.032 * k, 0.02 * k]);
+      P.push([GEO.sph, 0xffffff, -ex, ey, ex0, 0, 0, 0, 0.05 * k, 0.056 * k, 0.034 * k]);
+      P.push([GEO.sph, 0xffffff, ex, ey, ex0, 0, 0, 0, 0.05 * k, 0.056 * k, 0.034 * k]);
+      P.push([GEO.sph, eyeCol, -ex + 0.004, ey - 0.002, ex0 + 0.02 * k, 0, 0, 0, 0.025 * k, 0.03 * k, 0.02 * k]);
+      P.push([GEO.sph, eyeCol, ex - 0.004, ey - 0.002, ex0 + 0.02 * k, 0, 0, 0, 0.025 * k, 0.03 * k, 0.02 * k]);
+      P.push([GEO.sph, 0xffffff, -ex + 0.014 * k, ey + 0.014 * k, ex0 + 0.032 * k, 0, 0, 0, 0.009 * k, 0.01 * k, 0.008 * k]);
+      P.push([GEO.sph, 0xffffff, ex + 0.014 * k, ey + 0.014 * k, ex0 + 0.032 * k, 0, 0, 0, 0.009 * k, 0.01 * k, 0.008 * k]);
     } else if (es === 3) {               /* 실눈 */
-      P.push([GEO.box, eyeCol, -ex, ey, ez + 0.01 * k, 0, 0, 0, 0.085 * k, 0.022 * k, 0.02 * k]);
-      P.push([GEO.box, eyeCol, ex, ey, ez + 0.01 * k, 0, 0, 0, 0.085 * k, 0.022 * k, 0.02 * k]);
+      P.push([GEO.box, eyeCol, -ex, ey, ex0 + 0.004 * k, 0, 0, 0, 0.082 * k, 0.021 * k, 0.024 * k]);
+      P.push([GEO.box, eyeCol, ex, ey, ex0 + 0.004 * k, 0, 0, 0, 0.082 * k, 0.021 * k, 0.024 * k]);
     } else {                             /* 웃는 눈 ^ ^ */
-      P.push([GEO.torus, eyeCol, -ex, ey - 0.008 * k, ez, 0, 0, Math.PI, 0.045 * k, 0.045 * k, 0.045 * k]);
-      P.push([GEO.torus, eyeCol, ex, ey - 0.008 * k, ez, 0, 0, Math.PI, 0.045 * k, 0.045 * k, 0.045 * k]);
+      P.push([GEO.torus, eyeCol, -ex, ey - 0.006 * k, ex0 - 0.006 * k, 0, 0, Math.PI, 0.042 * k, 0.042 * k, 0.042 * k]);
+      P.push([GEO.torus, eyeCol, ex, ey - 0.006 * k, ex0 - 0.006 * k, 0, 0, Math.PI, 0.042 * k, 0.042 * k, 0.042 * k]);
     }
     /* 눈썹 */
-    P.push([GEO.box, browCol, -ex, ey + 0.072 * k, ez - 0.004 * k, 0, 0, 0.12, 0.07 * k, 0.014 * k, 0.02 * k]);
-    P.push([GEO.box, browCol, ex, ey + 0.072 * k, ez - 0.004 * k, 0, 0, -0.12, 0.07 * k, 0.014 * k, 0.02 * k]);
+    P.push([GEO.box, browCol, -ex, ey + 0.074 * k, ex0 - 0.004 * k, 0, 0, 0.13, 0.062 * k, 0.014 * k, 0.018 * k]);
+    P.push([GEO.box, browCol, ex, ey + 0.074 * k, ex0 - 0.004 * k, 0, 0, -0.13, 0.062 * k, 0.014 * k, 0.018 * k]);
     /* 코 */
-    P.push([GEO.sph, new THREE.Color(skin).multiplyScalar(0.9).getHex(), 0, -0.028 * k, 0.248 * k, 0, 0, 0, 0.016 * k, 0.014 * k, 0.014 * k]);
+    P.push([GEO.sph, new THREE.Color(skin).multiplyScalar(0.88).getHex(), 0, -0.034 * k, 0.252 * k, 0, 0, 0, 0.016 * k, 0.014 * k, 0.016 * k]);
     /* 입 */
     var ms = o.mouthStyle;
     if (ms === 0) {
-      P.push([GEO.torus, 0x8f3a3a, 0, -0.078 * k, 0.236 * k, 0, 0, Math.PI, 0.038 * k, 0.032 * k, 0.032 * k]);
+      P.push([GEO.torus, 0x8f3a3a, 0, -0.082 * k, 0.238 * k, 0, 0, Math.PI, 0.038 * k, 0.03 * k, 0.03 * k]);
     } else if (ms === 1) {
-      P.push([GEO.sph, 0x6f2730, 0, -0.086 * k, 0.238 * k, 0, 0, 0, 0.03 * k, 0.034 * k, 0.018 * k]);
+      P.push([GEO.sph, 0x6f2730, 0, -0.09 * k, 0.238 * k, 0, 0, 0, 0.028 * k, 0.032 * k, 0.02 * k]);
     } else if (ms === 2) {
-      P.push([GEO.box, 0x8f3a3a, 0, -0.082 * k, 0.24 * k, 0, 0, 0, 0.05 * k, 0.012 * k, 0.014 * k]);
+      P.push([GEO.box, 0x8f3a3a, 0, -0.086 * k, 0.24 * k, 0, 0, 0, 0.05 * k, 0.013 * k, 0.016 * k]);
     } else {
-      P.push([GEO.torus, 0x8f3a3a, 0, -0.07 * k, 0.238 * k, 0, 0, 0, 0.032 * k, 0.026 * k, 0.026 * k]);
+      P.push([GEO.torus, 0x8f3a3a, 0, -0.074 * k, 0.24 * k, 0, 0, 0, 0.03 * k, 0.024 * k, 0.024 * k]);
     }
     /* 볼터치 */
-    P.push([GEO.sph, 0xe88a7a, -0.15 * k, -0.055 * k, 0.195 * k, 0, 0, 0, 0.035 * k, 0.022 * k, 0.01 * k]);
-    P.push([GEO.sph, 0xe88a7a, 0.15 * k, -0.055 * k, 0.195 * k, 0, 0, 0, 0.035 * k, 0.022 * k, 0.01 * k]);
+    P.push([GEO.sph, 0xe8907f, -0.152 * k, -0.058 * k, 0.196 * k, 0, 0, 0, 0.036 * k, 0.022 * k, 0.012 * k]);
+    P.push([GEO.sph, 0xe8907f, 0.152 * k, -0.058 * k, 0.196 * k, 0, 0, 0, 0.036 * k, 0.022 * k, 0.012 * k]);
     return mergeParts(P);
   }
 
