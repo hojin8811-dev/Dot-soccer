@@ -611,6 +611,11 @@
   var SND = (function () {
     var A = null, master = null, ready = false, muted = false;
     var ambSrc = null, ambGain = null, amb2Src = null;
+    var matchOn = false;                     /* v26 — 경기 중에만 관중 앰비언스 */
+    /* v26 BGM — 컷인·휘슬·골 순간에 배경음만 잠깐 낮춘다(효과음이 또렷하게) */
+    function bgm(fn, a) {
+      try { if (global.DS && global.DS.Bgm && global.DS.Bgm[fn]) { global.DS.Bgm[fn](a); } } catch (e) { /* 무시 */ }
+    }
     var nbuf = null, lastKick = 0, lastPass = 0, lastWhistle = 0;
     try { muted = !!(global.localStorage && global.localStorage.getItem('dot-soccer-mute') === '1'); } catch (e) { muted = false; }
 
@@ -683,6 +688,7 @@
       var now = A.currentTime;
       if (now - lastWhistle < 0.18) { return; }
       lastWhistle = now;
+      bgm('duck', kind === 'long' ? 1700 : 750);
       var blasts = kind === 'long' ? 3 : 1;
       var dur = kind === 'long' ? 0.24 : 0.34;
       for (var n = 0; n < blasts; n++) {
@@ -760,6 +766,7 @@
       var now = A.currentTime;
       var s = clamp(level === undefined ? 0.6 : level, 0, 1);
       var d = dur || (0.8 + s * 1.4);
+      bgm('duck', d * 1000);
       var ns = A.createBufferSource(); ns.buffer = noiseBuf();
       var bp = A.createBiquadFilter(); bp.type = 'bandpass';
       bp.frequency.setValueAtTime(380 + s * 180, now);
@@ -784,6 +791,7 @@
     function groan() {
       if (!ready || muted) { return; }
       var now = A.currentTime;
+      bgm('duck', 1100);
       var ns = A.createBufferSource(); ns.buffer = noiseBuf();
       var lp = A.createBiquadFilter(); lp.type = 'lowpass';
       lp.frequency.setValueAtTime(760, now);
@@ -809,13 +817,17 @@
       muted = !!v;
       try { global.localStorage.setItem('dot-soccer-mute', muted ? '1' : '0'); } catch (e) { /* 무시 */ }
       if (master) { master.gain.value = muted ? 0 : 0.85; }
-      if (!muted) { init(); ambientOn(); }
+      /* v26 — 음소거 해제 시 로비에서 관중 소리가 터지지 않게, 경기 중일 때만 앰비언스를 켠다 */
+      if (!muted) { init(); if (matchOn) { ambientOn(); } }
+      bgm('refreshMute');
       return muted;
     }
     return {
       init: init, resume: resume, ambientOn: ambientOn, ambientOff: ambientOff,
       whistle: whistle, kick: kick, pass: pass, post: post, cheer: cheer, groan: groan,
       tackle: tackle, setMuted: setMuted,
+      matchOn: function (v) { matchOn = !!v; },
+      bus: function () { return (ready && A) ? { ctx: A, dest: master } : null; },
       isMuted: function () { return muted; },
       isReady: function () { return ready; }
     };
@@ -1323,6 +1335,7 @@
 
   function playCutin(def, ace) {
     cutinHold = 1.7;
+    try { if (DS.Bgm) { DS.Bgm.duck(1900); } } catch (e) { /* 무시 */ }
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
     var img = ace ? DS.Art.headSrc(ace.player) : '';
@@ -1542,7 +1555,10 @@
     ctx = canvas.getContext('2d');
     /* v17 — 첫 사용자 터치(킥오프)에서 오디오 문을 연다 (모바일 자동재생 정책) */
     SND.init();
+    SND.matchOn(true);
     SND.ambientOn();
+    /* v26 — 경기 테마 BGM (로비 테마에서 부드럽게 넘어온다) */
+    try { if (DS.Bgm) { DS.Bgm.play('match', 0.4); } } catch (e0) { /* 무시 */ }
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
     /* v25 — 피치 팀 링을 유니폼 색으로 (스코어보드와 통일) */
     applyTeamColors();
@@ -1697,6 +1713,7 @@
     /* v25 ③ — 후반 시작도 '확실한 킥오프': 반대 팀이 센터에서 시작한다 */
     if (wasHalf) {
       halfNo = 2;
+      try { if (DS.Bgm) { DS.Bgm.setHalf(false); } } catch (e) { /* 무시 */ }
       var s2 = firstKickSide === 'home' ? 'away' : 'home';
       resetKickoff(s2, {
         label: '2ND HALF KICK-OFF',
@@ -1769,6 +1786,8 @@
     M.running = false;
     cancelAnimationFrame(rafId);
     SND.ambientOff();
+    SND.matchOn(false);
+    try { if (DS.Bgm) { DS.Bgm.setHalf(false); DS.Bgm.play('lobby', 0.35); } } catch (e) { /* 무시 */ }
     replay.on = false;
     hideReplayOverlay();
   };
@@ -1779,6 +1798,8 @@
   };
   M.isMuted = function () { return SND.isMuted(); };
   M.audioUnlock = function () { SND.init(); SND.resume(); };
+  /* v26 — BGM(bgm.js)이 같은 AudioContext·마스터 게인을 빌려 쓴다(중복 컨텍스트 없음) */
+  M.audioBus = function () { return SND.bus(); };
   /* v17 QA — 방송 연출 상태 스냅샷 */
   M.broadcast = function () {
     return {
@@ -5204,6 +5225,8 @@
       say('전반 종료! ' + M.homeScore + ' : ' + M.awayScore, 'big');
       say('선수들이 물을 들이킵니다. 하프타임에 교체를 준비하세요.', 'normal');
       SND.whistle('long');
+      /* v26 — 하프타임: BGM 톤을 살짝 낮춘다(후반 시작에 원래대로) */
+      try { if (DS.Bgm) { DS.Bgm.setHalf(true); } } catch (eH) { /* 무시 */ }
       sayExp('전반 슈팅 ' + (goalStats.homeShots + goalStats.awayShots) + '개, 점유율은 ' +
         Math.round(possession.home / (possession.home + possession.away) * 100) + '대 ' +
         (100 - Math.round(possession.home / (possession.home + possession.away) * 100)) +
@@ -5456,6 +5479,9 @@
     SND.whistle('long');
     SND.cheer(M.homeScore >= M.awayScore ? 0.9 : 0.45, 2.4);
     global.setTimeout(function () { SND.ambientOff(); }, 2600);
+    /* v26 — 경기 종료 → 로비 테마로 (휘슬·함성이 먼저 들리게 1.3초 뒤에) */
+    SND.matchOn(false);
+    try { if (DS.Bgm) { DS.Bgm.play('lobby', 1.35); } } catch (eE) { /* 무시 */ }
 
     var i;
     var best = null;

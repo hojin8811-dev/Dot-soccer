@@ -2220,3 +2220,17 @@ body.rot-off .rotate { display: none; }
   .hand.v7 { flex: 0 0 auto; justify-content: flex-start; }
   .tcard.v7 { flex: 0 0 auto; max-height: 118px; }
 }
+
+/* ═════════════ v26 — 로비 사운드(BGM) 토글 ═════════════
+   상단 바 금화·팬 칩 옆에 같은 높이의 작은 버튼 하나. 390×844 세로에서도 넘치지 않게
+   가로 24px·세로는 칩 높이를 그대로 쓴다. */
+.tb-chip.tb-snd {
+  width: 26px; padding: 0; justify-content: center;
+  cursor: pointer; font-size: 12px; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, background .15s ease, border-color .15s ease;
+}
+.tb-chip.tb-snd.off { color: #ffbdb0; background: rgba(255, 90, 80, .14); border-color: rgba(255, 120, 100, .42); }
+.tb-chip.tb-snd:active { transform: scale(.93); }
+@media (max-height: 460px) { .tb-chip.tb-snd { width: 24px; font-size: 11px; } }
+@media (orientation: portrait) and (max-width: 700px) { .tb-chip.tb-snd { width: 22px; font-size: 10.5px; } }

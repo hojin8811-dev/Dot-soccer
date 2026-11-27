@@ -713,6 +713,20 @@
     }
   }
 
+  /* v26 — 사운드 음소거 상태(버튼 표기용) */
+  function sndMuted() {
+    try { return !!(DS.Match && DS.Match.isMuted && DS.Match.isMuted()); } catch (e) { return false; }
+  }
+  function paintSndChip(root) {
+    var list = (root || document).querySelectorAll('.tb-snd'), i, off = sndMuted();
+    for (i = 0; i < list.length; i++) {
+      list[i].innerHTML = off ? '🔇' : '🔊';
+      list[i].classList.toggle('off', off);
+      list[i].setAttribute('aria-label', off ? '소리 켜기' : '소리 끄기');
+      list[i].setAttribute('title', off ? '소리 켜기' : '소리 끄기');
+    }
+  }
+
   function renderHeader() {
     var h = document.getElementById('topbar');
     if (!h) { return; }
@@ -725,7 +739,10 @@
       '<div class="tb-chips">' +
       '<span class="tb-chip gold" title="보유 금화"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10h5M9.5 14h5"/></svg><em>금화</em>' + fmt(S.money) + '</span>' +
       '<span class="tb-chip" title="팬 수"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 7a3 3 0 0 1 0 6M18 20c0-2.4-1-4.5-2.6-5.6"/></svg><em>팬</em>' + fmt(S.fans) + '</span>' +
+      /* v26 — 로비에서도 BGM·소리를 바로 끄고 켜는 토글 */
+      '<button class="tb-chip tb-snd" data-act="snd" aria-label="소리 끄기" title="소리 끄기"></button>' +
       '</div>';
+    paintSndChip(h);
     paintEmblems(h);
   }
 
@@ -4438,11 +4455,21 @@
       if (ab) { ab.classList.toggle('on', !!autoOn); }
       return;
     }
+    if (act === 'snd') {
+      if (!DS.Match || !DS.Match.toggleMute) { return; }
+      var sm = DS.Match.toggleMute();
+      paintSndChip();
+      var mb0 = document.getElementById('m-mute');
+      if (mb0) { mb0.textContent = sm ? '🔇' : '🔊'; mb0.classList.toggle('off', !!sm); }
+      toast(sm ? '소리를 껐습니다' : '소리를 켰습니다');
+      return;
+    }
     if (act === 'mute') {
       if (!DS.Match || !DS.Match.toggleMute) { return; }
       var mm = DS.Match.toggleMute();
       t.textContent = mm ? '🔇' : '🔊';
       t.classList.toggle('off', !!mm);
+      paintSndChip();
       return;
     }
     if (act === 'pause') {
@@ -4603,6 +4630,8 @@
     for (i = 0; i < S.squad.length; i++) { EXTRA[S.squad[i].id] = S.squad[i]; }
     renderHeader();
     setTab('home');
+    /* v26 — 로비 BGM: 첫 터치에서 오디오를 열고 재생을 시작한다 */
+    try { if (DS.Bgm) { DS.Bgm.play('lobby'); } } catch (e) { /* 무시 */ }
 
     /* v24 — ?vs= 공유 링크로 들어오면 도전장을 바로 띄운다 */
     var vsCode = (DS.Pvp && DS.Pvp.codeFromUrl) ? DS.Pvp.codeFromUrl(global.location && global.location.href) : '';
