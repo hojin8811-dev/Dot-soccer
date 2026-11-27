@@ -601,12 +601,12 @@
       var sh = new THREE.Group();
       sh.position.set(side * 0.185, 0.30, 0);
       upper.add(sh);
-      var upper = new THREE.Mesh(mergeParts([
+      var upperArm = new THREE.Mesh(mergeParts([
         [GEO.cyl, kit.sleeve, 0, -0.045, 0, 0, 0, 0, 0.072, 0.12, 0.072],
         [GEO.cyl, kit.skinArm || o.skin, 0, -0.125, 0, 0, 0, 0, 0.05, 0.14, 0.05]
       ]), CHIBI_MAT);
-      upper.castShadow = true;
-      sh.add(upper);
+      upperArm.castShadow = true;
+      sh.add(upperArm);
       var el = new THREE.Group();
       el.position.y = -0.185;
       sh.add(el);
@@ -733,6 +733,7 @@
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.03;
     scene.add(sun);
+    scene.add(sun.target);
     var fill = new THREE.DirectionalLight(0x9fc0ff, 0.55);
     fill.position.set(-50, 46, 60);
     scene.add(fill);
@@ -1459,6 +1460,8 @@
     }
     global.addEventListener('resize', resize);
     resize();
+    camera.position.set(0, 1.6 + 72 * Math.sin(0.545), 2.6 + 72 * Math.cos(0.545));
+    camera.lookAt(0, 1.6, 2.6);
 
     /* ── 메인 루프 ── */
     var running = false, lastT = 0, raf = 0;
