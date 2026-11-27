@@ -1433,7 +1433,7 @@
       if (CAM.mode === 'full') {
         want.tx = 0; want.tz = 0; want.ty = 0.5; want.dist = 132; want.pitch = 0.95;
       } else if (CAM.mode === 'closeup') {
-        want.tx = o.x; want.tz = o.z + 0.4; want.ty = 0.95; want.dist = 11; want.pitch = 0.26;
+        want.tx = o.x; want.tz = o.z + 2.6; want.ty = 1.05; want.dist = 15; want.pitch = 0.33;
       } else {
         var inThird = U.smoothstep(HL - 34, HL - 8, Math.abs(o.x));
         want.tx = U.clamp(o.x * 0.92, -30, 30);
