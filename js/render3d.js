@@ -15,7 +15,7 @@
   /* ── 치수 (m) ───────────────────────────────────────────── */
   var FW = 68, FL = 105, HW = FW / 2, HL = FL / 2;   /* 피치 폭·길이 */
   var GOAL_W = 7.32, GOAL_H = 2.44, GOAL_D = 1.9;
-  var BALL_R = 0.16;
+  var BALL_R = 0.19;
   var GRAV = 19.6;
 
   /* ── 수학 유틸 ──────────────────────────────────────────── */
@@ -441,7 +441,7 @@
   /* ══════════════════════════════════════════════════════════
      3D 치비 선수 리그 (기하 도형 조립 · 관절 애니메이션)
      ══════════════════════════════════════════════════════════ */
-  GEO.hairCap = new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.53);
+  GEO.hairCap = new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.48);
   GEO.cone = new THREE.ConeGeometry(1, 1, 7);
   GEO.torus = new THREE.TorusGeometry(1, 0.08, 6, 12, Math.PI);
   GEO.cylFlat = new THREE.CylinderGeometry(1, 1, 1, 10);
@@ -503,13 +503,13 @@
     P.push([GEO.box, hair, HR * 0.9, HR * 0.28, -0.02 * k, 0, 0, -0.12, 0.07 * k, HR * 0.5, HR * 0.55]);
 
     /* ── 눈 ── */
-    var es = o.eyeStyle, ex = 0.088 * k, ey = 0.012 * k, ez = 0.222 * k;
+    var es = o.eyeStyle, ex = 0.086 * k, ey = 0.008 * k, ez = 0.228 * k;
     var eyeCol = 0x151821;
     var browCol = new THREE.Color(hair).multiplyScalar(0.85).getHex();
     if (es === 0 || es === 2) {          /* 큰 왕눈 */
       var sx = es === 2 ? 1.15 : 1.0;
-      P.push([GEO.sph, eyeCol, -ex, ey, ez, 0, 0, 0, 0.048 * k * sx, 0.062 * k, 0.032 * k]);
-      P.push([GEO.sph, eyeCol, ex, ey, ez, 0, 0, 0, 0.048 * k * sx, 0.062 * k, 0.032 * k]);
+      P.push([GEO.sph, eyeCol, -ex, ey, ez, 0, 0, 0, 0.044 * k * sx, 0.056 * k, 0.03 * k]);
+      P.push([GEO.sph, eyeCol, ex, ey, ez, 0, 0, 0, 0.044 * k * sx, 0.056 * k, 0.03 * k]);
       P.push([GEO.sph, 0xffffff, -ex + 0.014 * k, ey + 0.024 * k, ez + 0.02 * k, 0, 0, 0, 0.016 * k, 0.018 * k, 0.012 * k]);
       P.push([GEO.sph, 0xffffff, ex - 0.014 * k, ey + 0.024 * k, ez + 0.02 * k, 0, 0, 0, 0.016 * k, 0.018 * k, 0.012 * k]);
     } else if (es === 1) {               /* 흰자 + 눈동자 */
@@ -553,7 +553,7 @@
     var root = new THREE.Group();
     /* 접지 그림자(발밑) — 실시간 그림자 위에 얹어 한층 더 땅에 붙어 보이게 */
     if (o.blobTex) {
-      var blob = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 0.74),
+      var blob = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 0.9),
         new THREE.MeshBasicMaterial({ map: o.blobTex, transparent: true, opacity: 0.42, depthWrite: false }));
       blob.rotation.x = -Math.PI / 2;
       blob.position.y = 0.012;
@@ -577,9 +577,7 @@
       [GEO.sph, kit.shirt, 0.155, 0.318, 0, 0, 0, 0, 0.075, 0.062, 0.075],
       [GEO.cyl, kit.collar, 0, 0.345, 0, 0, 0, 0, 0.105, 0.05, 0.088],
       [GEO.torso, kit.shorts, 0, 0.005, 0, 0, 0, 0, 0.205, 0.17, 0.172],
-      [GEO.box, kit.trim, 0, 0.19, 0.152, 0, 0, 0, 0.055, 0.3, 0.02],
-      [GEO.box, kit.trim, 0, 0.19, -0.152, 0, 0, 0, 0.055, 0.3, 0.02],
-      [GEO.box, kit.trim, 0, 0.33, 0.14, 0, 0, 0, 0.35, 0.035, 0.02]
+      [GEO.torso, kit.trim, 0, 0.30, 0, 0, 0, 0, 0.19, 0.045, 0.158]
     ];
     var torso = new THREE.Mesh(mergeParts(torsoParts), CHIBI_MAT);
     torso.castShadow = true;
@@ -731,12 +729,12 @@
     var amb = new THREE.AmbientLight(0xffffff, 0.12);
     scene.add(amb);
     var sun = new THREE.DirectionalLight(0xffeed2, 2.7);
-    sun.position.set(46, 74, 44);
+    sun.position.set(26, 96, 34);
     sun.castShadow = true;
     sun.shadow.mapSize.width = 1536;
     sun.shadow.mapSize.height = 1536;
-    sun.shadow.camera.left = -56; sun.shadow.camera.right = 56;
-    sun.shadow.camera.top = 46; sun.shadow.camera.bottom = -46;
+    sun.shadow.camera.left = -52; sun.shadow.camera.right = 52;
+    sun.shadow.camera.top = 44; sun.shadow.camera.bottom = -44;
     sun.shadow.camera.near = 10; sun.shadow.camera.far = 230;
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.03;
@@ -786,7 +784,7 @@
           headR: 0.246 + (idx % 5) * 0.012,
           number: p.number,
           blobTex: blobTex,
-          scale: 0.95 + ((idx * 13) % 9) * 0.013,
+          scale: 1.24 + ((idx * 13) % 9) * 0.017,
           phase: p.phase
         });
         p.rig.root.position.set(p.x, 0, p.z);
@@ -1419,7 +1417,7 @@
     /* ── 카메라 (완전 수평 · yaw = 0) ── */
     var CAM = {
       mode: 'broadcast',
-      tx: 0, ty: 1.7, tz: 3.2, dist: 46, pitch: 0.545,
+      tx: 0, ty: 1.7, tz: 3.2, dist: 41, pitch: 0.545,
       cx: 0, cy: 36, cz: 64, ready: false
     };
     function updateCamera(dt) {
@@ -1428,13 +1426,13 @@
       if (CAM.mode === 'full') {
         want.tx = 0; want.tz = 0; want.ty = 0.5; want.dist = 132; want.pitch = 0.95;
       } else if (CAM.mode === 'closeup') {
-        want.tx = o.x; want.tz = o.z + 0.8; want.ty = 0.95; want.dist = 16; want.pitch = 0.34;
+        want.tx = o.x; want.tz = o.z + 0.4; want.ty = 0.95; want.dist = 11; want.pitch = 0.26;
       } else {
         var inThird = U.smoothstep(HL - 34, HL - 8, Math.abs(o.x));
         want.tx = U.clamp(o.x * 0.92, -30, 30);
         want.tz = U.clamp(o.z * 0.35, -5, 5) + 3.2;
         want.ty = 1.7;
-        want.dist = 47 - 11 * inThird;
+        want.dist = 41 - 9 * inThird;
         want.pitch = 0.545;
       }
       var k = U.clamp(1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt), 0, 0.95);
@@ -1452,7 +1450,7 @@
       camera.lookAt(CAM.tx, CAM.ty, CAM.tz);       /* up=(0,1,0) → 좌우 기울기 0 */
       CAM.ready = true;
       /* 공 그림자·조명 추종 */
-      sun.position.set(CAM.tx + 46, 74, 44);
+      sun.position.set(CAM.tx + 26, 96, 34);
       sun.target.position.set(CAM.tx * 0.6, 0, 0);
       sun.target.updateMatrixWorld();
     }
