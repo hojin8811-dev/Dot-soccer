@@ -10,7 +10,8 @@
   var pick = U.pick;
 
   var SAVE_KEY = 'dot-soccer-v3-save';
-  var MAX_SQUAD = 22;
+  var MAX_SQUAD = 18;             /* v33 — 1군 정원 = 선발 11 + 벤치 7. (v32까지 22로 벤치에 앉을 수 없는 4명이 초과 승격됐다) */
+  var SQUAD_FULL_MSG = '1군(선발+벤치 18명)이 가득 찼습니다. 선수를 방출/매각한 뒤 승격하세요.';
   var BENCH_SIZE = 7;
   var DIV_SIZE = 20;              /* 1부 · 2부 각 20팀 */
   var DIV_TV = { 1: 260, 2: 120 }; /* 리그별 경기당 중계권 수입 (v27 — 2부 90→120: 38라운드 누적 +1,140) */
@@ -246,6 +247,9 @@
     for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].id === id) { return DS.TEAMS[i].division || 1; } }
     return 1;
   }
+
+  /* v33 — 1군 정원(선발 11 + 벤치 7 = 18)이 실제로 찼는지. 기존 세이브가 18명을 넘어도 여기서 막힌다. */
+  function squadFull() { return S.squad.length >= MAX_SQUAD; }
 
   function autoLineup(squad, formation) {
     var slots = DS.FORMATIONS[formation].slots;
@@ -1426,10 +1430,10 @@
     var w = DS.POS[pos].w;
     var keys = ['s', 't', 'p'], best = 's', i;
     for (i = 1; i < keys.length; i++) { if ((w[keys[i]] || 0) > (w[best] || 0)) { best = keys[i]; } }
-    if (chance(0.7)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
+    if (chance(0.7)) { DS.growAttr(p, best, 1); }
     if (chance(0.35)) { p.set.cap = clamp((p.set.cap || 1) + 1, 1, 10); }
     p.exp = (p.exp || 0) + 120;
-    if (p.exp >= DS.expToNext(p.level || 0)) {
+    if (p.exp >= DS.expToNext(p.level || 0) && !DS.atPotCap(p)) {
       p.exp -= DS.expToNext(p.level || 0);
       p.level = (p.level || 0) + 1;
     }
@@ -1446,7 +1450,7 @@
   function doYouthPromote(id) {
     var y = ensureYouth(), p = youthById(id || youthSel.id);
     if (!p) { return; }
-    if (S.squad.length >= MAX_SQUAD) { toast('1군 자리가 없습니다. 선수를 내놓은 뒤 승격하세요.'); return; }
+    if (squadFull()) { toast(SQUAD_FULL_MSG); return; }
     p.youth = false;
     /* v23 — 유소년 출신 표식을 남긴다. 1군에서도 경기 EXP ×2.2를 계속 받는다. */
     p.originYouth = true;
@@ -1916,7 +1920,7 @@
     var t = ensureMarket(), i, L = null;
     for (i = 0; i < t.listings.length; i++) { if (t.listings[i].id === id) { L = t.listings[i]; } }
     if (!L) { toast('이미 마감된 매물입니다.'); return; }
-    if (S.squad.length >= MAX_SQUAD) { toast('선수단이 가득 찼습니다. 한 명을 내놓은 뒤 영입하세요.'); return; }
+    if (squadFull()) { toast('선수단이 가득 찼습니다. 한 명을 내놓은 뒤 영입하세요.'); return; }
     if (S.money < L.fee) { toast('이적료가 부족합니다 (' + fmt(L.fee) + ')'); return; }
     var p = listingPlayer(L);
     S.money -= L.fee;
@@ -4467,7 +4471,10 @@
     var cost = 300 + p.level * 120;
     if (S.money < cost) { toast('금화가 부족합니다.'); return; }
     S.money -= cost;
-    p.level++;
+    /* v33 — 잠재력 상한: 이미 OVR=잠재력이면 레벨·능력치가 더 오르지 않는다.
+       (콤보 특훈·세트피스 기술은 능력치와 별개라 그대로 익힌다) */
+    var cap0 = DS.atPotCap(p);
+    if (!cap0) { p.level++; }
     var gain = { s: 0, t: 0, p: 0, cap: 0, fk: 0, ck: 0 }, i, m, k;
     for (i = 0; i < 2; i++) {
       m = DS.trainMenuOf(trainSel.menus[i]);
@@ -4483,9 +4490,10 @@
     }
     var bonus = facValue('training');
     if (bonus > 0 && chance(bonus / 100)) { gain[pick(['s', 't', 'p'])] += 1; }
-    p.s = clamp(p.s + gain.s, 1, 10);
-    p.t = clamp(p.t + gain.t, 1, 10);
-    p.p = clamp(p.p + gain.p, 1, 10);
+    var applied = 0;
+    applied += DS.growAttr(p, 's', gain.s);
+    applied += DS.growAttr(p, 't', gain.t);
+    applied += DS.growAttr(p, 'p', gain.p);
     p.set.cap = clamp(p.set.cap + gain.cap, 1, 10);
     p.set.fk = clamp(p.set.fk + gain.fk, 1, 10);
     p.set.ck = clamp(p.set.ck + gain.ck, 1, 10);
@@ -4493,7 +4501,9 @@
     trainSel.menus = [];
     save();
     renderAll();
-    toast(combo ? '특훈 콤보 ' + combo.name + ' · ' + p.name + ' 각성' : p.name + ' 특훈 완료 (Lv.' + p.level + ')');
+    var capped = cap0 || DS.atPotCap(p);
+    toast((combo ? '특훈 콤보 ' + combo.name + ' · ' + p.name + ' 각성' : p.name + ' 특훈 완료 (Lv.' + p.level + ')') +
+      (capped ? ' · 잠재력 한계(OVR ' + DS.ratingOf(p) + '/' + p.pot + ') — 능력치는 더 오르지 않습니다' : ''));
   }
 
   function doEvolve(p, key) {
@@ -4504,9 +4514,9 @@
     S.money -= EVO_COST;
     p.role = key;
     var g = r.gain;
-    if (g.s) { p.s = clamp(p.s + g.s, 1, 10); }
-    if (g.t) { p.t = clamp(p.t + g.t, 1, 10); }
-    if (g.p) { p.p = clamp(p.p + g.p, 1, 10); }
+    if (g.s) { DS.growAttr(p, 's', g.s); }
+    if (g.t) { DS.growAttr(p, 't', g.t); }
+    if (g.p) { DS.growAttr(p, 'p', g.p); }
     p.stats = DS.statSheet(p);
     if (g.atk) { p.stats.atk = clamp(p.stats.atk + g.atk, 10, 99); }
     if (g.def) { p.stats.def = clamp(p.stats.def + g.def, 10, 99); }
@@ -4519,7 +4529,7 @@
 
   function doScoutNormal() {
     if (S.money < 600) { toast('금화가 부족합니다.'); return; }
-    if (S.squad.length >= MAX_SQUAD) { toast('선수단이 가득 찼습니다. IN/OUT으로 교환하세요.'); return; }
+    if (squadFull()) { toast('선수단이 가득 찼습니다. IN/OUT으로 교환하세요.'); return; }
     S.money -= 600;
     var p = DS.makePlayer({ rarity: DS.pickRarity('normal') });
     p.pic = DS.nextFreePic(S.squad, p.pos);

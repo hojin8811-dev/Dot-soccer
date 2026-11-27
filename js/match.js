@@ -151,6 +151,23 @@
   var possession = { home: 0.001, away: 0.001 };
   var halfScore = [[0, 0], [0, 0]];
   var formFactor = 1;
+  var qaTurbo = false;             /* v33 QA — 검증 하네스에서만 참 */
+  /* v33 — 두 팀 선발 평균 OVR 차이(홈 − 원정). 경합·차단·슛 확률과 전술 카드 무게에 반영한다. */
+  var powerGap = 0;
+  var teamOvr = { home: 0, away: 0 };
+  function gapOf(side) { return side === 'home' ? powerGap : -powerGap; }
+  /* 기본 능력치 차이를 경기력으로 옮기는 계수 (OVR 1당 1.4%, ±32% 상한) */
+  function duelK(side) { return clamp(1 + gapOf(side) * 0.018, 0.68, 1.36); }
+  /* 전술 카드·감독 보정의 무게 — 크게 열세인 팀은 카드로 판을 쉽게 뒤집지 못한다 */
+  function cardK(side) {
+    var g = gapOf(side);
+    if (g <= -10) { return 0.68; }
+    if (g <= -6) { return 0.85; }
+    return 1;
+  }
+  /* v33 — 슛 결정력의 상대 수준: 같은 위치의 슛도 상대 수비·GK가 강하면 xG가 낮다.
+     (v32는 슈터 스탯만 보고 상대 전력을 전혀 반영하지 않았다) */
+  function qualityK(side) { return clamp(1 + gapOf(side) * 0.03, 0.58, 1.45); }
 
   /* ── v15 — 추가시간 · 세트피스 · 오프사이드 계측 ── */
   var addedTime = { first: 0, second: 0 };      /* 45+N · 90+N 의 N */
@@ -1520,6 +1537,17 @@
     /* v26 — 경기 테마 BGM (로비 테마에서 부드럽게 넘어온다) */
     try { if (DS.Bgm) { DS.Bgm.play('match', 0.4); } } catch (e0) { /* 무시 */ }
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
+    /* v33 — 팀 전력차: 선발 11명 평균 OVR */
+    (function () {
+      var s = { home: 0, away: 0 }, n = { home: 0, away: 0 }, i2, q2;
+      for (i2 = 0; i2 < players.length; i2++) {
+        q2 = players[i2];
+        s[q2.side] += DS.ratingOf(q2.player); n[q2.side] += 1;
+      }
+      teamOvr.home = n.home ? s.home / n.home : 0;
+      teamOvr.away = n.away ? s.away / n.away : 0;
+      powerGap = teamOvr.home - teamOvr.away;
+    })();
     /* v25 — 피치 팀 링을 유니폼 색으로 (스코어보드와 통일) */
     applyTeamColors();
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
@@ -3008,8 +3036,16 @@
        나아가도록 거리로 적분하고, 속도가 빠를수록 보폭 S가 길어진다. */
     var moved = Math.hypot(p.x - ox, p.y - oy);
     var vInst = dt > 0 ? moved / dt : 0;
-    /* 프레임마다 목표가 바뀌며 생기는 잔진동에 다리가 반응하지 않게 0.1초 시정수로 울터다린 속도를 쓴다 */
-    p.gaitV = (p.gaitV == null) ? vInst : p.gaitV + (vInst - p.gaitV) * Math.min(1, dt * 10);
+    /* v33 — 정지 deadzone: 실제 이동 속도가 0.7 미만이면 '서 있음'으로 고정한다.
+       v32b는 목표까지 0.35만 남아도 moving=true라 다리가 미세하게 떨렸다(스케이트 잔진동). */
+    if (vInst < 0.7) {
+      p.moving = false;
+      p.vx = 0; p.vy = 0; p.speed = 0;
+      p.gaitV = 0;
+    } else {
+      /* 프레임마다 목표가 바뀌며 생기는 잔진동에 다리가 반응하지 않게 0.1초 시정수로 울터다린 속도를 쓴다 */
+      p.gaitV = (p.gaitV == null) ? vInst : p.gaitV + (vInst - p.gaitV) * Math.min(1, dt * 10);
+    }
     if (p.gaitV > 0.15) {
       var strideW = 2.3 + p.gaitV * 0.15;
       var g0 = p.gait || 0;
@@ -3176,6 +3212,7 @@
     ball.shot = null;
     ball.vx = 0; ball.vy = 0;
     ball.trail = [];
+    ball.bounces = 0;
     p.throughRun = null;
     p.dribbleT = 0;
     play.swarmed = false;
@@ -3341,7 +3378,10 @@
     /* v29 — 곡선 궤적 기준점(출발 좌표). bend 가 있으면 updateBall 이 직선 위에
        수직 오프셋을 더해 잔디 위 곡선을 그린다(종점은 aim 그대로). */
     ball.bx0 = ball.x; ball.by0 = ball.y;
-    if (!ball.bend) { ball.bend = 0; }
+    /* v33 — 곡선/종류는 킥마다 새로 정한다. v32는 이전 킥의 bend가 남아
+       짧은 땅볼 패스까지 크로스처럼 휘었다. */
+    ball.bend = 0;
+    ball.bounces = 0;
     ball.crossKind = null;
     ball.trail = [{ x: ball.x, y: ball.y, z: 0 }];
     /* 높이: 로프트가 있으면 발을 떠나 포물선을 그린다 (땅볼 패스는 z=0) */
@@ -3419,9 +3459,33 @@
     bubble(q, '🚩', '#ffd85a', 1.8);
   }
 
+  /* v33 — 오프사이드·파울 뒤 '반칙한 팀을 공에서 밀어낸다'.
+     v32까지는 공만 반칙 지점에 놓고 키커를 그 자리로 스냅해서, 오프사이드한 공격수가
+     공 위에 서 있다가 간접 프리킥을 자기 발밑에서 차는 것처럼 보였다.
+     이제 반칙 팀(공격팀)은 규칙대로 공에서 minD 이상 떨어진 자리로 물러난다. */
+  function retreatFromBall(side, cx, cy, minD, offender) {
+    var i, q, dx, dy, d, ux, uy, backY, nx, ny, vx2, vy2, L;
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      if (q.off || q.side !== side) { continue; }
+      dx = q.x - cx; dy = q.y - cy; d = Math.hypot(dx, dy);
+      if (q !== offender && d >= minD) { continue; }
+      if (d > 0.05) { ux = dx / d; uy = dy / d; }
+      else { ux = (q.baseX < 50 ? -1 : 1); uy = goalDir(side); }
+      /* 물러나는 방향은 '공에서 밀려나는 방향' 6 : '자기 골문 쪽' 4 */
+      backY = -goalDir(side);
+      vx2 = ux * 0.6; vy2 = uy * 0.6 + backY * 0.4;
+      L = Math.max(0.001, Math.hypot(vx2, vy2));
+      nx = cx + (vx2 / L) * minD;
+      ny = cy + (vy2 / L) * minD;
+      sendTo(q, clamp(nx, 3, WORLD_W - 3), clamp(ny, 3, WORLD_H - 3));
+    }
+  }
+
   function awardOffside(p) {
     var defSide = p.side === 'home' ? 'away' : 'home';
     var line = ball.offside ? ball.offside.line : offsideLineY(defSide);
+    var spotX = clamp(p.x, 8, 92), spotY = clamp(p.y, 8, 112);
     if (v15) { v15.offside[p.side] += 1; }
     logEvt('offside', p.side, p.x, p.y);
     flagShow = { t: 2.4, y: line, side: p.side };
@@ -3441,9 +3505,13 @@
     ball.vx = 0; ball.vy = 0;
     ball.trail = [];
     ball.shot = null;
-    ball.x = clamp(p.x, 8, 92);
-    ball.y = clamp(p.y, 8, 112);
-    freeKick(defSide, ball.x, ball.y, true);
+    ball.x = spotX;
+    ball.y = spotY;
+    /* v33 — 반칙한 팀은 공에서 9m 이상 떨어진다 (오프사이드 당사자 포함) */
+    retreatFromBall(p.side, spotX, spotY, 9.4, p);
+    /* 키커는 반칙 당한 수비팀에서 고른다(간접 프리킥) */
+    var taker = bestTaker(defSide, 'fk');
+    freeKick(defSide, spotX, spotY, true, { taker: taker });
     setSit('offside', short(p.name) + ' 오프사이드', true);
   }
 
@@ -3653,7 +3721,8 @@
       ball.x = p.x;
       ball.y = p.y + goalDir(p.side) * 0.8;
     }
-    kickBall(p, tx, ty, speed, 'pass', q, (type === 'short' || type === 'cutback' || type === 'wall') ? 0 : 1);
+    /* v33 — 땅볼 패스는 지면을 따라 직선으로(짧은·전진·벽·컷백), 띄우는 공만 포물선 */
+    kickBall(p, tx, ty, speed, 'pass', q, (type === 'short' || type === 'progressive' || type === 'cutback' || type === 'wall') ? 0 : 1);
     /* v29 ① — 전환 롱패스·크로스는 감기는 곡선 궤적, 스루패스는 침투 보정 */
     if (type === 'switchLong') { ball.bend = range(7, 11); ball.crossKind = 'switch'; }
     else if (type === 'switch') { ball.bend = range(3, 6); ball.crossKind = 'switch'; }
@@ -3941,6 +4010,9 @@
     var gy = attackGoalY(p.side);
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
     var acc = 0.50 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
+    /* v33 — 팀 전력차가 결정력에 그대로 드러나게 (OVR 1당 0.5%p) */
+    acc += gapOf(p.side) * 0.005;
+    var qk = qualityK(p.side);
     /* v20 ② — 주발: 강발 쪽에서 치면 파워, 반대쪽에서는 감아차기(정확·약간 느림) */
     var fs = footSideOf(p);
     var sideNow = p.x >= 50 ? 'R' : 'L';
@@ -3949,19 +4021,19 @@
     else if (fit === 'curl') { acc += 0.015 - (longshot ? 0.045 : 0); }
     else { acc += 0.025; }
     if (fit === 'curl' && longshot) { v20t.shots.weakLong += 1; }
-    if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09; }
+    if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09 * cardK(p.side); }
     if (p.side === 'home') { acc += mfx('shoot') * 0.008 + mfx('atk') * 0.004; }
     acc -= dist * 0.005;
     /* v25c (B1) — 박스 안 결정력: 가까운 슛은 골문으로 향할 확률을 조금 더 준다 */
     if (dist < 11.5) { acc += 0.05; }
     var onTarget = chance(clamp(acc, 0.2, 0.86));
-    var xg = clamp(0.62 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.52);
+    var xg = clamp(0.62 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.52) * qk;
     if (dist < 11.5) { xg += 0.075; }
     if (fit === 'strong') { xg += 0.015; }
     else if (fit === 'curl') { xg += 0.005; }
     v20t.shots[fit] += 1;
-    if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05; }
-    if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035; }
+    if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05 * cardK(p.side); }
+    if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035 * cardK(p.side); }
     if (p.side === 'away' && buffOf('def') > 0) { xg -= 0.045; }
     if (p.side === 'home') { xg += mfx('shoot') * 0.004 + mfx('atk') * 0.002; }
     else { xg -= mfx('def') * 0.005 + mfx('press') * 0.001; }
@@ -4097,7 +4169,7 @@
      · 수비가 이기면 헤더 클리어런스 → 그 공이 그대로 인플레이 세컨볼·역습으로 이어진다 */
   function launchContest(sp, side) {
     var dir = goalDir(side), gy = attackGoalY(side);
-    var taker = bestTaker(side, sp.type === 'corner' ? 'ck' : 'fk');
+    var taker = (sp && sp.taker && !sp.taker.off) ? sp.taker : bestTaker(side, sp.type === 'corner' ? 'ck' : 'fk');
     var target = bestBoxTarget(side);
     var by = taker || target;
     /* v29 ② — 크로스 낙하 지점은 세트피스 대형의 타깃(니어 62% / 파 38%)으로 정해진다.
@@ -4114,7 +4186,7 @@
       ty = gy - dir * (target ? clamp(Math.abs(target.y - gy), 7, 14.5) : range(8, 13));
       ty = clamp(ty, 5, WORLD_H - 5);
     }
-    var xg = 0.13 + (side === 'home' && buffOf('setpiece') > 0 ? 0.05 : 0);
+    var xg = (0.13 + (side === 'home' && buffOf('setpiece') > 0 ? 0.05 : 0)) * qualityK(side);
     if (side === 'home') { xg += mfx('jump') * 0.006; }
     else { xg -= mfx('def') * 0.003 + mfx('jump') * 0.003; }
     if (sp.type === 'indirect') { xg -= 0.02; }
@@ -4175,7 +4247,7 @@
       if (q.side === side) {
         var av = near * 1.1 + (q.player.stats.atk || 40) * 0.55 +
           ((q.player.set && q.player.set.jump) ? q.player.set.jump * 1.7 : 0) + (isFwdGroup(q) ? 10 : 0);
-        if (q.side === 'home' && buffOf('setpiece') > 0) { av += 8; }
+        if (q.side === 'home' && buffOf('setpiece') > 0) { av += 8 * cardK(side); }
         if (av > aV) { aV = av; atkBest = q; }
       } else {
         var dv = near * 1.1 + (q.player.stats.def || 40) * 0.62 + (isDefGroup(q) ? 8 : 0);
@@ -4188,6 +4260,9 @@
       return;
     }
     var aWin = clamp(aV / (aV + Math.abs(dV) + 0.001), 0.24, 0.76);
+    /* v33 — 공중볼 경합도 전력차를 따른다 */
+    aV *= duelK(side); dV *= duelK(defSide);
+    aWin = clamp(aV / (aV + Math.abs(dV) + 0.001), 0.18, 0.82);
     /* v29 ② — 헤딩 경합 연출: 공격·수비가 동시에 뛰어오르고 충돌 링이 터진다 */
     v29t.headerContest += 1;
     setPose(atkBest, 'jump', 0.6);
@@ -4201,7 +4276,7 @@
       /* 공격 승리 — 헤더 슛 */
       var dist = Math.hypot(atkBest.x - 50, atkBest.y - gy);
       var xg = clamp(0.34 * Math.exp(-dist / 10) + 0.02, 0.04, 0.30) * (ct.type === 'corner' ? 1 : 0.86);
-      xg = clamp(xg + ct.xg * 0.35, 0.03, 0.34);
+      xg = clamp((xg + ct.xg * 0.35) * qualityK(side), 0.02, 0.40);
       var onTarget = chance(clamp(0.56 + (atkBest.player.stats.atk - 60) * 0.004, 0.34, 0.80));
       v19t.header += 1;
       if (onTarget) { v29t.headerOnTarget += 1; }
@@ -4506,11 +4581,14 @@
     }
     /* 가까울수록 성공 확률이 높다 (화면 거리 기준) */
     var near = clamp(1.18 - (dpx - dLim * 0.75) / (dLim * 0.75) * 0.80, 0.35, 1.18);
-    var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 : 0);
+    var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 * cardK(defender.side) : 0);
     if (defender.side === 'home') { defSkill += mfx('def') * 1.2 + mfx('press') * 1.0; }
     var atkSkill = carrier.player.stats.spd * 0.7 + carrier.player.stats.atk * 0.3 + 12;
+    /* v33 — 팀 전력차: 압박·탈취 성공률에 그대로 반영 */
+    defSkill *= duelK(defender.side);
+    atkSkill *= duelK(carrier.side);
     var pT = clamp(0.85 * (defSkill / (defSkill + atkSkill)) * dt * 1.9 * near * 0.30, 0, 0.5);
-    if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1.45; }
+    if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1 + 0.45 * cardK(defender.side); }
     if (buffOf('tiki') > 0 && carrier.side === 'home') { pT *= 0.75; }
     if (!chance(pT)) { return; }
     doTackle(defender, carrier);
@@ -4696,9 +4774,10 @@
     for (var i = 0; i < players.length; i++) { players[i].setPos = null; }
   }
 
-  function beginSetpiece(type, side, hold) {
+  function beginSetpiece(type, side, hold, taker) {
     play.phase = 'setpiece';
-    play.setpiece = { type: type, side: side, t: hold, ox: ball.x, oy: ball.y };
+    play.setpiece = { type: type, side: side, t: hold, ox: null, oy: null, taker: taker || null };
+    play.setpiece.ox = ball.x; play.setpiece.oy = ball.y;
     play.atkSide = side;
     ball.carrier = null;
     ball.kind = 'idle';
@@ -4941,7 +5020,8 @@
     ]));
   }
 
-  function freeKick(side, spotX, spotY, indirect) {
+  function freeKick(side, spotX, spotY, indirect, opt) {
+    opt = opt || {};
     var dir = goalDir(side);
     var gy = attackGoalY(side);
     if (typeof spotX === 'number') { ball.x = spotX; }
@@ -4949,7 +5029,9 @@
     ball.x = clamp(ball.x, 8, 92);
     ball.y = clamp(ball.y, 8, 112);
     clearSetPos();
-    var taker = bestTaker(side, indirect ? 'pk' : 'fk');
+    /* v33 — 간접 프리킥(오프사이드)은 'pk'(승부차기) 능력치로 키커를 고르던 버그를 고쳐
+       프리킥 능력치로 고른다. 호출자가 키커를 지정하면 그 선수를 그대로 쓴다. */
+    var taker = opt.taker || bestTaker(side, 'fk');
     if (taker) { sendTo(taker, ball.x + (ball.x < 50 ? 1.5 : -1.5), ball.y - dir * 3.4); }
     /* 수비벽 — 공과 골문 사이에 3명이 벽을 세운다 */
     var dx = 50 - ball.x, dy = gy - ball.y;
@@ -4984,7 +5066,7 @@
     }
     var gk = goalkeeper(side === 'home' ? 'away' : 'home');
     if (gk) { sendTo(gk, clamp(50 + (ball.x - 50) * 0.18, 42, 58), gy - dir * 1.6); }
-    beginSetpiece(indirect ? 'indirect' : 'fk', side, indirect ? 1.6 : 2.1);
+    beginSetpiece(indirect ? 'indirect' : 'fk', side, indirect ? 1.9 : 2.1, taker);
     setSit('fk', teamShort(side) + (indirect ? ' 간접 프리킥' : ' 프리킥'), true);
     say('🎯 ' + teamShort(side) + (indirect ? ' 간접 프리킥' : ' 프리킥') + ' — ' +
       (wall.length ? '수비벽 ' + Math.min(3, wall.length) + '명이 섰습니다. ' : '') +
@@ -5032,7 +5114,7 @@
     var side = sp.side;
     var dir = goalDir(side);
     var gy = attackGoalY(side);
-    var taker = bestTaker(side, sp.type === 'corner' ? 'ck' : (sp.type === 'pk' ? 'pk' : 'fk'));
+    var taker = (sp.taker && !sp.taker.off) ? sp.taker : bestTaker(side, sp.type === 'corner' ? 'ck' : (sp.type === 'pk' ? 'pk' : 'fk'));
     var scorer = bestBoxTarget(side);
     var dist = Math.abs(ball.y - gy);
     var xg, tx, ty, dur, speed, by;
@@ -5132,7 +5214,7 @@
       say('⚽ 키커가 달려들어 찹니다!', 'shot');
     } else {
       var direct = dist < 30;
-      xg = direct ? 0.11 + ((taker && taker.player.set.fk) || 5) / 260 : 0.09;
+      xg = (direct ? 0.11 + ((taker && taker.player.set.fk) || 5) / 260 : 0.09) * qualityK(side);
       tx = direct ? clamp(50 + range(-7, 7), 38, 62) : clamp(50 + range(-6, 6), 36, 64);
       ty = direct ? gy : gy - dir * 10;
       dur = direct ? 0.7 : 1.0;
@@ -5349,7 +5431,8 @@
       renderAlpha = 1;
     }
     v21t.frames++;
-    draw();
+    /* v33 QA — 대량 경기 검증(밸런스 측정)에서만 그림을 건넌다. 일반 플레이에는 영향 없음. */
+    if (!qaTurbo) { draw(); }
     if (M.running) { rafId = requestAnimationFrame(loop); }
   }
 
@@ -5668,10 +5751,29 @@
     var c = ball.carrier, i, q, d;
     if (c) {
       possession[c.side] += dt;
-      ball.x = c.x + (50 - c.x) * 0.012;
-      ball.y = c.y + goalDir(c.side) * 1.4;
-      ball.z = 0; ball.vz = 0;
+      /* ── v33 — 드리볼: 공이 발 앞에 목석처럼 붙어 순간이동하던 것을
+         '진행 방향 발 앞 + 걸음 위상에 맞는 톡톡 튀는 리듬'으로 따라오게 한다. */
+      var gd = goalDir(c.side), mv, dirX = 0, dirY = gd, ahead, bob, sway, txb, tyb, rate;
+      mv = Math.hypot(c.vx || 0, c.vy || 0);
+      if (c.moving && mv > 1.2) { dirX = c.vx / mv; dirY = c.vy / mv; }
+      ahead = c.moving ? (1.5 + Math.min(0.6, (c.gaitV || 0) * 0.035)) : 1.05;
+      txb = c.x + dirX * ahead + (50 - c.x) * 0.008;
+      tyb = c.y + dirY * ahead;
+      if (c.moving) {
+        /* 발을 디딜 때마다 살짝 뜨고 잦아드는 잔디 튕김 */
+        bob = Math.abs(Math.sin(c.gait || 0)) * 0.26;
+        sway = Math.sin(c.gait || 0) * 0.22;
+        txb += -dirY * sway; tyb += dirX * sway;
+      } else {
+        bob = 0.04 + Math.sin(simTime * 2.2) * 0.02;
+      }
+      rate = 1 - Math.exp(-18 * dt);
+      ball.x += (txb - ball.x) * rate;
+      ball.y += (tyb - ball.y) * rate;
+      if (Math.hypot(ball.x - c.x, ball.y - c.y) > 3.2) { ball.x = txb; ball.y = tyb; }
+      ball.z = bob; ball.vz = 0;
       ball.flight = 0;
+      ball.trail = [];
       var near = nearestOpponentPx(c, tacklePx());
       if (near.player) { tryTackle(near.player, c, dt); }
       actionTimer -= dt;
@@ -5683,30 +5785,66 @@
     }
 
     var prevX = ball.x, prevY = ball.y;
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
-    ball.flight += dt;
-    /* v29 — 곡선 궤적: 직선 진행 위에 sin 곡선의 수직 오프셋을 더한다 (종점은 aim 유지) */
-    if (ball.bend && ball.dur > 0.02 && ball.aim) {
-      var bpr = clamp(ball.flight / ball.dur, 0, 1);
-      var bax = ball.aim.x - (ball.bx0 == null ? prevX : ball.bx0);
-      var bay = ball.aim.y - (ball.by0 == null ? prevY : ball.by0);
-      var blen = Math.max(0.001, Math.hypot(bax, bay));
-      var boff = Math.sin(bpr * Math.PI) * ball.bend;
-      ball.x = (ball.bx0 == null ? prevX : ball.bx0) + bax * bpr + (-bay / blen) * boff;
-      ball.y = (ball.by0 == null ? prevY : ball.by0) + bay * bpr + (bax / blen) * boff;
+    /* ── v33 — 공 궤적(지면 물리) ──
+       v32는 등속으로 미끄러지다 목표 지점에서 뚝 멈추고, 이전 킥의 bend가 남아
+       땅볼 패스까지 휘었다. 이제 궤적은 출발점(bx0,by0)에서 목표(aim)까지의
+       파라미터 진행으로 계산하고, 땅볼 패스만 등감속(처음 빠르게 → 도착할 때 0)한다. */
+    var flying = (ball.kind === 'pass' || ball.kind === 'shot' || ball.kind === 'contest');
+    if (flying && ball.aim && ball.dur > 0.02) {
+      ball.flight += dt;
+      var u = clamp(ball.flight / ball.dur, 0, 1);
+      var prog = (ball.kind === 'pass') ? (1 - (1 - u) * (1 - u)) : u;
+      var sx0 = (ball.bx0 == null ? prevX : ball.bx0), sy0 = (ball.by0 == null ? prevY : ball.by0);
+      var ax = ball.aim.x - sx0, ay = ball.aim.y - sy0;
+      ball.x = sx0 + ax * prog;
+      ball.y = sy0 + ay * prog;
+      /* v29 — 곡선 궤적: 직선 진행 위에 sin 곡선의 수직 오프셋 (종점은 aim 유지) */
+      if (ball.bend) {
+        var blen = Math.max(0.001, Math.hypot(ax, ay));
+        var boff = Math.sin(prog * Math.PI) * ball.bend;
+        ball.x += (-ay / blen) * boff;
+        ball.y += (ax / blen) * boff;
+      }
+      /* 남은 지면 속도(선수 AI의 리드패스·연출용) — 땅볼 패스는 도착할수록 줄어든다 */
+      var dprog = (ball.kind === 'pass') ? (2 * (1 - u)) : 1;
+      ball.vx = (ax / ball.dur) * dprog;
+      ball.vy = (ay / ball.dur) * dprog;
+    } else {
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+      /* v33 — 루즈볼 잔디 마찰: 굴러가는 공은 서서히 멈춘다 */
+      if (!ball.carrier && ball.kind === 'idle' && (ball.vx || ball.vy)) {
+        var damp = Math.exp(-2.1 * dt);
+        ball.vx *= damp; ball.vy *= damp;
+        if (Math.abs(ball.vx) < 0.5) { ball.vx = 0; }
+        if (Math.abs(ball.vy) < 0.5) { ball.vy = 0; }
+      }
+      ball.flight += dt;
     }
+    /* v33 — 띄운 공만 포물선, 땅에 닿을 때 vz = -vz * 0.45로 1~2회 바운드 */
     if (ball.z > 0 || ball.vz > 0) {
       ball.z += ball.vz * dt;
       ball.vz -= BALL_G * dt;
-      if (ball.z <= 0) { ball.z = 0; ball.vz = 0; }
+      if (ball.z <= 0) {
+        ball.z = 0;
+        if (ball.vz < -8 && (ball.bounces || 0) < 2) {
+          ball.bounces = (ball.bounces || 0) + 1;
+          ball.vz = -ball.vz * 0.45;
+          ball.vx *= 0.72; ball.vy *= 0.72;
+        } else {
+          ball.vz = 0;
+        }
+      }
     }
-    if (ball.trail.length === 0) { ball.trail.push({ x: ball.x, y: ball.y }); }
+    if (ball.trail.length === 0) { ball.trail.push({ x: ball.x, y: ball.y, z: ball.z }); }
     else {
       var last = ball.trail[ball.trail.length - 1];
-      if (Math.hypot(last.x - ball.x, last.y - ball.y) > 0.8) {
+      /* v33 — 잔상 간격을 공 속도에 맞춘다(빠를수록 촘촘하게 → 직선이 점선으로 보인다) */
+      var tGap = Math.max(0.55, Math.min(2.2, Math.hypot(ball.vx, ball.vy) * 0.03));
+      if (Math.hypot(last.x - ball.x, last.y - ball.y) > tGap) {
         ball.trail.push({ x: ball.x, y: ball.y, z: ball.z });
-        if (ball.trail.length > 22) { ball.trail.shift(); }
+        if (ball.trail.length > 26) { ball.trail.shift(); }
+        else if (ball.trail.length > 2) { ball.trail[ball.trail.length - 2].z = ball.trail[ball.trail.length - 2].z || 0; }
       }
     }
 
@@ -5723,7 +5861,8 @@
         d = Math.hypot(q.x - ball.x, q.y - ball.y);
         if (d < 2.5) {
           var pInt = clamp(1.0 * dt * (1 + q.player.stats.def / 110), 0, 0.45);
-          if (buffOf('press') > 0 && q.side === 'home') { pInt *= 1.4; }
+          pInt *= duelK(q.side);
+          if (buffOf('press') > 0 && q.side === 'home') { pInt *= 1 + 0.4 * cardK(q.side); }
           if (buffOf('tiki') > 0 && ball.from && ball.from.side === 'home') { pInt *= 0.7; }
           if (q.side === 'home') { pInt *= 1 + mfx('press') * 0.02 + mfx('def') * 0.01; }
           if (ball.from && ball.from.side === 'home') { pInt *= 1 - clamp(mfx('pass') * 0.02, 0, 0.16); }
@@ -5755,7 +5894,18 @@
       /* v18 ④ — 패스는 목표 지점에서 멈춘다.
          v17은 dur+0.25초까지 같은 속도로 더 날아가, 목표가 라인 근처면 최대 16단위를
          넘어가서 그대로 아웃됐다(목표 좌표를 안쪽으로 클램프한 의미가 사라졌음). */
+      /* v33 — 공중으로 띄운 패스가 목표 지점에 공중에서 도달하면, 땅에 떨어져 바운드하며
+         앞으로 흐르게 둔다(공중에서 순간이동해 멈추지 않는다). */
       if (ball.flight >= ball.dur) {
+        if (ball.z > 0.6) {
+          ball.kind = 'idle';
+          ball.aim = null;
+          ball.receiver = null;
+          ball.from = null;
+          ball.vx *= 0.55; ball.vy *= 0.55;
+          play.looseT = 0.4;
+          return;
+        }
         if (ball.aim) { ball.x = ball.aim.x; ball.y = ball.aim.y; }
         settleBall();
         return;
@@ -7145,26 +7295,27 @@
     ctx.restore();
   }
 
-  /* 슈팅 궤적 — 공 발광 트레일 (v10: 슛은 더 길고 밝게) */
+  /* 슈팅·패스 궤적 — 공 발광 트레일 (v10: 슛은 더 길고 밝게)
+     v33 — 잔상 좌표는 월드 (x, y, z)로만 저장하고, 그릴 때마다 '지금 카메라'로 투영한다.
+     카메라가 공을 따라 움직여도 잔상이 화면에서 휘거나 끊기지 않고, 직선 패스는 직선으로 보인다. */
   function drawShotTrail() {
     if (ball.trail.length < 2) { return; }
     var shooting = ball.kind === 'shot';
-    var i, t, pt, r;
+    var i, t, pt, r, pr;
     var longShot = ball.shot && ball.shot.long;
     for (i = 0; i < ball.trail.length; i++) {
       t = (i + 1) / ball.trail.length;
-      pt = scr(ball.trail[i].x, ball.trail[i].y);
-      var y = pt.y - depthPx(ball.trail[i].z || 0);
+      pt = QV.project(ball.trail[i].x, ball.trail[i].y, ball.trail[i].z || 0);
       r = (shooting ? 4.4 : 2.2) + t * (shooting ? 6.0 : 2.4);
       ctx.beginPath();
-      var gr = ctx.createRadialGradient(pt.x, y, 0, pt.x, y, r);
+      var gr = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, r);
       gr.addColorStop(0, shooting
         ? (longShot ? 'rgba(255,240,150,' + (0.86 * t) + ')' : 'rgba(255,214,140,' + (0.80 * t) + ')')
         : 'rgba(200,255,220,' + (0.26 * t) + ')');
       gr.addColorStop(0.55, shooting ? 'rgba(255,150,60,' + (0.34 * t) + ')' : 'rgba(150,255,210,0)');
       gr.addColorStop(1, 'rgba(255,90,30,0)');
       ctx.fillStyle = gr;
-      ctx.arc(pt.x, y, r, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
       ctx.fill();
     }
     if (longShot) {
@@ -7173,9 +7324,9 @@
       ctx.lineWidth = 1.3;
       ctx.beginPath();
       for (i = 1; i < ball.trail.length; i++) {
-        var pp = scr(ball.trail[i].x, ball.trail[i].y);
-        if (i === 1) { ctx.moveTo(pp.x, pp.y); }
-        else { ctx.lineTo(pp.x + (i % 2 ? 2.6 : -2.6), pp.y + (i % 2 ? -2 : 2)); }
+        pr = QV.project(ball.trail[i].x, ball.trail[i].y, ball.trail[i].z || 0);
+        if (i === 1) { ctx.moveTo(pr.x, pr.y); }
+        else { ctx.lineTo(pr.x + (i % 2 ? 2.6 : -2.6), pr.y + (i % 2 ? -2 : 2)); }
       }
       ctx.stroke();
       ctx.restore();
@@ -8478,6 +8629,92 @@
         avg: v20t.pressFrames ? Math.round(v20t.pressSum / v20t.pressFrames * 100) / 100 : 0,
         max: v20t.pressMax
       }
+    };
+  };
+
+  /* v33 QA — 빠른 대량 경기 검증용 터보(그리기 생략). 하네스 밖에서는 켜지지 않는다. */
+  M.qaTurbo = function (on) { qaTurbo = !!on; return qaTurbo; };
+  /* v33 QA — 공 물리(직선·마찰·바운드)·오프사이드 세트피스·전력차 검증 훅 (검증 하네스 전용) */
+  M.v33 = function () {
+    var out = {
+      gap: {
+        home: Math.round(teamOvr.home * 10) / 10,
+        away: Math.round(teamOvr.away * 10) / 10,
+        diff: Math.round(powerGap * 10) / 10
+      },
+      ball: {
+        x: Math.round(ball.x * 100) / 100, y: Math.round(ball.y * 100) / 100,
+        z: Math.round(ball.z * 100) / 100, vz: Math.round(ball.vz * 10) / 10,
+        vx: Math.round(ball.vx * 10) / 10, vy: Math.round(ball.vy * 10) / 10,
+        kind: ball.kind, bend: Math.round((ball.bend || 0) * 100) / 100,
+        dur: Math.round((ball.dur || 0) * 1000) / 1000, flight: Math.round((ball.flight || 0) * 1000) / 1000,
+        bounces: ball.bounces || 0, trail: ball.trail.length,
+        aim: ball.aim ? { x: Math.round(ball.aim.x * 10) / 10, y: Math.round(ball.aim.y * 10) / 10 } : null,
+        from: ball.from ? { name: ball.from.name, side: ball.from.side } : null,
+        receiver: ball.receiver ? { name: ball.receiver.name, side: ball.receiver.side } : null,
+        carrier: ball.carrier ? { name: ball.carrier.name, side: ball.carrier.side } : null
+      },
+      setpiece: play.setpiece ? {
+        type: play.setpiece.type, side: play.setpiece.side, t: Math.round(play.setpiece.t * 100) / 100,
+        ox: Math.round(play.setpiece.ox * 10) / 10, oy: Math.round(play.setpiece.oy * 10) / 10,
+        taker: play.setpiece.taker ? { name: play.setpiece.taker.name, side: play.setpiece.taker.side } : null
+      } : null,
+      offside: v15 ? { home: v15.offside.home, away: v15.offside.away } : null,
+      near: (function () {
+        var o = [], i, q, d;
+        for (i = 0; i < players.length; i++) {
+          q = players[i];
+          d = Math.hypot(q.x - ball.x, q.y - ball.y);
+          if (d < 12) {
+            o.push({ name: q.name, side: q.side, pos: q.pos, d: Math.round(d * 10) / 10, moving: !!q.moving });
+          }
+        }
+        return o;
+      })(),
+      still: (function () {
+        var i, q, n = 0, bad = [];
+        for (i = 0; i < players.length; i++) {
+          q = players[i];
+          if (q.moving) { continue; }
+          n++;
+          if (q.gaitV > 0.2) { bad.push({ name: q.name, gaitV: Math.round(q.gaitV * 100) / 100 }); }
+        }
+        return { idle: n, gaitLeak: bad };
+      })()
+    };
+    return out;
+  };
+  /* v33 QA — 오프사이드 상황을 결정적으로 재현한다 (검증 하네스 전용) */
+  M.debugOffside = function (side) {
+    if (!M.running) { return false; }
+    side = side === 'away' ? 'away' : 'home';
+    var atk = side, defSide = atk === 'home' ? 'away' : 'home';
+    var q = null, i, p, v, bv = -1;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== atk || p.off || isGK(p)) { continue; }
+      v = progressOf(atk, p.y);
+      if (v > bv) { bv = v; q = p; }
+    }
+    if (!q) { return false; }
+    /* 공을 그 선수 뒤쪽에 두고 패스 순간을 흉내낸다 */
+    ball.x = clamp(q.x + 2, 8, 92);
+    ball.y = clamp(q.y - goalDir(atk) * 12, 8, 112);
+    ball.carrier = null; ball.kind = 'idle'; ball.vx = 0; ball.vy = 0; ball.trail = [];
+    var ofs = { line: offsideLineY(defSide), x: q.x, y: q.y };
+    flagOffside(q, ofs);
+    awardOffside(q);
+    var dists = [], j, r;
+    for (j = 0; j < players.length; j++) {
+      r = players[j];
+      if (r.side !== atk || r.off) { continue; }
+      dists.push({ name: r.name, d: Math.round(Math.hypot(r.x - ball.x, r.y - ball.y) * 10) / 10,
+        setD: r.setPos ? Math.round(Math.hypot(r.setPos.x - ball.x, r.setPos.y - ball.y) * 10) / 10 : null });
+    }
+    return {
+      offender: q.name, defSide: defSide,
+      spot: { x: Math.round(ball.x * 10) / 10, y: Math.round(ball.y * 10) / 10 },
+      setpiece: M.v33().setpiece, atkDists: dists
     };
   };
 

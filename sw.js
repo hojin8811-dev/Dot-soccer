@@ -1,11 +1,11 @@
-/*! 꼬마일레븐 FC v32b — 현대 전술 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v32-20261128c';
+/*! 꼬마일레븐 FC v33 — 현대 전술 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v33-20261128a';
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=32&b=31', './js/data.js?v=32&b=31', './js/chibi.js?v=32&b=31', './js/quarter.js?v=32&b=31', './js/pvp.js?v=32&b=31', './js/match.js?v=32&b=31', './js/bgm.js?v=32&b=31', './js/game.js?v=32&b=31',
+        './css/style.css?v=33&b=32', './js/data.js?v=33&b=32', './js/chibi.js?v=33&b=32', './js/quarter.js?v=33&b=32', './js/pvp.js?v=33&b=32', './js/match.js?v=33&b=32', './js/bgm.js?v=33&b=32', './js/game.js?v=33&b=32',
         './assets/hero-banner.jpg'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

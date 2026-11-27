@@ -1649,12 +1649,21 @@
     return { spd: spd, atk: atk, def: def };
   }
 
-  function ratingOf(p) {
+  /* v33 — 잠재력 상한. ratingOf는 '표시·전력 산정용 OVR'이라 언제나 pot을 넘지 않고,
+     실제 능력치 합산값은 rawRating()으로 따로 본다(성장 캡 판정용). */
+  function potOf(p) {
+    var v = p && typeof p.pot === 'number' ? p.pot : 99;
+    return clamp(v, 20, 99);
+  }
+  function rawRating(p) {
     var w = POS[p.pos].w;
     var v = p.s * w.s + p.t * w.t + p.p * w.p;
     var lv = p.level || 0;
     var raw = 22 + v * 7.2 + lv * 1.1 + (RARITY[p.rarity].stars - 2) * 1.2;
     return clamp(Math.round(raw), 20, 99);
+  }
+  function ratingOf(p) {
+    return Math.min(rawRating(p), potOf(p));
   }
 
   function starsOf(p) {
@@ -1793,6 +1802,25 @@
   DS.makePlayer = makePlayer;
   DS.makeInitialSquad = makeInitialSquad;
   DS.ratingOf = ratingOf;
+  DS.rawRating = rawRating;
+  DS.potOf = potOf;
+  /* v33 — 잠재력 상한을 지키는 능력치 성장. 실제로 오른 양을 돌려준다. */
+  DS.growAttr = function (p, key, n) {
+    if (!p || !key) { return 0; }
+    n = n || 1;
+    var pot = potOf(p), applied = 0, before;
+    while (applied < n) {
+      if ((p[key] || 1) >= 10 || rawRating(p) >= pot) { break; }
+      before = p[key];
+      p[key] = clamp(before + 1, 1, 10);
+      if (rawRating(p) > pot) { p[key] = before; break; }
+      applied++;
+    }
+    p.stats = statSheet(p);
+    return applied;
+  };
+  /* v33 — 이미 상한을 넘은 세이브(ovr > pot)를 표시·성장 기준에서 정리한다. */
+  DS.atPotCap = function (p) { return !!p && rawRating(p) >= potOf(p); };
   DS.starsOf = starsOf;
   DS.statSheet = statSheet;
   DS.storyFor = storyFor;
@@ -1849,16 +1877,25 @@
     for (i = 0; i < keys.length; i++) { adj[keys[i]] = (w[keys[i]] || 0) * (bias[keys[i]] || 1); }
     var best = keys[0];
     for (i = 1; i < keys.length; i++) { if (adj[keys[i]] > adj[best]) { best = keys[i]; } }
-    var pot = p.pot || 99, cur = ratingOf(p);
-    var head = clamp((pot - cur) / 40, 0.03, 1);   /* 잠재력에 가까울수록 더디게 */
+    var pot = potOf(p), cur = ratingOf(p);
+    var head = clamp((pot - cur) / 40, 0, 1);      /* 잠재력에 가까울수록 더디게 (상한 도달 시 0) */
     var o, v;
+    /* v33 — 잠재력 도달 뒤에는 어떤 성장에서도 OVR을 넘기지 않는다.
+       (v32까지의 `|| chance(0.35)`가 상한을 무시하고 계속 올렸다) */
+    function bump(key) {
+      if (!key || rawRating(p) >= pot || (p[key] || 1) >= 10) { return false; }
+      var before = p[key];
+      p[key] = clamp(before + 1, 1, 10);
+      if (rawRating(p) > pot) { p[key] = before; return false; }
+      return true;
+    }
     if (mode === 'reserve') {
-      if (chance(0.70 * head)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
-      if (chance(0.38 * head)) { o = weightedKey(keys, adj); p[o] = clamp((p[o] || 1) + 1, 1, 10); }
+      if (chance(0.70 * head)) { bump(best); }
+      if (chance(0.38 * head)) { bump(weightedKey(keys, adj)); }
       if (chance(0.20)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
     } else {
-      if (cur < pot || chance(0.35)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
-      if (chance(0.4)) { o = weightedKey(keys, adj); p[o] = clamp((p[o] || 1) + 1, 1, 10); }
+      bump(best);
+      if (chance(0.4)) { o = weightedKey(keys, adj); bump(o); }
       if (chance(0.22)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
     }
     p.stats = statSheet(p);
@@ -1892,8 +1929,15 @@
     var ups = 0, guard = 0;
     p.exp = (p.exp || 0) + Math.round(exp);
     if (typeof p.pot !== 'number') { p.pot = Math.min(95, Math.max(60, ratingOf(p) + 8)); }
-    while (p.exp >= DS.expToNext(p.level || 0) && guard < 8) {
-      p.exp -= DS.expToNext(p.level || 0);
+    var pot = potOf(p), need;
+    while (p.exp >= (need = DS.expToNext(p.level || 0)) && guard < 8) {
+      /* v33 — 잠재력 상한. 레벨도 OVR에 반영되므로 상한에 닿으면 레벨업을 멈춘다
+         (EXP는 임계값 바로 아래에서 더 쌓이지 않는다). */
+      if (rawRating(p) >= pot) {
+        p.exp = Math.min(p.exp, Math.max(0, need - 1));
+        break;
+      }
+      p.exp -= need;
       p.level = (p.level || 0) + 1;
       DS.growOnLevel(p, mgr, mode);
       ups++; guard++;
