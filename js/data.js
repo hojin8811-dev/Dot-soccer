@@ -2122,9 +2122,9 @@
     },
     {
       key: 'medical', name: '메디컬룸', icon: 'medical',
-      desc: '경기 후 컨디션 회복 +{v}', target: '컨디션 회복',
+      desc: '경기 후 컨디션 회복 +{v} (감소 -6~10)', target: '컨디션 회복',
       base: 1200, grow: 1.5,
-      effect: function (lv) { return lv * 4; },
+      effect: function (lv) { return lv * 7; },
       unit: ''
     },
     {

@@ -357,6 +357,8 @@
       reserve: { ids: [], log: [], last: null, played: 0 },
       /* v24 — 비동기 PvP(유저 대전) 전적 · 최근 대결 기록 */
       pvp: defaultPvp(),
+      /* v25 — 무료 팀 휴식(라운드당 1회) 사용 라운드 */
+      restRound: -1,
       ageNotices: [],
       expLog: [],
       dex: { players: {}, emblems: {}, kits: {} },
@@ -483,6 +485,7 @@
         if (typeof sq0.pot !== 'number') { sq0.pot = Math.min(95, Math.max(60, DS.ratingOf(sq0) + 8)); }
       }
       if (typeof d.smatchStreak !== 'number') { d.smatchStreak = 0; }
+      if (typeof d.restRound !== 'number') { d.restRound = -1; }
       if (typeof d.condition !== 'number') { d.condition = 88; }
       if (typeof d.morale !== 'number') { d.morale = 66; }
       if (!d.sponsor) { d.sponsor = 'kimbap'; }
@@ -707,8 +710,8 @@
       '<div class="tb-sub">시즌 ' + S.season + ' · ' + divName(S.division) + ' · ' + roundLabel() + ' · ' + ourRank() + '위 · ' + S.formation + '</div></div>' +
       '</div>' +
       '<div class="tb-chips">' +
-      '<span class="tb-chip gold"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10h5M9.5 14h5"/></svg>' + fmt(S.money) + '</span>' +
-      '<span class="tb-chip"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 7a3 3 0 0 1 0 6M18 20c0-2.4-1-4.5-2.6-5.6"/></svg>' + fmt(S.fans) + '</span>' +
+      '<span class="tb-chip gold" title="보유 금화"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10h5M9.5 14h5"/></svg><em>금화</em>' + fmt(S.money) + '</span>' +
+      '<span class="tb-chip" title="팬 수"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 7a3 3 0 0 1 0 6M18 20c0-2.4-1-4.5-2.6-5.6"/></svg><em>팬</em>' + fmt(S.fans) + '</span>' +
       '</div>';
     paintEmblems(h);
   }
@@ -881,8 +884,11 @@
         '<div class="kpi"><b class="lime">' + xgEstimate(opp.strength).toFixed(1) + '</b><span>기대 득점 xG</span></div>' +
         '<div class="kpi"><b>' + pressLevel() + '</b><span>압박 강도</span></div>' +
         '<div class="kpi"><b class="coral">-' + staminaCost() + '%</b><span>체력 소모</span></div>' +
+        '<div class="kpi"><b class="' + (S.condition < COND_WARN ? 'coral' : '') + '">' + S.condition + '</b><span>팀 컨디션</span></div>' +
         '</div>' +
-        '<button class="btn primary wide" data-act="kickoff">공식전 킥오프</button></div>' +
+        (S.condition < COND_WARN ? '<div class="cond-warn">⚠ 컨디션 ' + S.condition + ' — 경기 후 -6~10. <b>팀 휴식</b>으로 회복할 수 있습니다.' +
+          (restAvailable() ? ' <button class="btn sm" data-act="rest">무료 휴식 +' + REST_GAIN + '</button>' : ' <span class="tiny muted">이번 라운드 휴식 사용함</span>') + '</div>' : '') +
+        '<button class="btn primary wide" data-act="kickoff">' + (S.condition < COND_GATE ? '컨디션 회복 후 킥오프 · ' + S.condition : '공식전 킥오프') + '</button></div>' +
         scoutHTML(prepareOpp('league'));
     }
 
@@ -938,15 +944,19 @@
       '</div>' +
       lastHTML +
       '<div class="card">' +
-      '<div class="card-head"><b>시즌 기록</b><span class="meta">승률 ' + (S.totals.matches ? Math.round(S.totals.wins / S.totals.matches * 100) : 0) + '%</span></div>' +
+      '<div class="card-head"><b>시즌 기록</b><span class="meta">시즌 ' + S.season + ' · ' + divName(S.division) + ' 리그</span></div>' +
       '<div class="kpis">' +
-      '<div class="kpi"><b>' + S.totals.matches + '</b><span>경기</span></div>' +
-      '<div class="kpi"><b class="lime">' + S.totals.wins + '</b><span>승</span></div>' +
-      '<div class="kpi"><b>' + S.totals.draws + '</b><span>무</span></div>' +
-      '<div class="kpi"><b class="coral">' + S.totals.losses + '</b><span>패</span></div>' +
-      '<div class="kpi"><b>' + S.totals.goals + '</b><span>득점</span></div>' +
-      '<div class="kpi"><b>' + S.totals.conceded + '</b><span>실점</span></div>' +
-      '</div></div>' +
+      '<div class="kpi"><b>' + tableRow('me').p + '</b><span>경기</span></div>' +
+      '<div class="kpi"><b class="lime">' + tableRow('me').w + '</b><span>승</span></div>' +
+      '<div class="kpi"><b>' + tableRow('me').d + '</b><span>무</span></div>' +
+      '<div class="kpi"><b class="coral">' + tableRow('me').l + '</b><span>패</span></div>' +
+      '<div class="kpi"><b>' + tableRow('me').gf + '</b><span>득점</span></div>' +
+      '<div class="kpi"><b>' + tableRow('me').ga + '</b><span>실점</span></div>' +
+      '</div>' +
+      /* v25 — 라벨을 내용에 맞춘다: 위는 이번 시즌 리그 기록, 아래는 통산(전 시즌 누적) */
+      '<div class="tiny muted" style="margin-top:5px">통산 전적 · ' + S.totals.matches + '경기 ' +
+      S.totals.wins + '승 ' + S.totals.draws + '무 ' + S.totals.losses + '패 · ' +
+      S.totals.goals + '득 ' + S.totals.conceded + '실</div></div>' +
       '<div class="card tight"><div class="row between"><div><div class="b" style="font-size:11.5px">유저 대전 · 비동기 PvP</div>' +
       '<div class="tiny muted">내 구단 코드를 보내 친구와 붙기 · 전적 ' + ensurePvp().w + '-' + ensurePvp().d + '-' + ensurePvp().l + '</div></div>' +
       '<div class="row" style="gap:4px"><button class="btn sm" data-act="pvpmycode">코드 복사</button>' +
@@ -1207,6 +1217,52 @@
     return fac ? facEffect(fac, S.facilities[key] || 0) : 0;
   }
 
+  /* ═════════════════  v25 — 팀 컨디션 · 무료 휴식  ═════════════════
+     경기마다 컨디션이 6~10씩 빠지는데 회복 수단이 유료 드링크뿐이라 3~4경기 만에
+     진행이 막혔다. 라운드당 1회 무료 팀 휴식(+16)을 열고, 메디컬룸 회복량을 올렸으며,
+     컨디션 25 미만으로 킥오프가 막힐 때는 조용한 토스트 대신 회복 선택 모달을 연다. */
+  var COND_GATE = 25;
+  var REST_GAIN = 16;
+  var COND_WARN = 40;
+  var pendingStart = null;
+
+  function restAvailable() { return S.restRound !== S.round; }
+  function restTeam() {
+    if (!restAvailable()) {
+      toast('이번 라운드 휴식은 이미 사용했습니다. 다음 라운드에 다시 쓸 수 있습니다.');
+      return false;
+    }
+    if (S.condition >= 100) { toast('컨디션이 이미 최상입니다.'); return false; }
+    var before = S.condition;
+    S.condition = clamp(S.condition + REST_GAIN, 0, 100);
+    S.restRound = S.round;
+    save();
+    renderAll();
+    toast('팀 휴식 · 컨디션 ' + before + ' → ' + S.condition + ' (라운드당 1회)');
+    return true;
+  }
+
+  function conditionModalHTML(inClub) {
+    var med = S.facilities.medical || 0;
+    var canStart = !!pendingStart && S.condition >= COND_GATE;
+    return '<div class="condbox">' +
+      '<div class="cond-row"><span>현재 컨디션</span><b class="' + (S.condition < COND_WARN ? 'coral' : 'lime') + '">' + S.condition + '</b></div>' +
+      '<div class="cond-bar"><i class="' + (S.condition < COND_WARN ? 'low' : '') + '" style="width:' + clamp(S.condition, 0, 100) + '%"></i></div>' +
+      '<div class="tiny muted" style="margin:6px 0 8px">경기 1회당 -6~10 · 메디컬룸 Lv.' + med + ' 회복 +' + facValue('medical') +
+      ' · 이번 라운드 무료 휴식 ' + (restAvailable() ? '가능' : '사용함') + '</div>' +
+      '<button class="btn primary wide" data-act="condrest" ' + (restAvailable() ? '' : 'disabled') + '>팀 휴식 · 무료 (컨디션 +' + REST_GAIN + ')</button>' +
+      '<button class="btn dark wide" style="margin-top:5px" data-act="conddrink" ' + (S.money < 600 ? 'disabled' : '') + '>컨디션 드링크 · 600 (+20)</button>' +
+      (inClub ? '' : '<button class="btn ghost wide" style="margin-top:5px" data-act="condclub">클럽 → 메디컬룸 업그레이드</button>') +
+      (pendingStart ? '<button class="btn ' + (canStart ? 'primary' : 'ghost') + ' wide" style="margin-top:5px" data-act="condgo" ' + (canStart ? '' : 'disabled') + '>' +
+        (canStart ? '이 컨디션으로 킥오프' : '컨디션 ' + COND_GATE + ' 이상이어야 킥오프할 수 있습니다') + '</button>' : '') +
+      '</div>';
+  }
+
+  function openConditionModal(kind, opt) {
+    pendingStart = { kind: kind, opt: opt || {} };
+    setSheet('컨디션 ' + S.condition + ' — 회복하고 킥오프', conditionModalHTML(), 'narrow');
+  }
+
   /* ═════════════════  유소년 아카데미 (v21) ═════════════════
      U-18 후보를 발굴해 포지션·롤을 지정해 키우고, 1군 승격이나 이적시장 매각으로 연결한다. */
   var YOUTH_SIZE = 3;
@@ -1402,6 +1458,7 @@
     if (last) {
       for (i = 0; i < last.rows.length; i++) {
         var x = last.rows[i];
+        if (!x || !x.name) { continue; }
         rows += '<div class="rl-row' + (x.levels ? ' up' : '') + '">' +
           '<span class="rl-nm">' + tierDot(x) + ' ' + esc(shortName(x.name)) + '<em>' + x.pos + '</em></span>' +
           '<span class="rl-rt">' + x.rating.toFixed(1) + '</span>' +
@@ -1416,8 +1473,15 @@
         ? '다음 리그 라운드에서 2군 경기가 자동으로 치러집니다.'
         : '유망주를 2군 출전으로 올리면 리그 라운드마다 2군 경기를 치릅니다.') + '</div>';
     }
-    for (i = 0; i < r.log.length && i < 4; i++) {
+    /* v25 — 같은 라운드 로그가 두 번 쌓이거나 상대명이 빈 줄은 걸러낸다 */
+    var seenLog = {}, shown = 0;
+    for (i = 0; i < r.log.length && shown < 4; i++) {
       var L = r.log[i];
+      if (!L || !L.oppName) { continue; }
+      var lgKey = L.season + '|' + L.round + '|' + L.oppName;
+      if (seenLog[lgKey]) { continue; }
+      seenLog[lgKey] = 1;
+      shown++;
       log += '<span class="rlg">S' + L.season + ' ' + L.round + 'R · ' + esc(L.oppName) + ' <b>' + L.gf + ':' + L.ga + '</b></span>';
     }
     return '<div class="card">' +
@@ -1503,6 +1567,8 @@
       '<div class="tiny muted" style="margin-top:3px">32세부터는 시즌마다 피지컬(스피드·파워)이 떨어집니다. 하락기는 EXP도 ×0.2.</div></div>';
   }
 
+  var clubRoleOpen = false;
+
   function renderClub() {
     var box = document.getElementById('screen-club');
     if (!box) { return; }
@@ -1537,11 +1603,19 @@
     var combo = trainSel.menus.length === 2 ? DS.findCombo(trainSel.menus[0], trainSel.menus[1]) : null;
     var trainCost = tp ? (300 + tp.level * 120) : 0;
 
-    var st = starters(), roleHTML = '';
+    var st = starters(), roleHTML = '', roleWait = 0, roleWaitHTML = '';
     for (i = 0; i < st.length; i++) {
       var r = DS.roleOf(st[i].role);
       /* v21b ② — 레벨이 모자라 롤을 열 수 없는 선수는 [진화]를 잠근다 */
       var canEvo = canEvolve(st[i]), needLv = evoNeed(st[i]);
+      /* v25 — 아직 진화할 수 없는(롤도 없는) 선수는 접어서 목록 길이를 줄인다 */
+      if (!canEvo && !r) {
+        roleWait++;
+        roleWaitHTML += '<div class="rw-row"><span class="rw-n">' + esc(shortName(st[i].name)) + '</span>' +
+          '<span class="rw-p">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span>' +
+          '<span class="rw-l">Lv.' + needLv + '부터</span></div>';
+        continue;
+      }
       roleHTML += '<div class="role-row">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + tierDot(st[i]) + ' ' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
@@ -1579,6 +1653,9 @@
       youthHTML() +
       reserveHTML() +
       ageNoticeHTML() +
+      '<div class="card">' +
+      '<div class="card-head"><span class="dot"></span><b>팀 컨디션 · 회복</b><span class="meta">REST · CONDITION</span></div>' +
+      conditionModalHTML(true) + '</div>' +
       '<div class="card dark">' +
       '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">클럽 하우스</b><span class="meta">FACILITIES</span></div>' +
       '<div class="grid2">' + facHTML + '</div></div>' +
@@ -1592,7 +1669,11 @@
       '</div>' +
       '<div class="card">' +
       '<div class="card-head"><b>롤 진화</b><span class="meta">현대 롤 · Lv.3 / Lv.4</span></div>' +
-      roleHTML + '</div>' +
+      roleHTML +
+      (roleWait ? '<button class="btn ghost sm wide" style="margin-top:5px" data-act="roletoggle">' +
+        (clubRoleOpen ? '진화 대기 ' + roleWait + '명 접기 ▲' : '진화 대기 ' + roleWait + '명 펼치기 ▼') + '</button>' +
+        (clubRoleOpen ? '<div class="rw-wrap">' + roleWaitHTML + '</div>' : '') : '') +
+      '</div>' +
       '<div class="card"><div class="card-head"><b>감독실</b><span class="meta">선임 감독 · 고유 포메이션</span></div>' +
       managerHTML('club') +
       '<div class="grid2" style="margin-top:7px">' +
@@ -1749,14 +1830,19 @@
     var t = ensureMarket(), i, L = null;
     for (i = 0; i < t.listings.length; i++) { if (t.listings[i].id === id) { L = t.listings[i]; } }
     if (!L) { return; }
-    if (L.negotiated) { toast('이미 협상한 매물입니다.'); return; }
-    L.negotiated = 1;
-    if (chance(0.68)) {
-      L.fee = Math.max(280, Math.round(L.fee * (0.84 + Math.random() * 0.08) / 50) * 50);
+    /* v25 — 실패해도 이적료를 올리지 않는다(손해만 보는 구조 제거). 대신 재시도할수록
+       성공 확률이 떨어지고, 최대 3회까지 협상할 수 있다. */
+    var tries = L.negoTries || 0;
+    if (tries >= 3) { toast('이 매물은 협상 3회를 모두 썼습니다.'); return; }
+    L.negoTries = tries + 1;
+    var p = 0.68 - tries * 0.16;
+    if (chance(p)) {
+      var cut = 0.80 + Math.random() * 0.10;
+      L.fee = Math.max(280, Math.round(L.fee * cut / 50) * 50);
+      L.negotiated = 1;
       toast('협상 성공! 이적료가 ' + fmt(L.fee) + ' 로 내려갔습니다.');
     } else {
-      L.fee = Math.round(L.fee * 1.06 / 50) * 50;
-      toast('상대 구단이 거절했습니다. 이적료가 올랐습니다 (' + fmt(L.fee) + ')');
+      toast('상대 구단이 거절했습니다. 이적료는 그대로입니다 (재시도 ' + (2 - tries) + '회)');
     }
     save();
     renderShop();
@@ -1816,7 +1902,7 @@
         '<div class="fee"><b>' + fmt(L.fee) + '</b><span>주급 ' + fmt(L.wage) + '</span></div>' +
         '<div class="row mkt-btns">' +
         '<button class="btn primary sm" data-act="sign" data-id="' + L.id + '" ' + (S.money < L.fee ? 'disabled' : '') + '>영입</button>' +
-        '<button class="btn ghost sm" data-act="nego" data-id="' + L.id + '" ' + (L.negotiated ? 'disabled' : '') + '>' + (L.negotiated ? '협상됨' : '협상') + '</button>' +
+        '<button class="btn ghost sm" data-act="nego" data-id="' + L.id + '" ' + (L.negotiated || (L.negoTries || 0) >= 3 ? 'disabled' : '') + '>' + (L.negotiated ? '협상됨' : '협상 ' + (3 - (L.negoTries || 0)) + '회') + '</button>' +
         '</div></div></div>';
     }
     if (!cards) { cards = '<div class="mkt-empty">이번 라운드 매물이 모두 마감됐습니다. 다음 라운드에 새 매물이 올라옵니다.</div>'; }
@@ -2202,6 +2288,10 @@
   /* ── v19 ④ — 2D 미니피치 (슈팅 xG맵 · 평균 포지션/패스 연결망) ──
      가로 피치·공격축을 화면 x로 투영한다 (월드 y=0 이 화면 왼쪽).
      홈은 왼쪽 골문을, 원정은 오른쪽 골문을 공격하는 실제 경기 화면과 같다. */
+  function roundLabelOf(kind) {
+    return kind === 'smatch' ? 'S매치' : (kind === 'pvp' ? '유저 대전' : '챌린지');
+  }
+
   function paintShotMaps(root) {
     var r = shownReport;
     if (!root || !r || !r.tele) { return; }
@@ -2226,9 +2316,11 @@
   }
 
   function drawMiniPitch(c, w, h, r, mode, side) {
-    var pad = 7, legH = 12;
+    var pad = 7, legH = 18;   /* v25 — 하단 범례가 잘리지 않게 여유를 준다 */
     var pw = w - pad * 2, ph = h - pad * 2 - legH;
-    var X = function (wy) { return pad + (clamp(wy, 0, 120) / 120) * pw; };
+    /* v25 — 경기 화면과 같은 방향: 월드 y=0(홈의 공격 골문)이 오른쪽. 이전에는 좌우가 뒤집혀
+       우리 슈팅이 상대 골문 반대편에 찍혔다. */
+    var X = function (wy) { return pad + (1 - clamp(wy, 0, 120) / 120) * pw; };
     var Y = function (wx) { return pad + (clamp(wx, 0, 100) / 100) * ph; };
     var i, sh, xg, rad, col;
     c.clearRect(0, 0, w, h);
@@ -2247,14 +2339,19 @@
     c.beginPath(); c.moveTo(X(60), pad); c.lineTo(X(60), pad + ph); c.stroke();
     c.beginPath(); c.arc(X(60), Y(50), Math.min(pw, ph) * 0.14, 0, Math.PI * 2); c.stroke();
     /* 페널티 박스 (양쪽) */
-    c.strokeRect(X(0), Y(21), X(16.5) - X(0), Y(79) - Y(21));
-    c.strokeRect(X(120) - (X(16.5) - X(0)), Y(21), X(16.5) - X(0), Y(79) - Y(21));
+    var boxW = Math.abs(X(16.5) - X(0));
+    c.strokeRect(Math.min(X(0), X(16.5)), Y(21), boxW, Y(79) - Y(21));
+    c.strokeRect(Math.min(X(120), X(103.5)), Y(21), boxW, Y(79) - Y(21));
     /* 골문 */
     c.strokeStyle = 'rgba(200,241,105,.65)';
     c.lineWidth = 2;
     c.beginPath(); c.moveTo(pad, Y(43)); c.lineTo(pad, Y(57));
     c.moveTo(pad + pw, Y(43)); c.lineTo(pad + pw, Y(57)); c.stroke();
-    var TEAM = { home: '#63b3ff', away: '#ff6b5c' };
+    var TEAM = {
+      home: (r.homeKit && r.homeKit.shirt) || '#63b3ff',
+      away: (r.awayKit && r.awayKit.shirt) || '#ff6b5c'
+    };
+    if (TEAM.home === TEAM.away) { TEAM = { home: '#63b3ff', away: '#ff6b5c' }; }
 
     if (mode === 'xg') {
       var shots = (r.tele.shots || []);
@@ -2333,7 +2430,7 @@
     c.fillStyle = 'rgba(233,244,221,.62)';
     c.font = '600 7px system-ui, sans-serif';
     c.textAlign = 'left';
-    c.fillText(label, pad + 1, h - 3);
+    c.fillText(label, pad + 1, h - 6);
   }
 
   function mapCardHTML(r) {
@@ -2813,7 +2910,12 @@
       lineup.push({ player: p, role: f.slots[k].role, pos: f.slots[k].pos, x: f.slots[k].x, y: f.slots[k].y });
     }
     if (lineup.length < 8) { toast('선발 선수가 부족합니다.'); return; }
-    if (S.condition < 25) { toast('컨디션이 너무 낮습니다. 회복이 필요합니다.'); return; }
+    if (S.condition < COND_GATE) {
+      /* v25 — 조용히 막지 않고, 바로 회복하고 이어갈 수 있게 모달을 연다 */
+      toast('컨디션 ' + S.condition + ' — 회복이 필요합니다. 휴식이나 드링크를 고르세요.');
+      openConditionModal(kind, opt);
+      return;
+    }
 
     /* v21b ⑥ — 실제로 킥오프까지 간 경기만 가이드 2단계로 기록 */
     if (kind === 'league') { guideMark('kickoff'); }
@@ -2923,8 +3025,10 @@
       season: S.season,
       roundLabel: kind === 'league' ? (S.round + '라운드') : (kind === 'smatch' ? 'S매치' : (kind === 'pvp' ? '유저 대전' : '챌린지')),
       competition: kind === 'league' ? '도트 리그' : (kind === 'smatch' ? 'S매치 스페셜' : (kind === 'pvp' ? '비동기 PvP · 유저 대전' : '챌린지 매치')),
-      date: '2045/11/' + (14 + (S.round % 12)) + ' ' + ['19:30', '20:00', '21:00'][S.round % 3],
-      stadium: stadiums[S.round % stadiums.length],
+      /* v25 — 고정된 2045년 날짜 대신 지금 시즌·라운드로 표기하고, 원정 경기는 상대 구장을 쓴다 */
+      date: '시즌 ' + S.season + ' · ' + (kind === 'league' ? (S.round + '라운드') : roundLabelOf(kind)) +
+        ' · ' + ['19:30', '20:00', '21:00'][S.round % 3],
+      stadium: (venueHome === false ? (oppTeam.short + ' 경기장') : (S.club.name.split(' ')[0] + ' 파크')),
       attendance: 380 + Math.floor(S.fans / 12),
       homeName: S.club.name,
       awayName: oppTeam.name,
@@ -3362,6 +3466,8 @@
       '<canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
       '<div id="m-banner" class="goal-banner"></div>' +
+      /* v25 — 피치 위 활성 전술카드 스트립 (남은 시간 게이지) */
+      '<div class="tac-strip" id="m-tacstrip"></div>' +
       '</div>' +
       /* v21b ③ — 피치 아래 실시간 선발 11인 체력·평점 바 (높은 화면에서만 펼침) */
       '<div class="m-squad off" id="m-squad"><div class="ms-head"><b>선발 11인</b><span>체력 · 평점</span></div>' +
@@ -3416,16 +3522,43 @@
     updateLiveSquad(st);
     var buffs = document.getElementById('m-buffs');
     if (buffs) {
-      var names = {
-        press: '압박', atk: '침투', def: '차단', build: '빌드업', tempo: '템포',
-        setpiece: '세트피스', through: '스루패스', trigger: '트리거',
-        tiki: '티키타카', offside: '오프사이드', longshot: '중거리', roar: '일갈'
-      };
-      var html = '', i;
+      var html = '', i, b2;
       for (i = 0; i < st.buffs.length; i++) {
-        html += '<span class="buffchip">' + (names[st.buffs[i].key] || st.buffs[i].key) + ' <em>' + st.buffs[i].left + 's</em></span>';
+        b2 = st.buffs[i];
+        html += '<span class="buffchip v25" style="--bc:' + (b2.color || '#c8f169') + '">' +
+          '<b>' + esc(b2.tag || '') + '</b>' + esc(b2.name || b2.key) + ' <em>' + b2.left + 's</em>' +
+          '<span class="bc-bar"><i style="width:' + (b2.pct == null ? 100 : b2.pct) + '%"></i></span></span>';
       }
       buffs.innerHTML = html;
+    }
+    /* v25 — 피치 위 활성 전술 스트립: 카드가 살아 있는 동안 계속 보이고, 게이지가 줄어든다 */
+    var strip = document.getElementById('m-tacstrip');
+    if (strip) {
+      if (!st.buffs || !st.buffs.length) {
+        if (strip.className !== 'tac-strip') { strip.className = 'tac-strip'; strip.innerHTML = ''; strip.removeAttribute && strip.removeAttribute('data-sig'); }
+      } else {
+        var stripSig = st.buffs.map(function (x) { return x.key; }).join(',');
+        if (strip.getAttribute('data-sig') !== stripSig) {
+          var sh = '', si;
+          for (si = 0; si < st.buffs.length; si++) {
+            b2 = st.buffs[si];
+            sh += '<div class="tac-pill" style="--pc:' + (b2.color || '#c8f169') + '">' +
+              '<i class="d"></i><b>' + esc(b2.name || b2.key) + '</b>' +
+              (b2.ace ? '<span class="ace">' + esc(b2.ace) + '</span>' : '') +
+              '<u>' + b2.left + 's</u>' +
+              '<span class="pbar"><i style="width:' + (b2.pct == null ? 100 : b2.pct) + '%"></i></span></div>';
+          }
+          strip.innerHTML = sh;
+          strip.setAttribute('data-sig', stripSig);
+        } else {
+          var bars = strip.querySelectorAll('.pbar > i'), tus = strip.querySelectorAll('u'), bi;
+          for (bi = 0; bi < bars.length && bi < st.buffs.length; bi++) {
+            bars[bi].style.width = (st.buffs[bi].pct == null ? 100 : st.buffs[bi].pct) + '%';
+            if (tus[bi]) { tus[bi].textContent = st.buffs[bi].left + 's'; }
+          }
+        }
+        strip.className = 'tac-strip on';
+      }
     }
     var usesEl = document.getElementById('m-uses');
     if (usesEl) {
@@ -3628,12 +3761,26 @@
         '<span class="ms-face">' + (p.face ? '<img src="' + p.face + '" alt="">' : '') + '</span>' +
         '<span class="ms-tx"><b>' + esc(p.name) + '</b><em>' + p.pos + ' · ' + p.stam + '%</em></span>' +
         '<span class="ms-bar"><i style="width:' + Math.max(2, Math.min(100, p.stam)) + '%"></i></span>' +
-        '<b class="ms-rt">' + p.rating.toFixed(1) + '</b></div>';
+        '<b class="ms-rt" title="평점">' + p.rating.toFixed(1) + '<em>평점</em></b></div>';
     }
     box.innerHTML = html;
   }
 
   /* ═════════════════  교체 ═════════════════ */
+  /* v25 — 교체창 포지션 적성: 지금 내보낼 선수의 자리(pos)에 벤치 선수가 얼마나 맞는지 */
+  function posFitOf(playerPos, slotPos) {
+    if (!playerPos || !slotPos) { return null; }
+    if (playerPos === slotPos) { return { m: '◎', l: '완전', c: 'f1' }; }
+    var gp = DS.posGroup(playerPos), gs = DS.posGroup(slotPos);
+    var lp = playerPos.charAt(0), ls = slotPos.charAt(0);
+    var sideOk = lp === ls || lp === 'C' || ls === 'C';
+    if (gp === gs) { return sideOk ? { m: '○', l: '적합', c: 'f2' } : { m: '△', l: '반대발', c: 'f3' }; }
+    if ((gp === 'DF' && gs === 'MF') || (gp === 'MF' && gs === 'DF') || (gp === 'MF' && gs === 'FW') || (gp === 'FW' && gs === 'MF')) {
+      return { m: '△', l: '인접', c: 'f3' };
+    }
+    return { m: '×', l: '부적합', c: 'f4' };
+  }
+
   function openSubs(halftime) {
     subHalf = !!halftime;
     if (!halftime && DS.Match && DS.Match.running && DS.Match.pause) { DS.Match.pause(); }
@@ -3647,10 +3794,16 @@
       outHTML += '<button class="sub-item' + (subState.outId === it.id ? ' on' : '') + (it.off ? ' off' : '') + '" data-act="subpick" data-side="out" data-id="' + it.id + '" ' + (it.off ? 'disabled' : '') + '>' +
         '<span class="sp">' + it.role + '</span><span class="sn">' + esc(it.name) + '</span><span class="sr">' + it.rating + '</span></button>';
     }
+    /* 선택된 OUT 선수의 자리에 대한 적성 표시 */
+    var outPos = null, k2;
+    for (k2 = 0; k2 < st.onPitch.length; k2++) { if (st.onPitch[k2].id === subState.outId) { outPos = st.onPitch[k2]; } }
     for (i = 0; i < st.bench.length; i++) {
       it = st.bench[i];
+      var fit = outPos ? posFitOf(it.pos, outPos.pos) : null;
       inHTML += '<button class="sub-item' + (subState.inId === it.id ? ' on' : '') + (it.used ? ' off' : '') + '" data-act="subpick" data-side="in" data-id="' + it.id + '" ' + (it.used ? 'disabled' : '') + '>' +
-        '<span class="sp">' + it.pos + '</span><span class="sn">' + esc(it.name) + '</span><span class="sr">' + it.rating + '</span></button>';
+        '<span class="sp">' + it.pos + '</span><span class="sn">' + esc(it.name) + '</span>' +
+        (fit ? '<span class="sf ' + fit.c + '" title="' + fit.l + '">' + fit.m + '</span>' : '') +
+        '<span class="sr">' + it.rating + '</span></button>';
     }
     ov.innerHTML = '<div class="sub-panel">' +
       '<div class="sub-head"><b>선수 교체</b><span>남은 교체 ' + st.subsLeft + '/' + (st.subsMax || 5) + '회 · 최대 5회 · 벤치 ' + st.bench.length + '명' + (halftime ? ' · 하프타임' : '') + '</span></div>' +
@@ -3981,6 +4134,35 @@
     if (act === 'evolvepick') { doEvolve(byId(t.getAttribute('data-p')), t.getAttribute('data-k')); return; }
 
     if (act === 'facility') { doFacility(t.getAttribute('data-k')); return; }
+    /* v25 — 컨디션 회복 · 무료 휴식 */
+    if (act === 'rest') { restTeam(); return; }
+    if (act === 'roletoggle') { clubRoleOpen = !clubRoleOpen; renderClub(); return; }
+    if (act === 'condrest') {
+      var rested = restTeam();
+      var pk = pendingStart ? pendingStart.kind : 'league';
+      var po = pendingStart ? pendingStart.opt : {};
+      openConditionModal(pk, po);
+      if (rested) { toast('회복 완료 · 컨디션 ' + S.condition); }
+      return;
+    }
+    if (act === 'conddrink') {
+      if (S.money < 600) { toast('금화가 부족합니다.'); return; }
+      S.money -= 600;
+      S.condition = clamp(S.condition + 20, 0, 100);
+      save(); renderAll();
+      openConditionModal(pendingStart ? pendingStart.kind : 'league', pendingStart ? pendingStart.opt : {});
+      toast('컨디션 +20 · 현재 ' + S.condition);
+      return;
+    }
+    if (act === 'condclub') { closeModal(); setTab('club'); return; }
+    if (act === 'condgo') {
+      if (!pendingStart) { closeModal(); return; }
+      var ps = pendingStart;
+      pendingStart = null;
+      closeModal();
+      startMatch(ps.kind, ps.opt);
+      return;
+    }
 
     /* ── v21: 이적시장 ── */
     if (act === 'sign') { doSignListing(t.getAttribute('data-id')); return; }

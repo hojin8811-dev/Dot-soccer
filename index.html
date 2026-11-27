@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v24 — 비동기 PvP 유저 대전 · 유소년 잠재력 확장</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v24는 내 구단을 코드(공유 링크 ?vs=)로 내보내 친구의 구단과 1:1로 붙는 비동기 유저 대전(PvP)을 연다 — 상대는 AI 감독이 지휘하고 나는 실시간 전술 카드로 개입하며, 리그 승점과는 분리된다. 유소년 잠재력은 70~92로 넓어져 특급·원더키드는 드물게 등장한다.">
+<title>도트싸커 v25 — 실시간 전술카드 대입 · 캐릭터 연출 업그레이드</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v25는 전술 카드를 쓰는 순간 그 전술이 피치 위에 그려진다 — 오프사이드 트랩 라인, 압박 타겟 링과 압박 벡터, 하프스페이스 침투 화살표, 티키타카 삼각 패스선, 중거리 조준 아크가 실시간으로 살아 움직이고, 선수들은 질주 잔상·발차기 충격파·슬라이딩 잔디·다이빙 고스트·골 세리머니 색종이로 반응한다. 경기 시작은 정렬된 킥오프 세리머니와 함께 확실하게 출발한다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=24">
-<link rel="icon" href="icons/icon-192.png?v=24">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=24">
-<link rel="stylesheet" href="css/style.css?v=24&b=11">
+<link rel="manifest" href="manifest.webmanifest?v=25">
+<link rel="icon" href="icons/icon-192.png?v=25">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=25">
+<link rel="stylesheet" href="css/style.css?v=25&b=12">
 </head>
 <body>
 <div id="app">
@@ -58,15 +58,15 @@
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=24&b=11"></script>
-<script src="js/pvp.js?v=24&b=11"></script>
-<script src="js/match.js?v=24&b=11"></script>
-<script src="js/game.js?v=24&b=11"></script>
+<script src="js/data.js?v=25&b=12"></script>
+<script src="js/pvp.js?v=25&b=12"></script>
+<script src="js/match.js?v=25&b=12"></script>
+<script src="js/game.js?v=25&b=12"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=24').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=25').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

@@ -1,12 +1,12 @@
-/*! 도트싸커 v24 — 비동기 PvP(유저 대전) · 유소년 잠재력 확장 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v24-20261127a';
+/*! 도트싸커 v25 — 실시간 전술카드 대입 · 캐릭터 연출 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v25-20261127';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=24&b=11', './js/data.js?v=24&b=11', './js/pvp.js?v=24&b=11', './js/match.js?v=24&b=11', './js/game.js?v=24&b=11',
+        './css/style.css?v=25&b=12', './js/data.js?v=25&b=12', './js/pvp.js?v=25&b=12', './js/match.js?v=25&b=12', './js/game.js?v=25&b=12',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

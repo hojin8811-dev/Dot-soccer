@@ -1,10 +1,10 @@
 {
-  "name": "도트싸커 v24 — 유저 대전(비동기 PvP) · 유소년 잠재력 확장 축구 RPG",
+  "name": "도트싸커 v25 — 실시간 전술카드 대입 · 캐릭터 연출 축구 RPG",
   "short_name": "도트싸커",
-  "description": "500명 고유 초상화가 원형 토큰이 되어 16:9 가로 스타디움을 누비는 필드 플레이 — 내 구단 코드(?vs=)를 보내 친구 구단과 붙는 비동기 유저 대전, 1·2부 40팀 리그, 감독 50명의 전술 철학, 유소년 아카데미(잠재 70~92)와 2군 리그, 나이별 성장 곡선이 있는 오리지널 축구 구단 RPG",
+  "description": "500명 고유 초상화가 원형 토큰이 되어 16:9 가로 스타디움을 누비는 필드 플레이 — 전술 카드를 쓰면 오프사이드 트랩 라인·압박 타겟 링·침투 화살표·티키타카 삼각 패스선이 피치 위에 실시간으로 그려지고, 선수 연출(질주 잔상·발차기 충격파·슬라이딩 잔디·다이빙 고스트·골 세리머니 색종이)이 살아나는 오리지널 축구 구단 RPG",
   "lang": "ko",
   "dir": "ltr",
-  "start_url": "./index.html?v=24&source=pwa",
+  "start_url": "./index.html?v=25&source=pwa",
   "scope": "./",
   "display": "standalone",
   "orientation": "landscape",
@@ -16,19 +16,19 @@
   ],
   "icons": [
     {
-      "src": "icons/icon-192.png?v=24",
+      "src": "icons/icon-192.png?v=25",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png?v=24",
+      "src": "icons/icon-512.png?v=25",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-maskable-512.png?v=24",
+      "src": "icons/icon-maskable-512.png?v=25",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

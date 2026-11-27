@@ -9,7 +9,11 @@
          경기 후 FM식 2D 슈팅 xG맵 + 평균 포지션/패스 연결망 계측
     v20: 라이브 터치라인 지시(공격 성향·압박 강도·수비 라인·공격 루트) ·
          포지션/현대 롤/주발이 실제 플레이에 반영(인버티드 윙어 컷인 · 전통 윙어 폭 ·
-         DM 드롭 · B2B 늦은 침투 · CF 폴스나인 vs ST 뒷공간) */
+         DM 드롭 · B2B 늦은 침투 · CF 폴스나인 vs ST 뒷공간)
+    v25: 실시간 전술카드 피치 오버레이(트랩 라인·압박 타겟 링·침투 화살표·티키타카 삼각선·
+         중거리 조준 아크·포위 링·템포 파동·세트피스 조준) · 카드별 활성 HUD 게이지 ·
+         캐릭터 연출(질주 잔상·발차기 스윙/충격파·슬라이딩 잔디/데칼·다이빙 고스트·
+         세리머니 색종이·스턴 별·땀방울·에이스 링) · 확실한 킥오프 세리머니 */
 (function (global) {
   'use strict';
 
@@ -86,7 +90,7 @@
     pressing: {
       key: 'pressing', label: '압박 강도', short: '압박',
       opts: [
-        { v: 'low', label: '낮음', short: '낮음' },
+        { v: 'low', label: '낮게', short: '낮게' },
         { v: 'normal', label: '보통', short: '보통' },
         { v: 'high', label: '전방 압박', short: '전방' }
       ]
@@ -94,15 +98,15 @@
     line: {
       key: 'line', label: '수비 라인', short: '라인',
       opts: [
-        { v: 'deep', label: '내리기', short: '내리기' },
-        { v: 'standard', label: '표준', short: '표준' },
-        { v: 'high', label: '올리기', short: '올리기' }
+        { v: 'deep', label: '라인 내리기', short: '내리기' },
+        { v: 'standard', label: '라인 유지', short: '유지' },
+        { v: 'high', label: '라인 올리기', short: '올리기' }
       ]
     },
     focus: {
       key: 'focus', label: '공격 루트', short: '루트',
       opts: [
-        { v: 'balance', label: '밸런스', short: '밸런스' },
+        { v: 'balance', label: '양쪽 루트', short: '양쪽' },
         { v: 'left', label: '좌측', short: '좌측' },
         { v: 'center', label: '중앙', short: '중앙' },
         { v: 'right', label: '우측', short: '우측' }
@@ -310,6 +314,22 @@
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
   var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
+  /* ═════════ v25 — 실시간 전술카드 피치 오버레이 · 캐릭터 연출 · 킥오프 세리머니 ═════════ */
+  var CARD_LIST = [];             /* data.js 12종 전술카드 (fx 1:1) */
+  var CARD_BY_FX = {};            /* fx → card def */
+  var cardAce = {};               /* fx → 그 카드로 지정된 에이스 선수 */
+  var cardHitCount = {};          /* QA — 카드별 발동 횟수 */
+  var parts = [];                 /* 통합 파티클 (먼지·불꽃·색종이·별·잔상·충격파) */
+  var decals = [];                /* 지면 데칼 (슬라이딩 마크) */
+  var v25t = {                    /* v25 계측기 */
+    spawn: 0, peak: 0, cards: 0, overlays: 0, confetti: 0,
+    dive: 0, tackle: 0, save: 0, kickSwing: 0, passWave: 0, aura: 0,
+    kickoff: 0, kickoffPass: 0, chain: 0, maxParts: 0
+  };
+  var pressChain = { n: 0, t: 0 }; /* 압박 트리거 — 연속 압박 보장 횟수 */
+  var kick = null;                 /* 킥오프 세리머니 상태 */
+  var firstKickSide = 'home';      /* 전반 킥오프 팀 (후반은 반대 팀) */
+  var halfNo = 1;
   var shake = { t: 0, t0: 0.3, mag: 0 };   /* 슛·골·선방 순간 카메라 흔들림 */
   var flash = { t: 0, t0: 2.4, side: 'home', score: '0 : 0', name: '' };   /* 골 전광판 */
   var artGateOn = false;          /* 22명 초상화가 준비될 때까지 킥오프를 잠깐 미룬다 */
@@ -928,9 +948,10 @@
     var df = lineYOf(side);
     var dir = goalDir(side);            /* 공격 방향 */
     /* v14 — 감독 전술: 더블 볼란테·역습형은 두 줄 간격을 좁혀 컴팩트 블록 */
-    var bank = Math.max(6.4, sh.bank + (styleOf(side).blockBank - 12.6));
+    /* v25 ② — 줄 간격을 조금 넓혀 블록이 세 줄로 또렷하게 서고, 볼 주변에 인원이 몰리는 체감을 줄인다 */
+    var bank = Math.max(8.2, (sh.bank + (styleOf(side).blockBank - 12.6)) * 1.16);
     if (group === 'MF') { return df + dir * bank; }
-    if (group === 'FW') { return df + dir * (bank * 2.05 + (styleOf(side).fwStay || 0)); }
+    if (group === 'FW') { return df + dir * (bank * 2.18 + (styleOf(side).fwStay || 0)); }
     return df;
   }
 
@@ -1257,8 +1278,18 @@
       });
     }
     for (var k in buffs) {
-      if (buffs.hasOwnProperty(k) && buffs[k] > 0) { out.buffs.push({ key: k, left: Math.ceil(buffs[k]) }); }
+      if (!buffs.hasOwnProperty(k) || !(buffs[k] > 0)) { continue; }
+      var cdef = CARD_BY_FX[k];
+      out.buffs.push({
+        key: k, left: Math.ceil(buffs[k]),
+        name: cdef ? cdef.name : k, tag: cdef ? cdef.tag : '',
+        color: cdef ? cdef.color : '#c8f169', icon: cdef ? cdef.icon : 'zap',
+        dur: cdef ? cdef.dur : 20,
+        pct: cdef ? Math.round(clamp(buffs[k] / cdef.dur, 0, 1) * 100) : 100,
+        ace: cardAce[k] ? cardAce[k].name : ''
+      });
     }
+    out.kick = kick ? { label: kick.label, side: kick.side, t: Math.round(kick.t * 100) / 100, t0: kick.t0 } : null;
     return out;
   }
   function pushHud() {
@@ -1286,16 +1317,21 @@
     var host = document.getElementById('m-cutin');
     if (!host) { return; }
     var img = ace ? DS.Art.headSrc(ace.player) : '';
+    var art = DS.tacticArtHTML(def.key, 'cutac');
     host.innerHTML =
       '<div class="cutin" style="--cc:' + def.color + '">' +
       '<div class="cutin-lines"></div>' +
-      '<div class="cutin-art">' + (img ? '<img src="' + img + '" alt="">' : '') + '</div>' +
+      '<div class="cutin-art">' + art +
+      (img ? '<span class="cutin-face"><img src="' + img + '" alt="">' +
+        (ace ? '<b>' + ace.name + '</b>' : '') + '</span>' : '') +
+      '</div>' +
       '<div class="cutin-body">' +
-      '<div class="cutin-tag">MOMENTUM CARD · ' + def.tag + '</div>' +
+      '<div class="cutin-tag">LIVE TACTICS · ' + def.tag + '</div>' +
       '<div class="cutin-name">' + def.name + '</div>' +
       '<div class="cutin-en">' + def.en + '</div>' +
       (ace ? '<div class="cutin-ace">' + ace.name + ' 발동</div>' : '') +
       '<div class="cutin-desc">' + def.desc + '</div>' +
+      '<div class="cutin-live"><i></i>피치에 즉시 대입 — 오라·전술선이 살아 있습니다</div>' +
       '</div></div>';
     host.classList.add('on');
     global.setTimeout(function () {
@@ -1346,15 +1382,29 @@
     return true;
   };
 
+  /* v25 검증용 — 모멘텀·개수 제한 없이 카드 효과를 직접 발동한다 (헤드리스 QA · 콘솔 확인용) */
+  M.qaCard = function (key) {
+    var def = DS.cardOf ? DS.cardOf(key) : null;
+    if (!def || !M.running) { return false; }
+    applyCard(def);
+    hudDirty = true;
+    pushHud();
+    return true;
+  };
+
   function applyCard(def) {
     var fx = def.fx;
     buffs[fx] = Math.max(buffs[fx] || 0, def.dur);
     var ace = aceFor(fx);
     if (ace) { ace.glow = 2.4; addRating(ace, 0.12); }
+    cardAce[fx] = ace;
+    cardHitCount[fx] = (cardHitCount[fx] || 0) + 1;
+    v25t.cards++;
     playCutin(def, ace);
+    cardBurst(def, ace);
 
     if (fx === 'setpiece') { setPieceCard(); }
-    if (fx === 'trigger') { pressTrigger(); }
+    if (fx === 'trigger') { pressTrigger(); pressChain = { n: 2, t: 0.8 }; }
     if (fx === 'roar') { roar(); }
     if (fx === 'offside') { offsideTrap(); }
     if (fx === 'longshot' && ace) { bubble(ace, '🔥 대포알 준비!', '#ffb066'); }
@@ -1364,7 +1414,55 @@
 
     if (cfg.onCard) { cfg.onCard(def.key, ace ? ace.name : ''); }
     say('🎴 ' + def.name + ' 발동! ' + def.desc, 'tactic');
+    sayExp('지금 피치 위 ' + (ace ? short(ace.name) + ' 주변' : '전체') + '에 ' + def.name + '가 걸렸습니다. 초록 오라와 전술선을 보세요.');
     hudDirty = true;
+  }
+
+  /* v25 ① — 카드 발동 순간, 피치 위로 전술이 퍼져 들어오는 연출 */
+  function cardBurst(def, ace) {
+    var p = ace || (ball.carrier && ball.carrier.side === 'home' ? ball.carrier : null);
+    var wx = p ? p.x : 50, wy = p ? p.y : 60;
+    var col = def.color;
+    spawnPart({ kind: 'wave', x: wx, y: wy, t0: 0.62, size: 9, color: hexA(col, 0.95), a0: 0.8, flat: 0.45 });
+    spawnPart({ kind: 'wave', x: wx, y: wy, t0: 0.9, size: 16, color: hexA(col, 0.8), a0: 0.5, flat: 0.45 });
+    fxSparks(wx, wy, 9, col, 7);
+    if (p) { p.skillT = Math.max(p.skillT || 0, 1.4); }
+  }
+
+  /* v25 — 압박 트리거 2연속 압박: 카드 설명대로 두 번은 확실히 붙는다 */
+  function firePressChain() {
+    var c = ball.carrier, i, p, best = null, bd = 999;
+    if ((buffs.trigger || 0) <= 0) { pressChain = { n: 0, t: 0 }; return; }
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off || isGK(p)) { continue; }
+      var dd = Math.hypot(p.x - ball.x, p.y - ball.y);
+      if (dd < bd) { bd = dd; best = p; }
+    }
+    pressChain.n -= 1;
+    pressChain.t = 1.15;
+    v25t.chain++;
+    if (!best) { return; }
+    if (c && c.side === 'away' && bd < 26) {
+      c.stun = Math.max(c.stun, 0.6);
+      setPose(best, 'tackle', 0.45);
+      fxGrass(best, 6);
+      fxSlideMark(best, 3.0);
+      fxRing(best, '#c8c23a', 0.9);
+      fxPop(best, 0.24);
+      addRating(best, 0.16);
+      addRating(c, -0.05);
+      giveBall(best);
+      charge(1.3);
+      bubble(best, '🛡️ 2차 압박!', '#c8c23a', 1.3);
+      say('⚡ 2차 압박! ' + U.josa(short(best.name), '이/가') + ' 다시 공을 빼앗습니다!', 'tackle');
+      SND.tackle();
+    } else {
+      best.skillT = Math.max(best.skillT || 0, 0.8);
+      fxRing(best, '#c8c23a', 0.7);
+      bubble(best, '🛡️ 압박 유지!', '#c8c23a', 1.1);
+    }
+    if (pressChain.n <= 0) { pressChain = { n: 0, t: 0 }; }
   }
 
   function setPieceCard() {
@@ -1437,6 +1535,8 @@
     SND.init();
     SND.ambientOn();
     players = makeHomePlayers(cfg.lineup).concat(makeAwayPlayers(cfg.awayPlayers, cfg.awayFormation));
+    /* v25 — 피치 팀 링을 유니폼 색으로 (스코어보드와 통일) */
+    applyTeamColors();
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
     var pi;
     for (pi = 0; pi < players.length; pi++) {
@@ -1495,6 +1595,15 @@
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
     spriteCache = {};
     ripples = [];
+    /* v25 — 전술 오버레이·파티클·데칼·킥오프 상태 초기화 */
+    initCards();
+    parts = []; decals = []; cardAce = {}; cardHitCount = {};
+    pressChain = { n: 0, t: 0 };
+    v25t = {
+      spawn: 0, peak: 0, cards: 0, overlays: 0, confetti: 0,
+      dive: 0, tackle: 0, save: 0, kickSwing: 0, passWave: 0, aura: 0,
+      kickoff: 0, kickoffPass: 0, chain: 0, maxParts: 0
+    };
     /* v17 연출 상태 초기화 */
     capOn = true; capAcc = 0; capBuf = [];
     replay = { on: false, frames: [], i: 0, t: 0, dur: 3.0, xg: 0, scorer: '', assist: '', min: 0 };
@@ -1526,7 +1635,14 @@
     }
     resetCamera();
     relaxBases();
-    resetKickoff(Math.random() < 0.5 ? 'home' : 'away');
+    /* v25 ③ — 경기 진입은 '확실한 킥오프'로 시작한다: 정렬 → 휘슬 → 첫 패스 */
+    firstKickSide = Math.random() < 0.5 ? 'home' : 'away';
+    halfNo = 1;
+    resetKickoff(firstKickSide, {
+      label: '1ST HALF KICK-OFF',
+      sub: cfg.homeShort + ' vs ' + cfg.awayShort + ' · ' + (firstKickSide === 'home' ? cfg.homeShort : cfg.awayShort) + ' 킥오프',
+      dur: 1.1
+    });
     /* v21b — 첫 rAF가 첫 물리 스텝보다 먼저 그리면 보간 기준값(px/py)이 없어
        공 좌표가 NaN이 되고 createRadialGradient가 예외를 던졌다. 시작 시점에 기준값을 심는다. */
     var pi0;
@@ -1564,10 +1680,23 @@
   };
   M.pause = function () { M.paused = true; };
   M.resume = function (quiet) {
+    var wasHalf = !!M.halftime;
     if (M.halftime) { deadTime = 0; }
     M.paused = false;
     M.halftime = false;
     lastT = 0;
+    /* v25 ③ — 후반 시작도 '확실한 킥오프': 반대 팀이 센터에서 시작한다 */
+    if (wasHalf) {
+      halfNo = 2;
+      var s2 = firstKickSide === 'home' ? 'away' : 'home';
+      resetKickoff(s2, {
+        label: '2ND HALF KICK-OFF',
+        sub: '후반 시작 · ' + teamShort(s2) + ' 킥오프',
+        dur: 1.1
+      });
+      if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
+      return;
+    }
     if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
   };
   var autoCards = false;
@@ -1880,11 +2009,11 @@
     var body = document.getElementById('m-comm-body');
     if (body) { body.innerHTML = ''; }
   }
-  function banner(text, sub) {
+  function banner(text, sub, cls) {
     var el = document.getElementById('m-banner');
     if (!el) { return; }
+    el.className = 'goal-banner on' + (cls ? ' ' + cls : '');
     el.innerHTML = '<div class="gb-text">' + text + '</div>' + (sub ? '<div class="gb-sub">' + sub + '</div>' : '');
-    el.classList.add('on');
     bannerT = 2.6;
   }
   function clearBanner() {
@@ -1923,6 +2052,19 @@
     }
     el.className = 'sit on tone-' + meta.tone;
     el.innerHTML = '<i></i><b>' + meta.label + '</b><span>' + team + (extra || meta.sub) + '</span>';
+    /* v25 — 같은 상황 문구가 20초 넘게 붙어 있지 않게 스스로 닫힌다 */
+    play.sitHold = 7.5;
+  }
+
+  function tickSit(dt) {
+    if (play.sitHold > 0) {
+      play.sitHold -= dt;
+      if (play.sitHold <= 0) {
+        var el = document.getElementById('m-sit');
+        if (el) { el.className = 'sit off'; }
+        play.sitKey = '';
+      }
+    }
   }
 
   /* ─────────────────────────  포지셔닝 · AI  ───────────────────────── */
@@ -2018,7 +2160,7 @@
     list.sort(function (a, b) { return a.d - b.d; });
     var dir = goalDir(carrier.side);
     /* v14 — 감독 전술: 티키타카는 삼각 거리를 좁히고, 직선 롱볼은 넓게 벌린다 */
-    var gap = styleOf(carrier.side).supportGap;
+    var gap = styleOf(carrier.side).supportGap * 1.16;   /* v25 — 지원 삼각을 조금 더 넓게 */
     /* 좌우로 벌린 두 명 + 앞쪽 한 명 — 세 방향이 겹치지 않게 고른다 */
     var wantL = null, wantR = null, wantF = null, j, it;
     for (j = 0; j < list.length; j++) {
@@ -2200,12 +2342,12 @@
     if (ball.x < 40) { play.boxLeft = true; }
     else if (ball.x > 60) { play.boxLeft = false; }
     if (play.boxLeft == null) { play.boxLeft = true; }
-    var nearX = play.boxLeft ? 42 : 58, farX = 100 - nearX;
+    var nearX = play.boxLeft ? 40 : 60, farX = 100 - nearX;
     var slots = [
-      { name: '니어포스트', x: nearX, d: 15.0 },
-      { name: '페널티스팟', x: 50, d: 20.5 },
-      { name: '파포스트', x: farX, d: 15.0 },
-      { name: '아크정면', x: 50 + (play.boxLeft ? 4 : -4), d: 29.0 }
+      { name: '니어포스트', x: nearX, d: 16.5 },
+      { name: '페널티스팟', x: 50, d: 22.0 },
+      { name: '파포스트', x: farX, d: 16.5 },
+      { name: '아크정면', x: 50 + (play.boxLeft ? 5 : -5), d: 30.5 }
     ];
     for (i = 0; i < players.length; i++) {
       p = players[i];
@@ -2256,18 +2398,19 @@
     var a = anchorOf(p);
     var push = stagePush(p, st);
     var g = groupOf(p);
-    var kx = g === 'DF' ? 0.17 : (g === 'MF' ? 0.19 : 0.13);   /* v8: 볼 쪽 압축을 줄여 포메이션 대형을 지킨다 */
-    var ky = g === 'DF' ? 0.08 : (g === 'MF' ? 0.11 : 0.12);
-    var spread = 0.94 + clamp(m.width + sty.width, 20, 99) / 100 * 0.52;   /* 폭 지표 + 감독 전술 */
-    /* 공에서 먼 선수일수록 자기 구역을 지킨다 (전원이 볼로 몰리지 않게) */
-    var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 18) / 55, 0.14, 1);
+    /* v25 ② — 공 쪽 압축을 더 줄여 22명이 한 구역에 뭉치는 체감을 완화한다 */
+    var kx = g === 'DF' ? 0.11 : (g === 'MF' ? 0.12 : 0.09);
+    var ky = g === 'DF' ? 0.06 : (g === 'MF' ? 0.08 : 0.09);
+    var spread = 1.00 + clamp(m.width + sty.width, 20, 99) / 100 * 0.52;   /* 폭 지표 + 감독 전술 */
+    /* 공에서 먼 선수일수록 자기 구역을 지킨다 (전원이 볼로 몰리지 않게) — v25: 거리 감쇠를 더 급하게 */
+    var hold = clamp(1 - (Math.hypot(p.x - ball.x, p.y - ball.y) - 14) / 40, 0.08, 1);
     var tx = 50 + (a.x - 50) * spread + (ball.x - 50) * kx * hold;
     var ty = a.y + (ball.y - 60) * ky * hold + z.dir * push;
 
     /* 반대편 윙어는 폭을 유지해 전환 패스 각을 만든다 */
     var farWing = (a.x < 38 && ball.x > 62) || (a.x > 62 && ball.x < 38);
     if (farWing && !isFwdGroup(p) && st !== 'final') {
-      tx = 50 + (a.x - 50) * (spread + 0.10);
+      tx = 50 + (a.x - 50) * (spread + 0.16);
     }
 
     /* 측면: 윙어·윙백은 전 구간에서 터치라인을 넓게 쓴다 */
@@ -2595,8 +2738,8 @@
       else { lineY = Math.min(lineY, Math.max(capY, 5)); }
     }
     lineY = clamp(lineY, 5, WORLD_H - 5);
-    var bank = Math.max(6.4, Math.abs(bankYOf(side, 'MF') - lineYOf(side)));      /* DF↔MF 간격 */
-    var fwGap = Math.max(bank * 2.02, Math.abs(bankYOf(side, 'FW') - lineYOf(side)));
+    var bank = Math.max(8.2, Math.abs(bankYOf(side, 'MF') - lineYOf(side)));      /* DF↔MF 간격 */
+    var fwGap = Math.max(bank * 2.18, Math.abs(bankYOf(side, 'FW') - lineYOf(side)));
     var widthK = clamp(0.93 + (clamp(m.width + sty.width, 20, 99) - 60) / 100 * 0.30, 0.86, 1.04);
     widthK *= sh.width;                                   /* 수비 전술은 폭을 조금 좁힌다 */
     var b = {
@@ -2740,6 +2883,25 @@
       if (Math.abs(dx) > 0.4) { p.facing = dx > 0 ? 1 : -1; }
       p.moving = true;
       p.speed = spd;
+      /* v25 ② — 전력 질주·드리블 잔상(trail) + 발밑 잔디 먼지 */
+      var ti;
+      if (p.trail) {
+        for (ti = p.trail.length - 1; ti >= 0; ti--) {
+          p.trail[ti].t += dt;
+          if (p.trail[ti].t > 0.3) { p.trail.splice(ti, 1); }
+        }
+      }
+      if (!isGK(p) && spd > 12.2) {
+        p.trailT = (p.trailT || 0) + dt;
+        if (p.trailT > 0.05) {
+          p.trailT = 0;
+          if (!p.trail) { p.trail = []; }
+          p.trail.push({ x: p.x, y: p.y, t: 0 });
+          if (p.trail.length > 4) { p.trail.shift(); }
+        }
+      }
+      p.dustT = (p.dustT || 0) + dt;
+      if (spd > 11.4 && p.dustT > 0.12) { p.dustT = 0; fxDust(p, 1, 0.75); }
     } else {
       p.vx = 0; p.vy = 0; p.moving = false; p.frame = 0; p.speed = 0;
     }
@@ -2776,7 +2938,7 @@
      v8~v15는 화면 최소 간격을 토큰 지름의 0.70배로 두고, 공 소유자 쌍은 0.26배까지 풀어 줘서
      GK·공격수·수비수가 한 점에서 한 덩어리로 보였다. v16은 예외 없이 모든 쌍을
      '토큰 지름 × 1.18' 이상 벌리고, 3회 relaxation으로 매 틱 끝에서 강제한다. */
-  var SEP_K = 1.18;        /* 최소 중심 거리 = 토큰 지름 × 1.18 */
+  var SEP_K = 1.30;        /* v25 ② — 최소 중심 거리 = 토큰 지름 × 1.30 (몰려 보이는 체감 완화) */
   var sepMove = 0;         /* 계측: 이번 틱 분리로 밀린 총 거리(월드 단위) */
   function separate() {
     var i, j, a, b, dx, dy, rt, sx, sy, dpx, minPx, push, ux, uy, sa, sb, pass, m;
@@ -3321,6 +3483,8 @@
     kickBall(p, tx, ty, speed, 'pass', q, (type === 'short' || type === 'cutback' || type === 'wall') ? 0 : 1);
     setPose(p, type === 'cross' || type === 'through' ? 'kick' : 'pass', 0.28);
     fxRing(p, type === 'through' ? '#9ff0c4' : (type === 'cross' ? '#ffd98a' : '#c8f169'), 0.62);
+    fxPassWave(p, tx, ty, type === 'through' ? '#9ff0c4' : (type === 'cross' ? '#ffd98a' : '#c8f169'));
+    if (type === 'cross' || type === 'through') { fxKickSwing(p, 1.1, '#fff2c0'); }
     fxPop(p, 0.22);
     ball.assist = p;
     ball.passFlag = true;              /* v18 ④ 계측: 이 공은 '패스'에서 나왔다 */
@@ -3637,6 +3801,9 @@
     if (p.side === 'home') { charge(1.8); }
     setPose(p, 'kick', 0.38);
     fxRing(p, longshot ? '#ffb066' : '#ffe28a', 0.95);
+    fxKickSwing(p, longshot ? 2.4 : 1.2, longshot ? '#ffb066' : '#fff2c0');
+    fxSparks(p.x, p.y, longshot ? 10 : 5, longshot ? '#ffb066' : '#ffe28a', longshot ? 9 : 6);
+    fxDust(p, 4, 1.2);
     kickCam(longshot ? 1.4 : 1.0, 0.16);
     fxPop(p, 0.34);
     SND.kick(1);
@@ -3883,6 +4050,9 @@
     if (gk.side === 'home') { charge(2.2); }
     bubble(gk, '🧤 슈퍼 세이브!', '#9fe8ff', 1.6);
     fxRing(gk, '#9fe8ff', 1.15);
+    /* v25 ② — 선방 성공: 방패/섬광 링 + 글러브 섬광 */
+    fxShieldRing(gk);
+    fxKickSwing(gk, 1.4, '#d8f6ff');
     kickCam(2.0, 0.26);
     fxPop(gk, 0.42);
     SND.groan();
@@ -3939,7 +4109,7 @@
     flash.score = M.homeScore + ' : ' + M.awayScore;
     fxPop(scorer, 0.5);
     bubble(scorer, '⚽ 골!', '#ffe98a', 1.8);
-    banner('GOAL!', short(scorer.name) + (isHome ? ' · ' + cfg.homeName : ' · ' + cfg.awayName));
+    banner('GOAL!', short(scorer.name) + (isHome ? ' · ' + cfg.homeName : ' · ' + cfg.awayName), 'goalnote');
     bannerT = 3.4;
     dead(1.5);
     setSit('goal', short(scorer.name) + ' 득점', true);
@@ -3987,6 +4157,11 @@
     }
     goalStage = 'celebrate';
     goalT = 1.8;
+    /* v25 ② — 세리머니 색종이·환호 파동: 득점자와 합류 동료 위로 터진다 */
+    fxConfetti(scorer.x, scorer.y, 24);
+    spawnPart({ kind: 'wave', x: scorer.x, y: scorer.y, t0: 0.7, size: 16, color: '#ffe98a', a0: 0.8, flat: 0.45 });
+    for (i = 0; i < cel.joins.length; i++) { fxConfetti(cel.joins[i].x, cel.joins[i].y, 6); }
+    v25t.confetti++;
     capOn = false;
     replay.scorer = scorer.name;
     replay.assist = assistName || '';
@@ -4139,6 +4314,11 @@
     setPose(defender, 'tackle', 0.52);
     fxRing(defender, buffOf('press') > 0 ? '#ff9f8a' : '#ffd98a', 0.78);
     fxPop(defender, 0.26);
+    /* v25 ② — 슬라이딩 잔디 뜯김·흙먼지 + 지면에 남는 슬라이딩 마크 */
+    fxGrass(defender, 7);
+    fxDust(defender, 4, 1.4);
+    fxSlideMark(defender, 3.6);
+    v25t.tackle++;
     /* v18 ④ — 태클·경합에서 발끝에 맞은 공이 터치라인 밖으로 흘러 스로인이 된다 */
     if (chance(0.30)) {
       bubble(defender, '💥 튕겨 나간다!', '#ffd98a', 1.1);
@@ -4653,44 +4833,141 @@
     if (side === 'home') { charge(1.2); }
   }
 
-  /* ─────────────────────────  리셋  ───────────────────────── */
-  function resetKickoff(side) {
-    var i, p;
+  /* ─────────────────────────  리셋  ─────────────────────────
+     v25 ③ — 킥오프 세리머니: 양 팀이 자기 진영에 정확히 자리 잡고(KICK-OFF 포메이션),
+     0.9~1.1초 동안 휘슬·파동 링·배너를 보여 준 뒤, 센터 서클 키커가 실제 첫 패스를
+     하며 경기가 출발한다. 멈춰 서서 어중간하게 시작하는 프레임을 없했다. */
+  function kickoffPositions(kickSide) {
+    var i, p, home;
     for (i = 0; i < players.length; i++) {
       p = players[i];
-      p.x = p.baseX; p.y = p.baseY; p.tx = p.baseX; p.ty = p.baseY;
+      if (p.off) { continue; }
+      home = p.side === 'home';
+      p.x = clamp(p.baseX, 4, WORLD_W - 4);
+      p.y = home ? clamp(p.baseY, 61.2, WORLD_H - 3) : clamp(p.baseY, 3, WORLD_H - 61.2);
+      p.tx = p.x; p.ty = p.y;
+      p.vx = 0; p.vy = 0; p.moving = false; p.speed = 0; p.frame = 0;
       p.stun = 0; p.diveT = 0; p.bubble = null; p.throughRun = null;
       p.mark = null; p.dribbleT = 0; p.setPos = null; p.pose = null; p.poseT = 0;
+      p.popT = 0; p.kind = isGK(p) ? 'gk' : 'keep';
     }
-    ball.x = 50; ball.y = WORLD_H / 2; ball.vx = 0; ball.vy = 0;
+    /* 수비 팀은 센터 서클(반지름 9.15) 밖으로 물러난다 */
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.off || p.side === kickSide) { continue; }
+      if (p.side === 'home') { p.y = Math.max(p.y, 69.8); }
+      else { p.y = Math.min(p.y, 50.2); }
+      p.tx = p.x; p.ty = p.y;
+    }
+    /* 키커 두 명 — 공 바로 뒤와 그 옆. 화면상 자기 골문 쪽이 뒤가 된다. */
+    var list = [], dir = goalDir(kickSide);
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.off || p.side !== kickSide || isGK(p)) { continue; }
+      list.push(p);
+    }
+    list.sort(function (a, b) {
+      var wa = (isFwdGroup(a) ? 2 : (isMidGroup(a) ? 1 : 0));
+      var wb = (isFwdGroup(b) ? 2 : (isMidGroup(b) ? 1 : 0));
+      if (wb !== wa) { return wb - wa; }
+      return Math.hypot(a.x - 50, a.y - 60) - Math.hypot(b.x - 50, b.y - 60);
+    });
+    var k1 = list[0] || null, k2 = list[1] || null;
+    if (k1) {
+      k1.x = 50; k1.y = 60 - dir * 0.9;
+      k1.tx = k1.x; k1.ty = k1.y;
+      k1.facing = 1;
+    }
+    if (k2) {
+      k2.x = 46.5; k2.y = 60 - dir * 3.4;
+      k2.tx = k2.x; k2.ty = k2.y;
+    }
+    return { k1: k1, k2: k2 };
+  }
+
+  function kickoffSetup(kickSide, label, sub, dur) {
+    var pair = kickoffPositions(kickSide);
+    ball.x = 50; ball.y = WORLD_H / 2; ball.vx = 0; ball.vy = 0; ball.z = 0; ball.vz = 0;
     ball.carrier = null; ball.from = null; ball.receiver = null;
     ball.kind = 'idle'; ball.shot = null; ball.trail = [];
-    ball.offside = null; ball.exempt = false;
-    var starter = null;
-    for (i = 0; i < players.length; i++) {
-      if (players[i].side === side && isMidGroup(players[i]) && !isGK(players[i])) { starter = players[i]; break; }
+    ball.offside = null; ball.exempt = true;
+    ball.px = ball.x; ball.py = ball.y; ball.pz = 0;
+    play.phase = 'kickoff';
+    play.stage = 'build'; play.stageT = 0;
+    play.atkSide = kickSide;
+    play.counterT = 0; play.recoverT = 0; play.passLine = null; play.setpiece = null;
+    kick = {
+      side: kickSide, t: 0, t0: dur || 1.0, label: label || 'KICK OFF', sub: sub || '',
+      k1: pair.k1, k2: pair.k2, acc: 0, rings: 0
+    };
+    v25t.kickoff++;
+    setSit('kickoff', label + ' · ' + teamShort(kickSide), true);
+    banner(label, sub, 'kick');
+    bannerT = 1.5;
+    SND.whistle(0.9);
+    spawnPart({ kind: 'wave', x: 50, y: 60, t0: 0.75, size: 8, color: '#c8f169', a0: 0.8, flat: 0.42 });
+    spawnPart({ kind: 'wave', x: 50, y: 60, t0: 0.95, size: 13, color: '#eaffd0', a0: 0.5, flat: 0.42 });
+  }
+
+  /* 세리머니 동안 매 프레임 — 링이 퍼지고, 끝나면 실제 첫 패스로 경기를 연다 */
+  function kickoffTick(dt) {
+    if (!kick) { return; }
+    kick.t += dt;
+    kick.acc += dt;
+    if (kick.acc >= 0.28) {
+      kick.acc = 0;
+      kick.rings++;
+      spawnPart({ kind: 'wave', x: 50, y: 60, t0: 0.7, size: 7, color: '#c8f169', a0: 0.55, flat: 0.42 });
     }
-    if (!starter) {
+    if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) { bannerT = 0; clearBanner(); } }
+    if (kick.t >= kick.t0) { kickoffRelease(); }
+  }
+
+  function kickoffRelease() {
+    var k = kick, i, p, starter = null, mate = null, bestD = 999, dir;
+    if (!k) { return; }
+    kick = null;
+    play.phase = 'play';
+    v25t.kickoffPass++;
+    starter = k.k1;
+    if (!starter || starter.off) {
       for (i = 0; i < players.length; i++) {
-        if (players[i].side === side && !isGK(players[i])) { starter = players[i]; break; }
+        p = players[i];
+        if (p.side === k.side && !p.off && !isGK(p)) { starter = p; break; }
       }
     }
-    if (starter) {
-      starter.x = 50; starter.y = WORLD_H / 2 + goalDir(side) * 4;
-      giveBall(starter);
+    if (!starter) { return; }
+    dir = goalDir(k.side);
+    /* 첫 패스 상대 — 자기 골문 쪽(뒤)으로 내주는 짧은 패스. 없으면 옆 동료. */
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p === starter || p.off || p.side !== k.side || isGK(p)) { continue; }
+      var back = (p.y - starter.y) * -dir;       /* 뒤쪽일수록 + */
+      var dd = Math.hypot(p.x - starter.x, p.y - starter.y) + (back > 0 ? 0 : 6);
+      if (dd < bestD) { bestD = dd; mate = p; }
     }
+    giveBall(starter);
+    ball.exempt = true;
+    setPose(starter, 'pass', 0.3);
+    fxKickSwing(starter, 0.7, '#eaffd0');
+    if (mate) {
+      kickPass(starter, mate, 'short');
+      say('🎙 ' + U.josa(short(starter.name), '이/가') + ' 킥오프 패스로 경기를 엽니다!', 'big');
+    } else {
+      bubble(starter, '경기 시작!', '#eaffd0', 1.2);
+    }
+    SND.whistle();
     play.phase = 'play';
-    play.stage = 'build';
-    play.stageT = 0;
-    play.atkSide = side;
-    play.counterT = 0;
-    play.recoverT = 0;
+  }
+
+  function resetKickoff(side, opts) {
+    opts = opts || {};
+    kickoffSetup(side, opts.label || 'KICK OFF', opts.sub || '', opts.dur || 1.0);
     M.phase = 'play';
     goalStage = null;
     cel = null;
     netFx.t = 0;
     if (!replay.on) { resetCamera(); }
-    if (simTime > 0) { SND.whistle(); }
   }
 
   /* ─────────────────────────  메인 루프  ───────────────────────── */
@@ -4739,6 +5016,19 @@
     var pi;
     for (pi = 0; pi < players.length; pi++) { players[pi].px = players[pi].x; players[pi].py = players[pi].y; }
     ball.px = ball.x; ball.py = ball.y; ball.pz = ball.z;
+
+    /* v25 ③ — 킥오프 세리머니: 이 동안은 경기 시계도 선수도 멈춰 있다.
+       휘슬과 함께 키커가 첫 패스를 하면 그때 경기가 열린다. */
+    if (kick) {
+      kickoffTick(dt);
+      updateParts(dt);
+      updateDecals(dt);
+      crowdTick(dt);
+      updateCamera(dt);
+      if (hudDirty) { hudDirty = false; pushHud(); }
+      return;
+    }
+
     if (cutinHold > 0) { cutinHold -= dt; if (hudDirty) { hudDirty = false; pushHud(); } return; }
 
     var i;
@@ -4779,6 +5069,31 @@
     for (i = ripples.length - 1; i >= 0; i--) {
       ripples[i].t += dt;
       if (ripples[i].t >= ripples[i].t0) { ripples.splice(i, 1); }
+    }
+    /* v25 ② — 파티클·데칼 수명 */
+    updateParts(dt);
+    updateDecals(dt);
+    tickSit(dt);
+    /* v25 — 땀방울 (피로 40% 이하) · 스턴 별 */
+    for (i = 0; i < players.length; i++) {
+      var ps = players[i];
+      if (ps.off) { continue; }
+      if (ps.stam <= 40) {
+        ps.sweatT = (ps.sweatT || 0) + dt;
+        if (ps.sweatT > 0.85) {
+          ps.sweatT = 0;
+          spawnPart({
+            kind: 'sweat', x: ps.x + (ps.facing > 0 ? 0.5 : -0.5), y: ps.y, z: 1.4,
+            vx: (ps.moving ? ps.vx * 0.03 : 0) + range(-0.5, 0.5), vy: range(-0.7, 0.7), vz: -0.3,
+            g: 12, drag: 1.4, t0: 0.5, size: 0.9, color: 'rgba(150,224,255,0.95)', a0: 0.85, front: true
+          });
+        }
+      }
+    }
+    /* v25 — 압박 트리거의 2연속 압박 (카드 설명대로 두 번은 확실히 붙는다) */
+    if (pressChain.n > 0) {
+      pressChain.t -= dt;
+      if (pressChain.t <= 0) { firePressChain(); }
     }
     if (shake.t > 0) { shake.t -= dt; if (shake.t < 0) { shake.t = 0; } }
     if (flash.t > 0) { flash.t -= dt; if (flash.t < 0) { flash.t = 0; } }
@@ -4909,8 +5224,7 @@
     }
 
     if (play.phase === 'kickoff') {
-      play.timer -= dt;
-      if (play.timer <= 0) { play.phase = 'play'; }
+      play.phase = 'play';
     }
 
     /* 안전장치: 공이 경기장 밖으로 크게 벗어나면 루즈볼로 회수 (공이 무한히 날아가는 정지 방지) */
@@ -5151,10 +5465,67 @@
   /* ───────────────  그리기 (가로 피치 · 원형 초상화 토큰)  ───────────────
      v10: 피치 위 22명의 몸통을 지우고, 고유 얼굴을 담은 원형 토큰으로 그린다.
      원 바깥 두까운 링이 팀을 나누다 — 홈 = 생생한 파랑, 원정 = 생생한 빨강. */
+  var TEAM_FX_DEF = {
+    home: { ring: '#3b82f6', ring2: '#38bdf8', glow: 'rgba(56,189,248,0.95)', base: 'rgba(8,32,58,0.94)', base2: 'rgba(12,52,92,0.94)', text: '#d9f2ff' },
+    away: { ring: '#ef4444', ring2: '#f87171', glow: 'rgba(248,113,113,0.95)', base: 'rgba(52,10,14,0.94)', base2: 'rgba(92,18,24,0.94)', text: '#ffe2dc' }
+  };
   var TEAM_FX = {
     home: { ring: '#3b82f6', ring2: '#38bdf8', glow: 'rgba(56,189,248,0.95)', base: 'rgba(8,32,58,0.94)', base2: 'rgba(12,52,92,0.94)', text: '#d9f2ff' },
     away: { ring: '#ef4444', ring2: '#f87171', glow: 'rgba(248,113,113,0.95)', base: 'rgba(52,10,14,0.94)', base2: 'rgba(92,18,24,0.94)', text: '#ffe2dc' }
   };
+
+  /* v25 — 스코어보드·엠블럼과 같은 유니폼 색으로 피치 링을 맞춘다.
+     두 팀 색이 너무 비슷해 구분이 안 되면 기존 파랑/빨강으로 돌아간다. */
+  function hexRgb(h) {
+    var t = String(h || '').replace('#', '');
+    if (t.length === 3) { t = t.charAt(0) + t.charAt(0) + t.charAt(1) + t.charAt(1) + t.charAt(2) + t.charAt(2); }
+    var n = parseInt(t, 16);
+    if (!isFinite(n) || t.length < 6) { return null; }
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgbStr(rgb) { return rgb[0] + ',' + rgb[1] + ',' + rgb[2]; }
+  function mixRgb(a, b, t) {
+    return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+  }
+  function lumOf(rgb) { return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; }
+  function hueOf(rgb) {
+    var r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+    if (d < 1e-6) { return 0; }
+    if (mx === r) { h = ((g - b) / d) % 6; }
+    else if (mx === g) { h = (b - r) / d + 2; }
+    else { h = (r - g) / d + 4; }
+    h *= 60; if (h < 0) { h += 360; }
+    return h;
+  }
+  function hueGap(a, b) { var d = Math.abs(hueOf(a) - hueOf(b)); return d > 180 ? 360 - d : d; }
+  function applyTeamColors() {
+    var hk = (cfg && cfg.homeKit) || {}, ak = (cfg && cfg.awayKit) || {};
+    var h = hexRgb(hk.shirt || hk.a || ''), a = hexRgb(ak.shirt || ak.a || '');
+    var white = [255, 255, 255], dark = [4, 20, 15];
+    /* 두 유니폼이 사실상 같은 색이면(밝기·색상 모두 근접) 원정만 대비색으로 바꾼다.
+       그 외에는 각 팀 유니폼 색을 그대로 써서 스코어보드·엠블럼과 링 색을 일치시킨다. */
+    var clash = !!(h && a) && Math.abs(lumOf(h) - lumOf(a)) < 0.13 && hueGap(h, a) < 55;
+    function paint(side, rgb) {
+      var f = TEAM_FX[side];
+      if (!rgb) {
+        var d0 = TEAM_FX_DEF[side];
+        f.ring = d0.ring; f.ring2 = d0.ring2; f.glow = d0.glow;
+        f.base = d0.base; f.base2 = d0.base2; f.text = d0.text;
+        return;
+      }
+      f.ring = 'rgb(' + rgbStr(rgb) + ')';
+      f.ring2 = 'rgb(' + rgbStr(mixRgb(rgb, white, 0.45)) + ')';
+      f.glow = 'rgba(' + rgbStr(rgb) + ',0.95)';
+      f.base = 'rgba(' + rgbStr(mixRgb(rgb, dark, 0.74)) + ',0.94)';
+      f.base2 = 'rgba(' + rgbStr(mixRgb(rgb, dark, 0.56)) + ',0.94)';
+      f.text = 'rgb(' + rgbStr(mixRgb(rgb, white, 0.80)) + ')';
+    }
+    var awayRgb = a;
+    if (clash) { awayRgb = hexRgb(lumOf(h) > 0.45 ? '#2f6fb8' : '#e0503a'); }
+    paint('home', h);
+    paint('away', awayRgb);
+  }
 
   function roundRect(x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y);
@@ -5167,6 +5538,767 @@
     ctx.lineTo(x, y + r);
     ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     v25 ① — 실시간 전술카드 피치 오버레이
+     카드가 켜져 있는 동안(buffs[fx] > 0) 그 카드의 전술이 '지금' 피치에서 어떻게
+     움직이는지 그린다. 수치는 이미 엔진(buffOf)이 쓰고 있으므로 여기서는 눈으로
+     읽히게 만드는 일만 한다. 색은 카드 고유 색(def.color)을 그대로 쓴다.
+     ══════════════════════════════════════════════════════════════════════════ */
+  var TAU = Math.PI * 2;
+  var PART_CAP = 300;
+
+  function initCards() {
+    var i, d;
+    CARD_LIST = []; CARD_BY_FX = {};
+    if (!DS.CARDS) { return; }
+    for (i = 0; i < DS.CARDS.length; i++) {
+      d = DS.CARDS[i];
+      CARD_LIST.push(d); CARD_BY_FX[d.fx] = d;
+    }
+  }
+
+  function hexA(hex, a) {
+    var h = (hex || '#c8f169').replace('#', '');
+    if (h.length === 3) { h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2); }
+    var n = parseInt(h, 16);
+    if (!isFinite(n)) { n = 0xc8f169; }
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+
+  /* 월드 1단위가 화면에서 몇 px 인지 (피치 중앙 기준 근사) */
+  function w2px() {
+    var o = scr(50, 60), ax = scr(60, 60), ay = scr(50, 70);
+    return { x: Math.hypot(ax.x - o.x, ax.y - o.y) / 10, y: Math.hypot(ay.x - o.x, ay.y - o.y) / 10 };
+  }
+
+  function groundRing(wx, wy, rWorld, color, lw, alpha, flat) {
+    var g = scr(wx, wy), s = w2px();
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 0.85 : alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw || 1.4;
+    ctx.beginPath();
+    ctx.ellipse(g.x, g.y, Math.max(1, rWorld * s.x), Math.max(1, rWorld * s.y * (flat == null ? 0.46 : flat)), 0, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function arrowTo(x1, y1, x2, y2, color, lw, head, dash) {
+    var ang = Math.atan2(y2 - y1, x2 - x1);
+    var hd = head || 5;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw || 1.4;
+    ctx.lineCap = 'round';
+    if (dash) { ctx.setLineDash(dash); }
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    if (dash) { ctx.setLineDash([]); }
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - hd * Math.cos(ang - 0.44), y2 - hd * Math.sin(ang - 0.44));
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - hd * Math.cos(ang + 0.44), y2 - hd * Math.sin(ang + 0.44));
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 카드가 켜진 정도 — 켜질 때 0.22초 페이드인, 꺼지기 전 0.4초 페이드아웃 */
+  function cardLife(def) {
+    var left = buffs[def.fx] || 0;
+    if (left <= 0) { return 0; }
+    var elapsed = def.dur - left;
+    return Math.min(clamp(elapsed / 0.22, 0, 1), clamp(left / 0.4, 0, 1));
+  }
+
+  function activeCardList() {
+    var out = [], i, d;
+    for (i = 0; i < CARD_LIST.length; i++) {
+      d = CARD_LIST[i];
+      if ((buffs[d.fx] || 0) > 0) { out.push(d); }
+    }
+    return out;
+  }
+
+  /* 이 선수가 지금 받고 있는 전술 오라 (가장 먼저 켜진 카드 하나) */
+  function auraOf(p) {
+    if (!p || p.off || !p.side) { return null; }
+    var i, d;
+    for (i = 0; i < CARD_LIST.length; i++) {
+      d = CARD_LIST[i];
+      if ((buffs[d.fx] || 0) <= 0) { continue; }
+      if (p.side !== 'home') { continue; }
+      if (d.fx === 'def' || d.fx === 'offside') {
+        if (isDefGroup(p)) { return d; }
+        continue;
+      }
+      if (d.fx === 'press' || d.fx === 'trigger') {
+        if (!isGK(p) && (isMidGroup(p) || isFwdGroup(p))) { return d; }
+        continue;
+      }
+      if (d.fx === 'atk' || d.fx === 'through' || d.fx === 'longshot') {
+        if (isFwdGroup(p) || isWingerPos(p) || p.pos === 'AM') { return d; }
+        continue;
+      }
+      if (isGK(p)) { continue; }
+      return d;
+    }
+    return null;
+  }
+
+  function drawGroundAura(gx, gy, r, def) {
+    var col = def.color;
+    var t = simTime * 2.4 + (gx + gy) * 0.03;
+    ctx.save();
+    ctx.globalAlpha = 0.44 + 0.14 * Math.sin(t * 1.7);
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 5]);
+    ctx.lineDashOffset = -t * 9;
+    ctx.beginPath(); ctx.ellipse(gx, gy + 1.2, r * 1.52, r * 0.68, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.14 + 0.06 * Math.sin(t * 1.7);
+    ctx.fillStyle = hexA(col, 0.9);
+    ctx.beginPath(); ctx.ellipse(gx, gy + 1.2, r * 1.52, r * 0.68, 0, 0, TAU); ctx.fill();
+    /* 앞쪽 반원만 밝게 — 오라가 '살아 있다'는 느낌 */
+    ctx.globalAlpha = 0.72;
+    ctx.strokeStyle = hexA(col, 0.85);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(gx, gy + 1.2, r * 1.52, r * 0.68, 0, -0.9 + Math.sin(t) * 0.5, 0.9 + Math.sin(t) * 0.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ─────────────────────────  v25 ② — 파티클  ───────────────────────── */
+  function spawnPart(o) {
+    if (!o) { return null; }
+    if (parts.length >= PART_CAP) { parts.shift(); }
+    var q = {
+      kind: o.kind || 'dot', x: o.x || 0, y: o.y || 0, z: o.z || 0,
+      vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0,
+      g: o.g == null ? 30 : o.g, drag: o.drag == null ? 1.9 : o.drag,
+      t: 0, t0: o.t0 || 0.5, size: o.size || 1.5, color: o.color || '#ffffff',
+      a0: o.a0 == null ? 1 : o.a0, rot: o.rot || 0, vr: o.vr || 0,
+      front: !!o.front, ang: o.ang || 0, span: o.span || 0, flat: o.flat
+    };
+    parts.push(q);
+    v25t.spawn++;
+    if (!v25t.kinds) { v25t.kinds = {}; }
+    v25t.kinds[q.kind] = (v25t.kinds[q.kind] || 0) + 1;
+    if (parts.length > v25t.maxParts) { v25t.maxParts = parts.length; }
+    return q;
+  }
+
+  function updateParts(dt) {
+    var i, q;
+    for (i = parts.length - 1; i >= 0; i--) {
+      q = parts[i];
+      q.t += dt;
+      if (q.t >= q.t0) { parts.splice(i, 1); continue; }
+      if (q.kind === 'wave' || q.kind === 'ring' || q.kind === 'swing' || q.kind === 'passw' || q.kind === 'shield') { continue; }
+      q.vz -= q.g * dt;
+      q.z += q.vz * dt;
+      if (q.z < 0) { q.z = 0; if (q.vz < -1) { q.vz = -q.vz * 0.28; } else { q.vz = 0; } }
+      q.x += q.vx * dt;
+      q.y += q.vy * dt;
+      var dk = 1 - Math.min(0.9, q.drag * dt);
+      q.vx *= dk; q.vy *= dk;
+      q.rot += q.vr * dt;
+    }
+  }
+
+  function drawParts(front) {
+    var i, q, g, y, t, a, k, sz;
+    for (i = 0; i < parts.length; i++) {
+      q = parts[i];
+      if (!!q.front !== !!front) { continue; }
+      k = q.kind;
+      g = scr(q.x, q.y);
+      y = g.y - depthPx(q.z);
+      t = clamp(q.t / q.t0, 0, 1);
+      a = q.a0 * (1 - t);
+      if (a <= 0.01) { continue; }
+      sz = q.size;
+      ctx.save();
+      if (k === 'dot' || k === 'dust') {
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = q.color;
+        ctx.beginPath();
+        ctx.ellipse(g.x, y, sz * (0.7 + t * 1.5), sz * (0.7 + t * 1.5) * 0.62, 0, 0, TAU);
+        ctx.fill();
+      } else if (k === 'grass') {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = q.color;
+        ctx.translate(g.x, y);
+        ctx.rotate(q.rot);
+        ctx.fillRect(-sz * 0.9, -sz * 0.24, sz * 1.8, sz * 0.48);
+      } else if (k === 'spark') {
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = q.color;
+        ctx.lineWidth = Math.max(0.9, sz * 0.5);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(g.x, y);
+        ctx.lineTo(g.x - q.vx * 0.022, y - q.vy * 0.022 + q.vz * 0.012);
+        ctx.stroke();
+      } else if (k === 'conf') {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = q.color;
+        ctx.translate(g.x, y);
+        ctx.rotate(q.rot);
+        ctx.fillRect(-sz * 0.9, -sz * 0.45, sz * 1.8, sz * 0.9);
+      } else if (k === 'star') {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = q.color;
+        ctx.translate(g.x, y);
+        ctx.rotate(q.rot);
+        ctx.beginPath();
+        ctx.moveTo(0, -sz * 1.7); ctx.lineTo(sz * 0.45, -sz * 0.45); ctx.lineTo(sz * 1.6, 0);
+        ctx.lineTo(sz * 0.45, sz * 0.45); ctx.lineTo(0, sz * 1.7); ctx.lineTo(-sz * 0.45, sz * 0.45);
+        ctx.lineTo(-sz * 1.6, 0); ctx.lineTo(-sz * 0.45, -sz * 0.45);
+        ctx.closePath(); ctx.fill();
+      } else if (k === 'sweat') {
+        ctx.globalAlpha = a * 0.9;
+        ctx.fillStyle = q.color;
+        ctx.beginPath();
+        ctx.ellipse(g.x, y, sz * 0.55, sz * 0.95, 0, 0, TAU);
+        ctx.fill();
+      } else if (k === 'wave' || k === 'shield') {
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = q.color;
+        ctx.lineWidth = Math.max(0.8, 2.4 * (1 - t));
+        var rr = sz * (0.35 + t * 1.9);
+        ctx.beginPath();
+        ctx.ellipse(g.x, g.y, rr, rr * (q.flat == null ? 0.44 : q.flat), 0, 0, TAU);
+        ctx.stroke();
+      } else if (k === 'ring') {
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = q.color;
+        ctx.lineWidth = Math.max(0.8, 2.6 * (1 - t));
+        var rr2 = sz * (0.2 + t * 1.6);
+        ctx.beginPath(); ctx.arc(g.x, y, rr2, 0, TAU); ctx.stroke();
+      } else if (k === 'swing') {
+        ctx.globalAlpha = a * 0.95;
+        ctx.strokeStyle = q.color;
+        ctx.lineWidth = Math.max(1.1, 3.2 * (1 - t));
+        ctx.lineCap = 'round';
+        var sp = q.span || 1.5;
+        var a0 = q.ang - sp / 2 + sp * clamp(t * 1.6, 0, 1) - sp * 0.5;
+        ctx.beginPath();
+        ctx.arc(g.x, y, sz * (0.85 + t * 0.55), a0, a0 + sp * 0.85);
+        ctx.stroke();
+      } else if (k === 'passw') {
+        ctx.globalAlpha = a * 0.9;
+        ctx.strokeStyle = q.color;
+        ctx.lineWidth = Math.max(1, 2.6 * (1 - t));
+        var rr3 = sz * (0.18 + t * 1.15);
+        ctx.beginPath();
+        ctx.ellipse(g.x, g.y, rr3, rr3 * 0.5, 0, q.ang - 0.85, q.ang + 0.85);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /* 액션별 파티클 묶음 — 모두 같은 풀을 쓰고, 겹치면 오래된 것부터 버린다 */
+  function fxDust(p, n, power) {
+    if (!p) { return; }
+    var i, sp = power || 1;
+    for (i = 0; i < n; i++) {
+      spawnPart({
+        kind: 'dust', x: p.x + range(-0.7, 0.7), y: p.y + range(-0.7, 0.7), z: 0.1,
+        vx: -p.facing * range(1.4, 4.2) * sp + range(-1.2, 1.2),
+        vy: range(-2.4, 2.4) * sp, vz: range(0.4, 1.9) * sp,
+        g: 9, drag: 2.6, t0: 0.34 + Math.random() * 0.24,
+        size: 0.9 + Math.random() * 0.9, color: 'rgba(206,222,182,0.9)', a0: 0.62
+      });
+    }
+  }
+
+  function fxGrass(p, n) {
+    if (!p) { return; }
+    var i;
+    for (i = 0; i < n; i++) {
+      spawnPart({
+        kind: 'grass', x: p.x + range(-0.6, 0.6), y: p.y + range(-0.6, 0.6), z: 0.2,
+        vx: range(-4.5, 4.5), vy: range(-3.2, 3.2), vz: range(1.4, 4.4),
+        g: 26, drag: 1.2, t0: 0.48 + Math.random() * 0.4,
+        size: 0.8 + Math.random() * 1.0, rot: Math.random() * 6, vr: range(-9, 9),
+        color: Math.random() < 0.45 ? '#7fc63d' : '#4e8f2c', a0: 0.95
+      });
+    }
+  }
+
+  function fxSparks(x, y, n, color, spd) {
+    var i, s = spd || 7;
+    for (i = 0; i < n; i++) {
+      var a = Math.random() * TAU;
+      spawnPart({
+        kind: 'spark', x: x, y: y, z: range(0.2, 1.2),
+        vx: Math.cos(a) * range(0.5, s), vy: Math.sin(a) * range(0.5, s), vz: range(0.6, 4.2),
+        g: 24, drag: 2.2, t0: 0.24 + Math.random() * 0.22,
+        size: 1.2 + Math.random() * 1.2, color: color || '#ffe28a', a0: 1, front: true
+      });
+    }
+  }
+
+  function fxConfetti(x, y, n) {
+    var cols = ['#ffe28a', '#8ff0b6', '#78f2ff', '#ff9f8a', '#c3a6ff', '#ffffff', '#c8f169'];
+    var i;
+    for (i = 0; i < n; i++) {
+      spawnPart({
+        kind: 'conf', x: x + range(-2.5, 2.5), y: y + range(-1.6, 1.6), z: range(1.5, 4.5),
+        vx: range(-5.5, 5.5), vy: range(-4.5, 4.5), vz: range(6, 13),
+        g: 30, drag: 0.9, t0: 1.1 + Math.random() * 0.9,
+        size: 1.1 + Math.random() * 1.1, rot: Math.random() * 6, vr: range(-8, 8),
+        color: cols[(Math.random() * cols.length) | 0], a0: 1, front: true
+      });
+    }
+  }
+
+  /* 발차기 스윙 아크 — 찬 발 쪽으로 호가 그려지고 임팩트 링이 터진다 */
+  function fxKickSwing(p, power, color) {
+    if (!p) { return; }
+    v25t.kickSwing++;
+    spawnPart({
+      kind: 'swing', x: p.x, y: p.y, z: 0, t0: 0.3, size: 3.2 + (power || 1) * 1.5,
+      color: color || '#fff2c0', a0: 0.9, ang: p.side === 'home' ? 0 : Math.PI,
+      span: 1.7, front: true
+    });
+    spawnPart({ kind: 'wave', x: p.x, y: p.y, t0: 0.34, size: 2.2 + (power || 1) * 1.2, color: color || '#ffe28a', a0: 0.55, flat: 0.5 });
+  }
+
+  function fxPassWave(p, tx, ty, color) {
+    if (!p) { return; }
+    v25t.passWave++;
+    var a = Math.atan2(scr(tx, ty).y - scr(p.x, p.y).y, scr(tx, ty).x - scr(p.x, p.y).x);
+    spawnPart({ kind: 'passw', x: p.x, y: p.y, t0: 0.42, size: 3.0, color: color || '#c8f169', a0: 0.85, ang: a });
+  }
+
+  function fxShieldRing(p) {
+    if (!p) { return; }
+    v25t.save++;
+    spawnPart({ kind: 'shield', x: p.x, y: p.y, t0: 0.55, size: 4.4, color: '#9fe8ff', a0: 0.95, flat: 0.55 });
+    spawnPart({ kind: 'ring', x: p.x, y: p.y, z: 1.6, t0: 0.4, size: 5.2, color: '#e8fbff', a0: 0.9, front: true });
+    fxSparks(p.x, p.y, 5, '#bfeeff', 5);
+  }
+
+  /* 슬라이딩 마크 — 지면에 남았다가 서서히 사라진다 */
+  function fxSlideMark(p, len) {
+    if (!p) { return; }
+    decals.push({ x: p.x, y: p.y, ang: p.facing > 0 ? 0.22 : -0.22, life: 0, t0: 3.4, len: len || 3.4 });
+    if (decals.length > 14) { decals.shift(); }
+  }
+
+  function updateDecals(dt) {
+    var i;
+    for (i = decals.length - 1; i >= 0; i--) {
+      decals[i].life += dt;
+      if (decals[i].life >= decals[i].t0) { decals.splice(i, 1); }
+    }
+  }
+
+  function drawDecals() {
+    var i, d, g, t, s = w2px();
+    for (i = 0; i < decals.length; i++) {
+      d = decals[i];
+      g = scr(d.x, d.y);
+      t = clamp(d.life / d.t0, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = 0.30 * (1 - t);
+      ctx.fillStyle = 'rgba(38,74,30,0.95)';
+      ctx.translate(g.x, g.y);
+      ctx.rotate(d.ang);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, d.len * s.x * 0.5, d.len * s.y * 0.14, 0, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 0.16 * (1 - t);
+      ctx.fillStyle = 'rgba(120,90,52,0.9)';
+      ctx.beginPath();
+      ctx.ellipse(0, s.y * 0.05, d.len * s.x * 0.4, d.len * s.y * 0.09, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* v25 ③ — 킥오프 센터 서클 마커: 세리머니 동안 센터 스폿이 살아 있음을 보여 준다 */
+  function drawKickoffMark() {
+    if (!kick) { return; }
+    var g = scr(50, 60), s = w2px();
+    var k = clamp(kick.t / kick.t0, 0, 1);
+    var pulse = 0.5 + 0.5 * Math.sin(kick.t * 11);
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.4 * pulse;
+    ctx.strokeStyle = 'rgba(234,255,208,0.95)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * 9.15, s.y * 9.15 * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.55 * (1 - k * 0.4);
+    ctx.setLineDash([5, 5]);
+    ctx.lineDashOffset = -kick.t * 26;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * (10 + k * 7), s.y * (10 + k * 7) * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    /* 센터 스폿 */
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(234,255,208,0.95)';
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, 2.2 + pulse * 1.4, (2.2 + pulse * 1.4) * 0.5, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  /* ─────────────────────────  전술 오버레이 (카드별)  ───────────────────────── */  function drawCardOverlays() {
+    var i, d, a, shown = {};
+    for (i = 0; i < CARD_LIST.length; i++) {
+      d = CARD_LIST[i];
+      a = cardLife(d);
+      if (a <= 0.01) { continue; }
+      shown[d.fx] = 1;
+      v25t.overlays++;
+      if (d.fx === 'press' || d.fx === 'trigger') { ovPress(d, a); }
+      else if (d.fx === 'offside') { ovOffside(d, a); }
+      else if (d.fx === 'atk' || d.fx === 'through') { ovRuns(d, a); }
+      else if (d.fx === 'tiki' || d.fx === 'build') { ovTriangle(d, a); }
+      else if (d.fx === 'longshot') { ovLongshot(d, a); }
+      else if (d.fx === 'def') { ovIsolate(d, a); }
+      else if (d.fx === 'tempo' || d.fx === 'roar') { ovWave(d, a); }
+      else if (d.fx === 'setpiece') { ovSetpiece(d, a); }
+    }
+  }
+
+  /* 압박/트리거 — 볼 소유자 타겟 링 + 전방 압박 벡터선 */
+  function ovPress(d, a) {
+    var c = ball.carrier;
+    var tx = c ? c.x : ball.x, ty = c ? c.y : ball.y;
+    var g = scr(tx, ty), s = w2px();
+    var col = d.color;
+    var pulse = 0.5 + 0.5 * Math.sin(simTime * 6.4);
+    ctx.save();
+    ctx.globalAlpha = a * 0.95;
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * (6.4 + pulse * 1.5), s.y * (6.4 + pulse * 1.5) * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -simTime * 16;
+    ctx.globalAlpha = a * 0.75;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * 3.4, s.y * 3.4 * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    /* 조준선 4방향 틱 */
+    ctx.globalAlpha = a * 0.9;
+    var k, ang, rr = s.x * 6.4;
+    for (k = 0; k < 4; k++) {
+      ang = k * Math.PI / 2 + simTime * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(g.x + Math.cos(ang) * rr * 0.94, g.y + Math.sin(ang) * rr * 0.43);
+      ctx.lineTo(g.x + Math.cos(ang) * rr * 1.12, g.y + Math.sin(ang) * rr * 0.51);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* 압박 벡터 — 볼에 가까운 홈 선수 3명 */
+    var list = [], i, p;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off || isGK(p)) { continue; }
+      list.push({ p: p, dd: Math.hypot(p.x - tx, p.y - ty) });
+    }
+    list.sort(function (u, v) { return u.dd - v.dd; });
+    for (i = 0; i < list.length && i < 3; i++) {
+      var q = list[i].p, qs = scr(q.x, q.y);
+      var mx = qs.x + (g.x - qs.x) * 0.78, my = qs.y + (g.y - qs.y) * 0.78;
+      arrowTo(qs.x, qs.y, mx, my, hexA(col, 0.85 * a), 1.7, 5.0, [5, 4]);
+      if (d.fx === 'trigger') {
+        ctx.save();
+        ctx.globalAlpha = a * 0.95;
+        ctx.fillStyle = hexA(col, 0.95);
+        ctx.beginPath(); ctx.arc(qs.x, qs.y - 1, 3.2, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#08160f';
+        ctx.font = '900 4.6px system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(i + 1), qs.x, qs.y - 0.8);
+        ctx.textAlign = 'left';
+        ctx.restore();
+      }
+    }
+    /* 트리거 — 스턴 걸린 상대 머리 위 별 + '2연속 압박' 표식 */
+    if (d.fx === 'trigger') {
+      ctx.save();
+      ctx.globalAlpha = a * 0.9;
+      ctx.fillStyle = hexA(col, 0.95);
+      ctx.font = '900 7px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('PRESS ×2', g.x, g.y - s.y * 9.5);
+      ctx.textAlign = 'left';
+      ctx.restore();
+    }
+  }
+
+  /* 오프사이드 트랩 — 최종 수비 라인을 가로지르는 점선 + 전진 화살표 */
+  function ovOffside(d, a) {
+    var col = d.color, b = blockOf('home');
+    var wy = clamp(b.dfY, 3, WORLD_H - 3);
+    var s = w2px(), i, p, list = [], g0, g1;
+    /* 라인 자체는 drawTrapLine이 그린다 — 여기서는 '전진' 지시를 올린다 */
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off || isGK(p) || !isDefGroup(p)) { continue; }
+      list.push(p);
+    }
+    for (i = 0; i < list.length; i++) {
+      p = list[i];
+      g0 = scr(p.x, p.y);
+      g1 = scr(p.x, clamp(p.y - 7.5, 2, WORLD_H - 2));
+      arrowTo(g0.x, g0.y, g1.x, g1.y, hexA(col, 0.62 * a), 1.35, 4.6, null);
+    }
+    /* 라인 위에 흐르는 셰브런 — '한꺼번에 올린다' */
+    var ly = wy, yy, xx;
+    ctx.save();
+    ctx.globalAlpha = a * 0.72;
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.3;
+    for (i = 0; i < 5; i++) {
+      yy = 16 + i * (WORLD_W - 32) / 4;
+      var pt = scr(yy, ly);
+      var pt2 = scr(yy, clamp(ly - 3.4, 1, WORLD_H - 1));
+      arrowTo(pt2.x, pt2.y, pt.x, pt.y, hexA(col, 0.8 * a), 1.2, 4.0, null);
+    }
+    ctx.restore();
+    /* 전진 폭 표시 — 라인과 현재 수비 위치의 갭 */
+    var gA = scr(50, ly), gB = scr(50, ly - 7.5);
+    ctx.save();
+    ctx.globalAlpha = a * 0.4;
+    ctx.strokeStyle = hexA(col, 0.9);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(gA.x, gA.y); ctx.lineTo(gB.x, gB.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /* 침투/스루패스 — 윙어·공격수의 하프스페이스·뒷공간 침투 화살표 */
+  function ovRuns(d, a) {
+    var col = d.color, i, p, list = [], g1, g2, inward, depth, s = w2px();
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off || isGK(p)) { continue; }
+      if (!(isFwdGroup(p) || isWingerPos(p) || p.pos === 'AM')) { continue; }
+      list.push(p);
+    }
+    for (i = 0; i < list.length && i < 3; i++) {
+      p = list[i];
+      inward = p.x < 50 ? 1 : -1;
+      depth = d.fx === 'through' ? 15 : 8.5;
+      g1 = scr(p.x, p.y);
+      g2 = scr(clamp(p.x + inward * (d.fx === 'through' ? 5.5 : 4.2), 4, 96), clamp(p.y - depth, 3, 117));
+      arrowTo(g1.x, g1.y, g2.x, g2.y, hexA(col, 0.88 * a), 1.7, 5.6, d.fx === 'through' ? [6, 4] : null);
+      /* 출발 발밑 링 + 도착 지점 표적 */
+      ctx.save();
+      ctx.globalAlpha = a * 0.85;
+      ctx.strokeStyle = hexA(col, 0.9);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(g2.x, g2.y, s.x * 2.6, s.y * 2.6 * 0.45, 0, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(g2.x, g2.y, s.x * 1.3, s.y * 1.3 * 0.45, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+    if (d.fx === 'through') {
+      /* 수비 라인 뒤 공간을 가로지르는 점선 */
+      var block = blockOf('away');
+      var ly = clamp(block.dfY, 4, 116);
+      var l1 = scr(0, ly), l2 = scr(WORLD_W, ly);
+      ctx.save();
+      ctx.globalAlpha = a * 0.34;
+      ctx.strokeStyle = hexA(col, 0.9);
+      ctx.lineWidth = 1.1;
+      ctx.setLineDash([5, 6]);
+      ctx.beginPath(); ctx.moveTo(l1.x, l1.y); ctx.lineTo(l2.x, l2.y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  /* 티키타카/빌드업 — 볼 소유자와 가까운 동료 사이의 전술 삼각 패스 연결선 */
+  function ovTriangle(d, a) {
+    var col = d.color, c = ball.carrier, i, p, list = [];
+    var cxw, cyw;
+    if (c && c.side === 'home') { cxw = c.x; cyw = c.y; }
+    else { cxw = ball.x; cyw = ball.y; }
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off || isGK(p)) { continue; }
+      list.push({ p: p, dd: Math.hypot(p.x - cxw, p.y - cyw) });
+    }
+    list.sort(function (u, v) { return u.dd - v.dd; });
+    var nodes = [{ x: cxw, y: cyw }];
+    for (i = 0; i < list.length && nodes.length < 3; i++) { nodes.push({ x: list[i].p.x, y: list[i].p.y }); }
+    if (nodes.length < 2) { return; }
+    var gs = [], k;
+    for (i = 0; i < nodes.length; i++) { gs.push(scr(nodes[i].x, nodes[i].y)); }
+    ctx.save();
+    ctx.strokeStyle = hexA(col, 0.78 * a);
+    ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -simTime * 20;
+    ctx.beginPath();
+    for (i = 0; i < gs.length; i++) {
+      k = (i + 1) % gs.length;
+      ctx.moveTo(gs[i].x, gs[i].y);
+      ctx.lineTo(gs[k].x, gs[k].y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    /* 변을 따라 흐르는 패스 점 — '공이 도는' 느낌 */
+    ctx.fillStyle = hexA(col, 0.95);
+    for (i = 0; i < gs.length; i++) {
+      k = (i + 1) % gs.length;
+      var ph = (simTime * 0.55 + i * 0.33) % 1;
+      var px = gs[i].x + (gs[k].x - gs[i].x) * ph;
+      var py = gs[i].y + (gs[k].y - gs[i].y) * ph;
+      ctx.beginPath(); ctx.arc(px, py, 1.9, 0, TAU); ctx.fill();
+    }
+    /* 꼭짓점 마커 */
+    ctx.globalAlpha = a * 0.9;
+    for (i = 0; i < gs.length; i++) {
+      ctx.beginPath(); ctx.arc(gs[i].x, gs[i].y, 2.6, 0, TAU);
+      ctx.fillStyle = hexA(col, 0.9); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* 중거리 슛 — 슈터 앞 슈팅 사거리 아크 + 골문 조준선 */
+  function ovLongshot(d, a) {
+    var col = d.color, sh = cardAce['longshot'], i, p, best = null, bd = 999;
+    if (!sh || sh.off) {
+      for (i = 0; i < players.length; i++) {
+        p = players[i];
+        if (p.side !== 'home' || p.off || isGK(p)) { continue; }
+        var dy = Math.abs(p.y - 0);
+        if (dy < bd) { bd = dy; best = p; }
+      }
+      sh = best;
+    }
+    if (!sh) { return; }
+    var gs = scr(sh.x, sh.y), gm = scr(50, 1.5), s = w2px();
+    ctx.save();
+    ctx.globalAlpha = a * 0.95;
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.9;
+    ctx.beginPath();
+    ctx.ellipse(gs.x, gs.y, s.x * 19, s.y * 19 * 0.5, 0, -1.15, 1.15);
+    ctx.stroke();
+    ctx.globalAlpha = a * 0.5;
+    ctx.setLineDash([4, 5]);
+    ctx.beginPath(); ctx.ellipse(gs.x, gs.y, s.x * 13, s.y * 13 * 0.5, 0, -1.05, 1.05); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    /* 조준선 + 골문 크로스헤어 */
+    arrowTo(gs.x, gs.y, gm.x, gm.y + s.y * 1.6, hexA(col, 0.5 * a), 1.2, 5.4, [3, 5]);
+    ctx.save();
+    ctx.globalAlpha = a * 0.95;
+    ctx.strokeStyle = hexA('#ffe28a', 0.95);
+    ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(gm.x, gm.y + s.y * 1.6, 4.2 + Math.sin(simTime * 5) * 1.1, 0, TAU); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(gm.x - 7, gm.y + s.y * 1.6); ctx.lineTo(gm.x + 7, gm.y + s.y * 1.6);
+    ctx.moveTo(gm.x, gm.y + s.y * 1.6 - 7); ctx.lineTo(gm.x, gm.y + s.y * 1.6 + 7);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 원톱 고립 — 상대 최전방 공격수 주변 포위/차단 링 */
+  function ovIsolate(d, a) {
+    var col = d.color, tgt = null, best = -1, i, p;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'away' || p.off || isGK(p)) { continue; }
+      var pr = progressOf('away', p.y);
+      if (pr > best) { best = pr; tgt = p; }
+    }
+    if (!tgt) { return; }
+    var g = scr(tgt.x, tgt.y), s = w2px(), k, ang;
+    ctx.save();
+    ctx.globalAlpha = a * 0.9;
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * (7.5 + Math.sin(simTime * 4) * 0.7), s.y * (7.5 + Math.sin(simTime * 4) * 0.7) * 0.45, 0, 0, TAU); ctx.stroke();
+    /* 4방향 차단 브래킷 */
+    for (k = 0; k < 4; k++) {
+      ang = k * Math.PI / 2 + Math.PI / 4;
+      var bx = g.x + Math.cos(ang) * s.x * 9.2, by = g.y + Math.sin(ang) * s.y * 9.2 * 0.45;
+      ctx.beginPath();
+      ctx.moveTo(bx - 3.2, by - 3.2); ctx.lineTo(bx + 3.2, by + 3.2);
+      ctx.moveTo(bx + 3.2, by - 3.2); ctx.lineTo(bx - 3.2, by + 3.2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = a * 0.72;
+    ctx.fillStyle = hexA(col, 0.9);
+    ctx.font = '900 7px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ISOLATED', g.x, g.y - s.y * 10.5);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  /* 템포/일갈 — 전원 스피드·사기 상승 파동 */
+  function ovWave(d, a) {
+    var col = d.color, sx = 0, sy = 0, n = 0, i, p;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off) { continue; }
+      sx += p.x; sy += p.y; n++;
+    }
+    if (!n) { return; }
+    sx /= n; sy /= n;
+    var g = scr(sx, sy), s = w2px(), k, ph;
+    ctx.save();
+    for (k = 0; k < 3; k++) {
+      ph = (simTime * 0.55 + k / 3) % 1;
+      ctx.globalAlpha = a * 0.55 * (1 - ph);
+      ctx.strokeStyle = hexA(col, 0.95);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y, s.x * (6 + ph * 30), s.y * (6 + ph * 30) * 0.5, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+    /* 각 선수 위로 솟는 상승 화살표 */
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.side !== 'home' || p.off) { continue; }
+      var gs2 = scr(p.x, p.y);
+      var ph2 = (simTime * 1.4 + (i % 4) * 0.25) % 1;
+      ctx.save();
+      ctx.globalAlpha = a * 0.5 * (1 - ph2);
+      ctx.strokeStyle = hexA(col, 0.95);
+      ctx.lineWidth = 1.2;
+      var ay = gs2.y - 6 - ph2 * 9;
+      ctx.beginPath();
+      ctx.moveTo(gs2.x - 2.6, ay + 2.4); ctx.lineTo(gs2.x, ay); ctx.lineTo(gs2.x + 2.6, ay + 2.4);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /* 세트피스 — 목표 지점 조준 링 */
+  function ovSetpiece(d, a) {
+    var col = d.color, atk = play.atkSide || 'home';
+    var ty = attackGoalY(atk) - goalDir(atk) * 16;
+    var g = scr(50, ty), s = w2px(), k, ang;
+    ctx.save();
+    ctx.globalAlpha = a * 0.9;
+    ctx.strokeStyle = hexA(col, 0.95);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * 8.5, s.y * 8.5 * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, s.x * 4.2, s.y * 4.2 * 0.45, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    for (k = 0; k < 6; k++) {
+      ang = k * TAU / 6 + simTime * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(g.x + Math.cos(ang) * s.x * 9.2, g.y + Math.sin(ang) * s.y * 9.2 * 0.45);
+      ctx.lineTo(g.x + Math.cos(ang) * s.x * 10.6, g.y + Math.sin(ang) * s.y * 10.6 * 0.45);
+      ctx.stroke();
+    }
+    ctx.restore();
+    arrowTo(g.x, g.y, g.x, g.y - s.y * 12, hexA(col, 0.45 * a), 1.2, 5, [4, 4]);
   }
 
   /* 실제 경기 공 — 일러스트에 그려진 공과 헷갈리지 않게 네온 링·진한 외곽선·그림자 */
@@ -5470,6 +6602,51 @@
     var headRec = loadHead(p);
     var t = simTime;
     var hop = 0, tilt = 0, slide = 0, scale = 1;
+    var PI2 = Math.PI * 2;
+    var aceNow = false, afx;
+    for (afx in cardAce) {
+      if (cardAce.hasOwnProperty(afx) && (buffs[afx] || 0) > 0 && cardAce[afx] === p) { aceNow = true; break; }
+    }
+
+    /* ── v25 ② — 전술 오라(발밑) : 지금 이 선수를 움직이는 카드 색 ── */
+    var aura = auraOf(p);
+    if (aura) { drawGroundAura(g.x, g.y, r, aura); }
+
+    /* ── v25 ② — 전력 질주·드라이브 모션 잔상 ── */
+    if (p.trail && p.trail.length && !gk) {
+      var ti2, tr2, tg2, al2;
+      for (ti2 = 0; ti2 < p.trail.length; ti2++) {
+        tr2 = p.trail[ti2];
+        al2 = (1 - clamp(tr2.t / 0.3, 0, 1)) * 0.17;
+        if (al2 <= 0.012) { continue; }
+        tg2 = scr(tr2.x, tr2.y);
+        ctx.save();
+        ctx.globalAlpha = al2;
+        ctx.fillStyle = tf.ring2;
+        ctx.beginPath();
+        ctx.arc(tg2.x, tg2.y - r * 0.96, r * (0.92 - ti2 * 0.10), 0, PI2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /* ── v25 ② — GK 다이빙: 2~3단 고스트 잔상 + 글러브 섬광 ── */
+    if (pose === 'dive') {
+      if (!p._diveSeen) { p._diveSeen = 1; v25t.dive++; }
+      var dk0 = clamp(1 - p.diveT / 0.7, 0.15, 1);
+      var kk, off2, al3;
+      for (kk = 3; kk >= 1; kk--) {
+        off2 = -(p.diveDir || 1) * r * kk * (0.52 + dk0 * 0.42);
+        al3 = (0.26 / kk) * dk0;
+        ctx.save();
+        ctx.globalAlpha = al3;
+        ctx.fillStyle = '#bfeeff';
+        ctx.beginPath();
+        ctx.arc(g.x + off2, g.y - r * 1.04, r * (1 - kk * 0.07), 0, PI2);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else if (p._diveSeen) { p._diveSeen = 0; }
 
     if (pose === 'dive') {                     /* GK 다이빙 — 옆으로 날아가며 기운다 */
       var dk = clamp(1 - p.diveT / 0.7, 0, 1);
@@ -5500,7 +6677,6 @@
     var cx = g.x + slide;
     var cy = g.y - r * 0.96 + hop;             /* 원 아래가 잔디에 닿는다 */
     var ringW = Math.max(1.7, r * 0.22);       /* 팀 링 두께 — v14: 토큰과 함께 슬림하게 */
-    var PI2 = Math.PI * 2;
 
     /* ── 지면 그림자 (떠 있는 높이만큼 짙고 넓게) ── */
     var air = clamp(Math.abs(hop) / (r * 2.2), 0, 1);
@@ -5613,6 +6789,21 @@
     ctx.strokeStyle = 'rgba(4,14,10,0.70)';
     ctx.stroke();
 
+    /* ── v25 ② — 에이스 링: 카드로 지정된 선수는 금빛 이중 링이 또렷하게 ── */
+    if (aceNow) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,232,150,0.98)';
+      ctx.lineWidth = 1.7;
+      ctx.setLineDash([5, 4]);
+      ctx.lineDashOffset = -t * 22;
+      ctx.beginPath(); ctx.arc(0, 0, r + ringW * 2.4, 0, PI2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,252,230,0.72)';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.arc(0, 0, r + ringW * 2.0, 0, PI2); ctx.stroke();
+      ctx.restore();
+    }
+
     /* GK — 링 안쪽 금색 이중 포인트 */
     if (gk) {
       ctx.beginPath(); ctx.arc(0, 0, r - ringW * 1.05, 0, PI2);
@@ -5623,6 +6814,40 @@
       ctx.globalAlpha = 1;
     }
     ctx.restore();
+
+    /* ── v25 ② — 스턴: 머리 위로 도는 어지럼 별 ── */
+    if (p.stun > 0) {
+      var sk, sAng, sxp, syp, ssz, svi, sa;
+      for (sk = 0; sk < 3; sk++) {
+        sAng = t * 6.2 + sk * (PI2 / 3);
+        sxp = cx + Math.cos(sAng) * r * 1.2;
+        syp = cy - r * 1.5 + Math.sin(sAng) * r * 0.32;
+        ssz = r * 0.26;
+        ctx.save();
+        ctx.globalAlpha = 0.62 + 0.3 * Math.sin(t * 9 + sk);
+        ctx.fillStyle = '#ffe98a';
+        ctx.beginPath();
+        for (svi = 0; svi < 4; svi++) {
+          sa = svi * Math.PI / 2;
+          ctx.lineTo(sxp + Math.cos(sa) * ssz * 1.6, syp + Math.sin(sa) * ssz * 1.6);
+          ctx.lineTo(sxp + Math.cos(sa + Math.PI / 4) * ssz * 0.5, syp + Math.sin(sa + Math.PI / 4) * ssz * 0.5);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+    /* ── v25 ② — 골 세리머니 환호 오라 ── */
+    if (pose === 'celebrate') {
+      ctx.save();
+      ctx.globalAlpha = 0.32 + 0.22 * Math.sin(t * 7);
+      ctx.strokeStyle = 'rgba(255,233,138,0.95)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.ellipse(g.x, g.y + 1.2, r * (1.6 + 0.28 * Math.sin(t * 5)), r * (1.6 + 0.28 * Math.sin(t * 5)) * 0.5, 0, 0, PI2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     /* ── 체력 경고 게이지 (40% 이하) ── */
     if (p.stam <= 40) { drawFatigue(p, cx, cy, r, ringW); }
@@ -6024,11 +7249,15 @@
     if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
     else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
 
+    drawCardOverlays();
+    drawKickoffMark();
     drawPressZone();
     drawPassLine();
     drawOffsideLine();
     drawTrapLine();
     drawSupportWeb();
+    drawDecals();
+    drawParts(false);
     drawRipples();
 
     var arr = players.slice().sort(function (a, b) {
@@ -6040,6 +7269,8 @@
     drawShotTrail();
 
     for (i = 0; i < arr.length; i++) { drawPlayer(arr[i]); }
+    /* v25 ② — 불꽃·색종이·스턴 별 등 앞 레이어 파티클 */
+    drawParts(true);
 
     /* 말풍선 (겹치면 위로 쌓는다) */
     var placed = [];
@@ -6153,6 +7384,36 @@
   /* ─────────────────────────  v21 계측  ───────────────────────── */
 
   /* v16 계측: 프레임 단위 선수 좌표·토큰 반지름 — 겹침·GK 밀집·블록 위치를 실측한다 */
+  /* ─────────────────────────  v25 검증용 상태 조회  ─────────────────────────
+     활성 전술카드·오버레이·파티클·킥오프 세리머니를 한 번에 돌려준다.
+     (브라우저 콘솔 `DS.Match.v25()`) */
+  M.v25 = function () {
+    var i, list = activeCardList(), out = [], q, aceFx = [];
+    for (i = 0; i < list.length; i++) {
+      q = list[i];
+      out.push({
+        key: q.key, fx: q.fx, name: q.name, color: q.color, tag: q.tag,
+        left: Math.round((buffs[q.fx] || 0) * 10) / 10, dur: q.dur,
+        life: Math.round(cardLife(q) * 100) / 100,
+        ace: cardAce[q.fx] ? cardAce[q.fx].name : ''
+      });
+      if (cardAce[q.fx]) { aceFx.push(q.fx); }
+    }
+    return {
+      cards: v25t.cards, cardHits: cardHitCount, active: out,
+      overlayFrames: v25t.overlays, parts: parts.length, maxParts: v25t.maxParts, spawn: v25t.spawn,
+      kinds: v25t.kinds || {},
+      decals: decals.length, confetti: v25t.confetti, diveFrames: v25t.dive,
+      tackles: v25t.tackle, saves: v25t.save, kickSwing: v25t.kickSwing, passWave: v25t.passWave,
+      chain: v25t.chain, kickoff: v25t.kickoff, kickoffPass: v25t.kickoffPass,
+      kick: kick ? { label: kick.label, side: kick.side, t: Math.round(kick.t * 100) / 100, t0: kick.t0 } : null,
+      half: halfNo, aceFx: aceFx,
+      team: { home: TEAM_FX.home.ring, away: TEAM_FX.away.ring },
+      phase: play.phase, clock: Math.round(M.clock * 10) / 10,
+      carrier: ball.carrier ? ball.carrier.name : null
+    };
+  };
+
   M.inspect = function () {
     var i, p, out = [];
     for (i = 0; i < players.length; i++) {
