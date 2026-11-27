@@ -3007,17 +3007,20 @@
        다리가 전속력으로 헛돌았다(발 헛돌기·스케이트). 이제 한 걸음(위상 π)마다 S 월드 단위를
        나아가도록 거리로 적분하고, 속도가 빠를수록 보폭 S가 길어진다. */
     var moved = Math.hypot(p.x - ox, p.y - oy);
-    var vAct = dt > 0 ? moved / dt : 0;
-    p.gaitV = vAct;
-    if (vAct > 0.15) {
-      var strideW = 2.3 + vAct * 0.15;
+    var vInst = dt > 0 ? moved / dt : 0;
+    /* 프레임마다 목표가 바뀌며 생기는 잔진동에 다리가 반응하지 않게 0.1초 시정수로 울터다린 속도를 쓴다 */
+    p.gaitV = (p.gaitV == null) ? vInst : p.gaitV + (vInst - p.gaitV) * Math.min(1, dt * 10);
+    if (p.gaitV > 0.15) {
+      var strideW = 2.3 + p.gaitV * 0.15;
       var g0 = p.gait || 0;
-      p.gait = g0 + Math.PI * (moved / strideW);
+      p.gait = g0 + Math.PI * (p.gaitV * dt) / strideW;
       /* 발을 딛는 타이밍(위상 kπ)마다 잔디 먼지 톡톡 — 달릴 때만, 공중에 뜬 포즈는 제외 */
-      if (vAct > 6.2 && !p.stun && p.pose !== 'tackle' && p.pose !== 'dive' && p.pose !== 'jump'
+      if (p.gaitV > 6.2 && !p.stun && p.pose !== 'tackle' && p.pose !== 'dive' && p.pose !== 'jump'
           && Math.floor(p.gait / Math.PI) !== Math.floor(g0 / Math.PI)) {
-        fxDust(p, 1, 0.34 + 0.28 * Math.min(1, vAct / 16));
+        fxDust(p, 1, 0.34 + 0.28 * Math.min(1, p.gaitV / 16));
       }
+    } else {
+      p.gaitV = 0;
     }
 
     /* v32 — 급턴: 진행 방향이 크게 꺾이는 순간 발밑에 잔디 먼지가 튄다 */
