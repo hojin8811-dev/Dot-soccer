@@ -1,7 +1,7 @@
 # 인수인계 — 《꼬마일레븐 FC》 (`Dot-soccer`)
 
-> 기준 **v30 (중계뷰 카메라 1.15× · 선수 원 13% 축소 · 중계뷰/전체뷰 토글 · 공중볼 Z축 그림자 · 골 임팩트[0.15초 셰이크+슬로모션] · 침투 화살표 · 완전 가로 전용 UI) · 2026-11-27 · 라이브 `?v=30&b=28`**
-> 버전별 상세 이력은 `README.md`(맨 위가 최신 v30), 화면 캡처는 `preview/v30/`에 있습니다.
+> 기준 **v31 (대각선 쿼터뷰 3D 경기장 · 머리+몸통 일체형 치비 전신 스프라이트 · 공 추적 중계 카메라 · 우하단 미니맵 레이더 · 골대/관중석/광고판) · 2026-11-28 · 라이브 `?v=31&b=29`**
+> 버전별 상세 이력은 `README.md`(맨 위가 최신 v31), 화면 캡처는 `preview/v31/`에 있습니다.
 
 ---
 
@@ -13,16 +13,17 @@
 | 화면 | 하단 5탭 — 공식전(리그) / S매치 / 마이팀 / 클럽 / 이적시장. **844×390 가로** 기준 설계(844×360도 지원), **완전 가로 전용** — 세로(폭 900 이하)에서는 플레이 화면 대신 전체 화면 회전 안내(`#rotate`)가 뜨고, 가로로 돌리면 즉시 걷힌다 |
 | 기술 | **정적 HTML/CSS/JS만**(빌드 없음). 경기 엔진은 Canvas 60Hz 시뮬레이션 + 서브프레임 보간 |
 | 저장소·배포 | `https://github.com/hojin8811-dev/Dot-soccer` · 브랜치 `main` = GitHub Pages 루트. push하면 자동 반영, CI 없음 (저장소 이름·URL은 옛 이름 `Dot-soccer` 그대로 — 링크·세이브 보호) |
-| 라이브 | `https://hojin8811-dev.github.io/Dot-soccer/?v=30&b=28` |
+| 라이브 | `https://hojin8811-dev.github.io/Dot-soccer/?v=31&b=29` |
 | 규모 | 선수 초상 500종 + 감독 50명 · 1·2부 리그(2부 20팀 38라운드, 내 리그 AI 19 + 나) · 감독별 육성 특성 · 유소년 아카데미(잠재 70~92) + 2군 리그 · 비동기 PvP(구단 코드 `?vs=`) · 실시간 전술 오버레이 12종 |
 
 ---
 
 ## 2. 지금 상태 — 실제로 확인한 값 (2026-11-27 기준)
 
-- **최신 커밋**: v30 `feat(v30): 중계뷰 카메라·공중볼 Z축·골 임팩트·침투 화살표·가로 전용 UI (b=28)`
-- **`index.html` 로드**: `css/style.css?v=30&b=28`, `js/data.js`·`js/pvp.js`·`js/match.js`·`js/bgm.js`·`js/game.js` 모두 `?v=30&b=28`, `manifest.webmanifest?v=30`, 서비스워커 등록 `sw.js?v=30&b=28`
-- **`sw.js`**: 캐시 이름 `dot-soccer-v30-20261127e` — 네트워크 우선 + 오프라인 폴백
+- **최신 커밋**: v31 `feat(v31): 쿼터뷰 3D 경기장·치비 전신 선수·미니맵 레이더 (b=29)`
+- **`index.html` 로드**: `css/style.css?v=31&b=29`, `js/data.js`·**`js/chibi.js`**·**`js/quarter.js`**·`js/pvp.js`·`js/match.js`·`js/bgm.js`·`js/game.js` 모두 `?v=31&b=29`, `manifest.webmanifest?v=31`, 서비스워커 등록 `sw.js?v=31&b=29`
+- **`sw.js`**: 캐시 이름 `dot-soccer-v31-20261128a` — 네트워크 우선 + 오프라인 폴백 (v31부터 `assets/stadium-pitch.png` 프리캐시 제거)
+- **v31 렌더러 구조**: `js/quarter.js`(`DS.Q`)가 3D 카메라·투영·스타디움·미니맵을 담당하고, `js/match.js`의 `scr()`·`depthPx()`·`updateCamera()`·`drawPlayer()`가 이를 호출한다. 스프라이트 메타데이터는 `js/chibi.js`(`DS.CHIBI.BODY`·`DS.CHIBI.HAIR`)에 있고 PNG는 `assets/chibi/<타입>_<포즈>.png`(h0~h2·a0~a2·g0·g1 × run_a/run_b/kick/tackle · GK idle/dive). 재생성은 `python3 scripts/chibi_build.py`(images로 뽑은 `downloads/chibi_v_*.png` → 흰 배경 제거·150px 정규화).
 - **v30 ① 중계뷰 카메라 + 선수 원 13% 축소**: `CAM_Z0 = 1.15`(중계뷰) · `CAM_Z_FULL = 1.0`(전체뷰) · `CAM_Z_CHANCE = 1.20`. `updateCamera()`는 공 화면좌표를 `1-exp(-5.0·dt)`(≈프레임당 0.08)로 Lerp 추적하고, 공 진행 방향으로 살짝 리드하며, 박스 25m 이내·슈팅·세트피스·골에서 1.20~1.26×로 미세 줌인한다. `camClampToView()`가 항상 초점을 가시 사각형 안으로 클램프해 화면 밖 검은 여백이 없다. 선수 원은 `rBase*0.87`(중계뷰)/`×1.0`(전체뷰), 팀 링 두께는 `rBase*0.22`로 **축소 전 기준**을 써 화면상 얇아지지 않는다. 상단 `📺 중계 / 🗺 전체` 토글(`#m-view`, `data-act="viewmode"`) → `DS.Match.toggleView()` · `setView('broadcast'|'full')` · `viewState()`.
 - **v30 ② 공중볼 Z축**: 로빙·전환·클리어·로빙슛은 `ball.z`(중력 `BALL_G=150`)로 포물선을 그리고 `y - depthPx(z)`에 그려진다. 바닥 그림자는 **고도에 비례해 작아지고 옅어지는** 방사형 그라데이션 타원(`shK = 1-zpx*0.007` · `shA = 0.42-zpx*0.0022`)이고, 높은 볼(zpx>14)은 그림자→공 점선으로 높이를 읽힌다. `drawMatchBall()`은 공중일 때 자체 그림자를 그리지 않는다(중복 방지). QA 훅 `DS.Match.debugBallAir(z)`.
 - **v30 ③ 골 임팩트 시퀀스**: 골라인 통과 순간 `kickCam(4.2, 0.15)`(0.15초 셰이크) + `slowmo{k:0.34, t:0.42}`(실시간 0.42초)로 골망이 천천히 줄렁이고, **공은 센터서클로 순간이동하지 않는다**(`ball.netAt`에 골라인 좌표 보관, `ball.z=0.6`). 0.42초 뒤 `goalCutin()`(GOAL 컷인) → 1.15초 컷인 정지 → 1.8초 세리머니 → `fadeFx`(0.46초 암전) → `resetKickoff`. 슬로모션은 `dt`에만 곱해 배속·시계와 무관하게 실시간으로 끝난다.
