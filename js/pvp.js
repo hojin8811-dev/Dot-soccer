@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v26 — 비동기 PvP (pvp.js)
+/*! 꼬마일레븐 FC v27 — 비동기 PvP (pvp.js)
     · 구단 스냅샷 직렬화(URL-safe Base64 + 체크섬) → 공유 URL(?vs=) · 짧은 복사 코드
     · importSquadCode() 유효성 검증 + 치팅 스탯 상한 클램프
     · 챌린지 매치용 상대 스쿼드 복원(내 팀은 실시간 개입, 상대는 AI 지휘)
@@ -18,7 +18,7 @@
      index.html이 실제로 불러온 이 스크립트의 쿼리(?v=&b=)에서 읽는다.
      그래야 배포 때 캐시 버스터를 올리면 공유 링크도 같이 따라온다. */
   function scriptVer() {
-    var out = { v: '26', b: '18' };
+    var out = { v: '27', b: '21' };
     try {
       var doc = global.document, src = '';
       if (doc && doc.querySelector) {
@@ -49,6 +49,8 @@
     levelMax: 15,
     powerMax: 91,
     playersMin: 11, playersMax: 18,
+    /* v27 — 엔트리 규격은 선발 11 + 벤치 7 = 18명 하나로 고정한다 */
+    squadSize: 18, benchSize: 7, starterSize: 11,
     clubMax: 14, nameMax: 12,
     picMax: 511,
     minCodeLen: 60               /* 11명짜리 실제 코드도 150자 이상 — 잘린 입력은 먼저 걸러진다 */
@@ -194,6 +196,27 @@
     pic: 9, role: 4, foot: 2, trait: 4, form: 4, style: 3, count: 5, color: 8
   };
 
+  /* v27 — 18명 규격 보정용 아카데미 선수.
+     · 구버전(11~16명) 코드를 읽을 때와, 선수단이 18명이 안 되는 세이브를 내보낼 때
+       부족한 자리만 채운다(선발 11명은 절대 건드리지 않으므로 전력 계산에 영향 없음).
+     · 스탯 4/4/4(OVR 약 51)의 동 등급이라 상대 전력을 올리지 않는다. */
+  var FILLER_POS = ['GK', 'CB', 'LB', 'CM', 'CM', 'RB', 'ST'];
+  function fillerRecords(n, offset) {
+    var out = [], i, k;
+    offset = offset || 0;
+    for (i = 0; i < n; i++) {
+      k = (offset + i) % FILLER_POS.length;
+      out.push({
+        name: cleanText('아카데미' + (offset + i + 1), LIMITS.nameMax),
+        pos: FILLER_POS[k], rarity: 'dong',
+        s: 4, t: 4, p: 4, level: 0, pic: 0,
+        role: '', foot: '', trait: '', pad: true
+      });
+    }
+    return out;
+  }
+  P.fillerRecords = fillerRecords;
+
   function writeName(w, name, lenBits, maxLen) {
     var chars = String(name || '').split('').slice(0, maxLen), i, hangul = false, c;
     if (!chars.length) { chars = ['?']; }
@@ -251,6 +274,11 @@
         foot: src.foot || '',
         trait: src.trait || ''
       });
+    }
+    /* v27 — 어떤 세이브에서도 내보내기는 항상 18명(선발 11 + 벤치 7) */
+    if (players.length < LIMITS.squadSize) {
+      var add = fillerRecords(LIMITS.squadSize - players.length, 0), ai;
+      for (ai = 0; ai < add.length; ai++) { players.push(add[ai]); }
     }
     var kit = club.kit || {};
     var snap = {
@@ -412,6 +440,15 @@
       if (rec.foot && footK().indexOf(rec.foot) < 0) { rec.foot = ''; }
       snap.players.push(rec);
     }
+    /* v27 — 구버전 코드(11~16명)는 부족한 벤치 자리만 아카데미 선수로 채워 18명 규격으로 맞춘다.
+       선발 11명은 그대로라 전력·치팅 상한 판정에는 영향이 없고, 채운 수는 도전장에 표시한다. */
+    var padded = 0;
+    if (snap.players.length < LIMITS.squadSize) {
+      padded = LIMITS.squadSize - snap.players.length;
+      var pads = fillerRecords(padded, 0), pi;
+      for (pi = 0; pi < pads.length; pi++) { snap.players.push(pads[pi]); }
+    }
+    snap.padded = padded;
     snap.power = powerOf(snap.players);
     snap.clamped = clamped;
     snap.codeLength = code.length;
@@ -538,21 +575,25 @@
       club: snap.club, short: P.shortName(snap.club),
       formation: snap.formation, style: snap.style, styleName: st.name,
       power: snap.power, count: snap.players.length,
+      starters: Math.min(LIMITS.starterSize, snap.players.length),
+      bench: Math.max(0, snap.players.length - LIMITS.starterSize),
       lineup: lineup, top: top.slice(0, 4),
-      clamped: snap.clamped || 0
+      clamped: snap.clamped || 0,
+      padded: snap.padded || 0
     };
   };
 
   /* ═════════════════  프리셋 라이벌 3팀  ═════════════════
      코드가 없는 혼자 테스트 유저도 바로 맛볼 수 있게, 실제 코드 포맷으로 구운 샘플 구단.
-     (같은 decode 경로를 타므로 프리셋도 검증·클램프를 그대로 통과한다) */
+     (같은 decode 경로를 타므로 프리셋도 검증·클램프를 그대로 통과한다)
+     v27 — 세 팀 모두 선발 11 + 벤치 7 = 18명 규격으로 다시 구웠다(전력 61 / 70 / 81). */
   var PRESET_DEFS = [
     { key: 'r1', tag: '2부 다크호스', desc: '낮은 블록 + 한 방 역습. 2부에서 올라오는 팀',
-      code: 'DSP1-JWZW5swAEAAjACHip6Refw2ESwVVgamFB6VxqwSSCVVQcaCx1RwB0bKBVRQdyFB4CgIwQlBVVgSsEB2rClcAsDVVQc8Gh0DBa5asGVZgMgFB0DFt0ZSHVZQDUEx6chUcdAHUVQxuEh0DAHcqBIVZAC8EZ6VylYdAMUVQ-EFJwOAbkaKMWVQGsEZ3HAB0asBm3g' },
+      code: 'DSP1-JWZW5swAEAAjACGMhaHv_YqEUgTNwK7eZ1ZBusqASGVQLjWB2yAAVP_BERwDXFJ6VwB0bKBERwB5FJ1Rx0AVHDGVQG7M52ZFCUVHWEZgOytJ1ZA_8brHEdANu-hxKhUcdAHEcwGCyxwWwIwQlIEcgIgSh3BVa5asMFdAEWbJ2iR3EqOMFZAFgbB3HCTcP_ACJwJ1cR3BVbcqBBERgE3EZ6VylYLjCFRAOfUR2ySTcbJHEUwNY-JxXgbkaKHEUwDmsxxXgC9WGKFUgI-lB3PxqwSSMEYwG8cR1RxbcasAjkU' },
     { key: 'r2', tag: '1부 중위권', desc: '측면 오버래핑으로 폭을 넓히는 1부 중위권',
-      code: 'DSP1-JWquVgqAEGFuaXhS9fqPDmzAawlVwauDBwYyAsaASmZgV8CJ3ASTcZkRmZwcIEJ1TEbkaKBmZwT2EB1TFUcdADmZgQ8EJ0DBt0ZSGmdgMMER0BUAVP_GmdgGYEp2ySlYdAJmZQzMC5xXgbkaKIndQHKEJ2yBCUVHamZg4YGhwWwC9WGMmZgBeEx2ZGoEasDIcg' },
+      code: 'DSP1-JWquVgqAEGFuaXhSp6RcjswAcgTSQKZdB2UiTcP_CXZgCJSZzVgAVP_BVWAPFDB2UiTcZkRVWANXFJzzgC9WGDXZgEbUBwWxa5asGVdwNKsJxXiTcZkWVeAN2yZ3ARbcasJXcwH6iZ2yRusbdIVggCgqh1ZBqwSSKYcwGqmR6cilYGmMWhAACcxxXg80aAQTOAKndJ3ARz8a0BURwIBE52yBCUVHSWVQEXWx3PwbkaKHVdAD6sx6k2lYLjHUdALq1JxXgHcqBKXYgNAjJ0DBusP_MVZAFkKxz_xt0ZSAius' },
     { key: 'r3', tag: '1부 강호', desc: '전방 압박 + 하이 라인. 1부 상위권 강호',
-      code: 'DSP1-KF4Y6xwAEGOQWExjuml4Wm4vDmzMhDL4CwneQZ2Gh0BWlYdABoeAW8CB1ZAB0bKBoeATUEJwkBYYqOBniQViEJ1TFUxP_GndwYMFB4ChusP_GniABOEJ26VusP_EpdwIgDJ1uyAsaAYnhwwOFBzVhz8a0InhwMQEZzVilYdAFndw7IEZxKilcAsMohwB6EZwWyTcP_Cc5Q' }
+      code: 'DSP1-KF4Y6xwAEGOQWExjuml4Wm5xt_iLDu8iEglagAfcZ3PxCUVHSpdwFpU52rBusP_BmagPhGRxXh3AqxBXegEdFJ0DFoIdADadwGZUh1uBwVasGmiQCesJ6VwbkaKHnpQCu7JwkA80aAXmpQL48xwOBtAasJpgwFGmx1uB0AVHLmpQAmUh2rCTcbJKpgwNykh6VhUcdAATSgJvcJ6k0HcqBBVWQLpCB0DA_8dACoZgAZMhwWx3AqxHmlABo8R2yQHcqBHWlACMsJwP13AqxKocwFWk53BVoIdAMXlQPOUh1uBUxP_ACyw' }
   ];
   var presetCache = null;
   P.presets = function () {

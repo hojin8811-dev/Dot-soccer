@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v26 — 게임 데이터 · 선수 생성 · 픽셀 아트 (data.js) */
+/*! 꼬마일레븐 FC v27 — 게임 데이터 · 선수 생성 · 픽셀 아트 (data.js) */
 (function (global) {
   'use strict';
 
@@ -1991,7 +1991,10 @@
     return { id: p.id, name: p.name, ovrFrom: before, ovrTo: ratingOf(p), lost: lost.join(' · ') };
   };
 
-  /* 이적료 — OVR·등급·나이·레벨. 20대 중반이 정점, 33세 이상은 급락. */
+  /* 이적료 — OVR·등급·나이·레벨. 20대 중반이 정점, 33세 이상은 급락.
+     v27 — 2부→1부로 올라가는 성장 구간(OVR 57~87)의 몸값을 최대 10%까지 부드럽게 낮춘다.
+       2부 시즌 수입(약 1.9만)으로 OVR 70~74 매물 1~2명을 영입할 수 있게 맞추고,
+       최상위(레전드 88+) 가격은 그대로 둬 1부 경제를 흔들지 않는다. */
   DS.marketValue = function (p) {
     if (!p) { return 0; }
     var ovr = Math.max(20, ratingOf(p));
@@ -1999,7 +2002,9 @@
     var age = p.age || 26;
     var ageK = age <= 20 ? 1.4 : (age <= 23 ? 1.28 : (age <= 26 ? 1.14 : (age <= 29 ? 1 : (age <= 32 ? 0.74 : 0.46))));
     var rarK = { dong: 0.85, eun: 1, geum: 1.22, legend: 1.55 }[p.rarity] || 1;
-    var fee = base * ageK * rarK * (1 + (p.level || 0) * 0.035);
+    var band = 1;
+    if (ovr > 56 && ovr < 88) { band = 1 - 0.10 * Math.sin(Math.PI * (ovr - 56) / 32); }
+    var fee = base * ageK * rarK * band * (1 + (p.level || 0) * 0.035);
     return Math.max(260, Math.round(fee / 50) * 50);
   };
   /* 주급 — 이적료의 3.5% 수준(경기당이 아니라 시즌 주급 감각) */

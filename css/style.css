@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v26 — 현대 전술 축구 RPG · 모바일 UI (style.css) */
+/*! 꼬마일레븐 FC v27 — 현대 전술 축구 RPG · 모바일 UI (style.css) */
 :root {
   --bg: #08231e;
   --bg2: #0d332c;
@@ -1222,34 +1222,6 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
 .cmt-line.exp { color: #d6f0ff; }
 .cmt-line.exp .cmt-min { color: #8fd8ff; }
 
-/* ── v17 📺 리플레이 오버레이 (피치 위) ── */
-.m-replay { position: absolute; inset: 0; z-index: 7; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
-.m-replay.on { opacity: 1; }
-.m-replay .rp-top { position: absolute; left: 8px; top: 6px; display: flex; align-items: center; gap: 5px; }
-.m-replay .rp-badge {
-  font-size: 9.5px; font-weight: 900; letter-spacing: .6px; color: #fff;
-  background: linear-gradient(180deg, #ff5a48, #d92a1c); border-radius: 6px; padding: 2px 7px;
-  box-shadow: 0 0 10px rgba(255, 90, 72, .55); animation: rpPulse 1.1s ease-in-out infinite;
-}
-.m-replay .rp-speed { font-size: 8px; font-weight: 900; color: #0b2030; background: #cfe9ff; border-radius: 5px; padding: 1px 5px; }
-@keyframes rpPulse { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
-.m-replay .rp-bar {
-  position: absolute; left: 8px; right: 8px; bottom: 30px; height: 2px;
-  background: rgba(255, 255, 255, .16); border-radius: 2px; overflow: hidden;
-}
-.m-replay .rp-bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #ff7a5c, #ffe98a); }
-.m-replay .rp-sub {
-  position: absolute; left: 8px; bottom: 6px; max-width: 62%;
-  font-size: 10px; font-weight: 800; color: #f2fbff; letter-spacing: -.1px;
-  background: rgba(4, 20, 16, .82); border: 1px solid rgba(160, 220, 255, .28);
-  border-radius: 7px; padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.m-replay .rp-skip {
-  position: absolute; right: 8px; bottom: 6px; pointer-events: auto; cursor: pointer;
-  height: 20px; padding: 0 9px; border-radius: 7px; font-size: 9px; font-weight: 900;
-  color: #06222e; background: #cfe9ff; border: none; box-shadow: 0 2px 6px rgba(0, 0, 0, .4);
-}
-.m-replay .rp-skip:active { transform: translateY(1px); }
 .tbtn.off { color: #ffbdb0; border-color: rgba(255, 120, 100, .4); }
 #m-comm-body.cmt-body {
   flex: 1 1 auto; max-height: 20px; height: 20px; overflow: hidden;
@@ -1622,6 +1594,20 @@ body.rot-off .rotate { display: none; }
 .zlegend .z-rel i { background: #c8432f; }
 
 /* ③ 이적시장 */
+/* v27 — 매물 갱신 주기 안내 (라운드 종료 시 자동 갱신) */
+.mkt-timer {
+  display: flex; align-items: center; gap: 5px; margin: 0 0 5px; padding: 4px 7px;
+  border-radius: 8px; background: rgba(200, 241, 105, .10); border: 1px solid rgba(200, 241, 105, .28);
+  white-space: nowrap; overflow: hidden;
+}
+.mkt-timer .mt-l { font-size: 8px; font-weight: 900; color: #c8f169; letter-spacing: -.2px; }
+.mkt-timer b { font-size: 9.5px; font-weight: 900; color: #f2fbff; }
+.mkt-timer em { margin-left: auto; font-style: normal; font-size: 7.5px; font-weight: 800; color: rgba(233, 244, 221, .62); }
+@media (max-width: 430px) {
+  .mkt-timer { gap: 4px; padding: 3px 6px; }
+  .mkt-timer b { font-size: 9px; }
+  .mkt-timer em { font-size: 7px; }
+}
 .mkt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-items: start; }
 .mkt {
   display: flex; gap: 5px; padding: 4px 5px; border-radius: 10px; align-items: flex-start;

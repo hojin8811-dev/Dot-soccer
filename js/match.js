@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v26 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
+/*! 꼬마일레븐 FC v27 — 진짜 축구 AI · 실시간 경기 엔진 (match.js)
     v16: 전 프레임 Hard Separation(겹침 0) · 박스 타겟 슬롯 분산 · GK 보호 · 수비 복귀
     v17: TV 생중계 카메라(패닝·찬스 줌인) · 골 세레모니·Net Ripple·3초 리플레이 ·
          Web Audio 경기장 사운드 · 살아있는 관중석 · 캐스터/해설 2인 중계
@@ -51,9 +51,7 @@
   /* ═════════ v17 — TV 생중계 연출 상태 ═════════ */
   var CAM_Z0 = 1.035;                                       /* 기본 프레임 — 살짝 당겨 패닝 여유를 만든다 */
   var cam = { x: W / 2, y: H / 2, z: CAM_Z0 };              /* 방송 카메라 (줌·패닝) */
-  var capOn = true, capAcc = 0, capBuf = [];                /* 리플레이 링 버퍼 (최근 3.6초) */
-  var replay = { on: false, frames: [], i: 0, t: 0, dur: 3.0, xg: 0, scorer: '', assist: '', min: 0 };
-  var goalStage = null, goalT = 0;                          /* 'celebrate' → 'replay' */
+  var goalStage = null, goalT = 0;                          /* 'celebrate' 세리머니 동안만 사용 */
   var cel = null;                                           /* 세레모니 (득점자·코너·동료) */
   var netFx = { t: 0, t0: 1.15, side: 'home' };             /* 골망 출렁임 */
   var crowd = { energy: 0, acc: 0, flashes: [], wave: 0 };   /* 관중석 반짝임·깃발·파도 */
@@ -467,108 +465,9 @@
     camClampToView();
   }
 
-  /* ───────────── v17 리플레이 링 버퍼 ───────────── */
-  function snapshotFrame() {
-    var i, p, f = {
-      t: simTime,
-      cam: { x: cam.x, y: cam.y, z: cam.z },
-      ball: { x: ball.x, y: ball.y, z: ball.z, kind: ball.kind },
-      ps: []
-    };
-    for (i = 0; i < players.length; i++) {
-      p = players[i];
-      f.ps.push({
-        p: p, x: p.x, y: p.y, pose: p.pose, poseT: p.poseT,
-        diveT: p.diveT, diveDir: p.diveDir, facing: p.facing,
-        popT: p.popT, popT0: p.popT0, phase: p.phase
-      });
-    }
-    capBuf.push(f);
-    while (capBuf.length > 2 && simTime - capBuf[0].t > 3.6) { capBuf.shift(); }
-    while (capBuf.length > 96) { capBuf.shift(); }
-  }
-  function captureTick(dt) {
-    if (!capOn || play.phase === 'goal' || replay.on) { return; }
-    capAcc += dt;
-    var guard = 0;
-    while (capAcc >= 0.05 && guard < 6) { capAcc -= 0.05; snapshotFrame(); guard++; }
-  }
-  function replaySubText() {
-    return '⚽ ' + short(replay.scorer) + ' ' + replay.min + "'" +
-      ' · 도움 ' + (replay.assist ? short(replay.assist) : '—') +
-      ' · xG ' + (replay.xg > 0 ? replay.xg.toFixed(2) : '—');
-  }
-  function replayEl() {
-    var wrap = canvas ? canvas.parentNode : null;
-    if (!wrap) { return null; }
-    var el = document.getElementById('m-replay');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'm-replay';
-      el.className = 'm-replay';
-      el.innerHTML = '<div class="rp-top"><span class="rp-badge">📺 REPLAY</span><span class="rp-speed">0.5×</span></div>' +
-        '<div class="rp-bar"><i id="m-replay-bar"></i></div>' +
-        '<div class="rp-sub" id="m-replay-sub"></div>' +
-        '<button class="rp-skip" id="m-replay-skip" type="button">건너뛰기 ›</button>';
-      wrap.appendChild(el);
-      var sk = el.querySelector('#m-replay-skip');
-      if (sk) {
-        sk.addEventListener('click', function (ev) {
-          ev.preventDefault(); ev.stopPropagation(); skipReplay();
-        });
-        sk.addEventListener('touchend', function (ev) {
-          ev.preventDefault(); ev.stopPropagation(); skipReplay();
-        });
-      }
-    }
-    return el;
-  }
-  function showReplayOverlay() {
-    var el = replayEl();
-    if (!el) { return; }
-    var sub = el.querySelector('#m-replay-sub');
-    if (sub) { sub.innerHTML = replaySubText(); }
-    var bar = el.querySelector('#m-replay-bar');
-    if (bar) { bar.style.width = '0%'; }
-    el.classList.add('on');
-  }
-  function hideReplayOverlay() {
-    var el = document.getElementById('m-replay');
-    if (el && el.parentNode) { el.parentNode.removeChild(el); }
-  }
-  function startReplay() {
-    var i, from, fr = [];
-    goalStage = 'replay';
-    clearBanner();
-    bannerT = 0;
-    flash.t = 0;
-    if (!capBuf.length) { endReplay(); return; }
-    from = capBuf[capBuf.length - 1].t - 1.6;
-    for (i = 0; i < capBuf.length; i++) { if (capBuf[i].t >= from) { fr.push(capBuf[i]); } }
-    if (fr.length < 6) { fr = capBuf.slice(Math.max(0, capBuf.length - 14)); }
-    replay.frames = fr;
-    replay.on = true; replay.t = 0; replay.i = 0; replay.dur = 3.0;
-    showReplayOverlay();
-    if (cmtQ.length) { cmtQ.length = 0; }
-  }
-  function replayTick(rdt) {
-    if (!replay.on) { return; }
-    replay.t += rdt;
-    var n = replay.frames.length;
-    var k = replay.dur > 0 ? replay.t / replay.dur : 1;
-    if (k >= 1 || !n) { endReplay(); return; }
-    replay.i = Math.min(n - 1, Math.floor(k * n));
-    var bar = document.getElementById('m-replay-bar');
-    if (bar) { bar.style.width = Math.round(clamp(k, 0, 1) * 100) + '%'; }
-  }
-  function skipReplay() {
-    if (!replay.on) { return; }
-    endReplay();
-  }
-  function endReplay() {
-    replay.on = false; replay.frames = []; replay.i = 0; replay.t = 0;
-    hideReplayOverlay();
-    capBuf = []; capAcc = 0; capOn = true;
+  /* v27 — 골 세리머니가 끝나면 곧바로 킥오프로 복귀한다.
+     (v17의 3초 골 리플레이/하이라이트 오버레이는 사용자 요청으로 완전히 제거했다) */
+  function finishCelebration() {
     goalStage = null; cel = null;
     bannerT = 0;
     var el = document.getElementById('m-banner');
@@ -1645,14 +1544,11 @@
       kickoff: 0, kickoffPass: 0, chain: 0, maxParts: 0
     };
     /* v17 연출 상태 초기화 */
-    capOn = true; capAcc = 0; capBuf = [];
-    replay = { on: false, frames: [], i: 0, t: 0, dur: 3.0, xg: 0, scorer: '', assist: '', min: 0 };
     goalStage = null; goalT = 0; cel = null;
     netFx = { t: 0, t0: 1.15, side: 'home' };
     crowd = { energy: 0, acc: 0, flashes: [], wave: 0 };
     lastGoalXg = 0; lastGoalAssist = '';
     cmtQ = []; cmtT = 0;
-    hideReplayOverlay();
     hideCutin();
     setupDeck(cfg.deck);
     cutinHold = 0;
@@ -1808,8 +1704,6 @@
     SND.ambientOff();
     SND.matchOn(false);
     try { if (DS.Bgm) { DS.Bgm.setHalf(false); DS.Bgm.play('lobby', 0.35); } } catch (e) { /* 무시 */ }
-    replay.on = false;
-    hideReplayOverlay();
   };
   /* v17 — 음소거 토글 (localStorage 저장) */
   M.toggleMute = function () {
@@ -1825,12 +1719,10 @@
     return {
       cam: { x: Math.round(cam.x * 10) / 10, y: Math.round(cam.y * 10) / 10, z: Math.round(cam.z * 1000) / 1000 },
       view: { w: W, h: H },
-      replay: { on: replay.on, i: replay.i, n: replay.frames.length, t: Math.round(replay.t * 100) / 100, dur: replay.dur, sub: replay.on ? replaySubText() : null },
       goal: { stage: goalStage, t: Math.round(goalT * 100) / 100, cel: cel ? { scorer: cel.scorer.name, corner: cel.corner, joins: cel.joins.length } : null },
       net: Math.round(netFx.t * 100) / 100,
       crowd: { energy: Math.round(crowd.energy * 100) / 100, flashes: crowd.flashes.length },
       sound: { muted: SND.isMuted(), ready: SND.isReady() },
-      cap: { n: capBuf.length, on: capOn },
       cmt: { q: cmtQ.length }
     };
   };
@@ -4141,8 +4033,6 @@
     var i;
     var mn = minute();
     var half = mn < 45 ? 0 : 1;
-    /* v17 — 리플레이 마지막 프레임: 골이 들어가는 순간의 공 위치를 남긴다 */
-    snapshotFrame();
     if (side === 'home') {
       M.homeScore++;
       halfScore[half][0]++;
@@ -4230,11 +4120,6 @@
     spawnPart({ kind: 'wave', x: scorer.x, y: scorer.y, t0: 0.7, size: 16, color: '#ffe98a', a0: 0.8, flat: 0.45 });
     for (i = 0; i < cel.joins.length; i++) { fxConfetti(cel.joins[i].x, cel.joins[i].y, 6); }
     v25t.confetti++;
-    capOn = false;
-    replay.scorer = scorer.name;
-    replay.assist = assistName || '';
-    replay.min = mn;
-    replay.xg = lastGoalXg;
   }
 
   /* v17 — 세레모니 목표 좌표 (득점자 코너 · 동료 추종) */
@@ -5035,7 +4920,7 @@
     goalStage = null;
     cel = null;
     netFx.t = 0;
-    if (!replay.on) { resetCamera(); }
+    resetCamera();
   }
 
   /* ─────────────────────────  메인 루프  ───────────────────────── */
@@ -5054,12 +4939,7 @@
       }
     }
     if (!M.paused) {
-      if (replay.on) {
-        /* v17 — 리플레이는 실제 시간으로 3초 (0.5배속), 배속과 무관하게 흘러간다 */
-        replayTick(realDt);
-        crowdTick(realDt);
-        renderAlpha = 1;
-      } else if (cutinHold > 0) {
+      if (cutinHold > 0) {
         /* v26c ② — 기술/골 컷인 정지. 배속(×1/×2/×3)과 무관하게 실제 시간으로만 깎고,
            이 동안 step()은 한 번도 돌지 않아 경기 시계·선수 이동·손패 쿨다운이 모두 멈춘다.
            ×3 배속에서 1.7초 컷인이 0.57초 만에 끝나 뒤에서 경기 시간이 흘러가던 버그 수정. */
@@ -5205,7 +5085,7 @@
       updateCamera(dt);
       if (goalStage === 'celebrate') {
         goalT -= dt;
-        if (goalT <= 0) { startReplay(); }
+        if (goalT <= 0) { finishCelebration(); }
       }
       return;
     }
@@ -5296,7 +5176,6 @@
       separate();
       updateCamera(dt);
       crowdTick(dt);
-      captureTick(dt);
       if (sp) {
         sp.t -= dt;
         if (sp.t <= 0) { executeSetpiece(sp); }
@@ -5327,7 +5206,6 @@
     separate();
     updateBall(dt);
     updateCamera(dt);
-    captureTick(dt);
 
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
@@ -7232,59 +7110,9 @@
     }
   }
 
-  /* v17 — 리플레이 프레임 (기록된 좌표로 다시 그린다. 화면 캡처 없이 선명하다) */
-  function drawReplayFrame() {
-    var fr = replay.frames[replay.i] || replay.frames[replay.frames.length - 1];
-    if (!fr) { return; }
-    var cz = fr.cam.z || CAM_Z0, cx = fr.cam.x, cy = fr.cam.y, i, s, p;
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.scale(cz, cz);
-    ctx.translate(-cx, -cy);
-    ctx.fillStyle = '#071a13';
-    ctx.fillRect(cx - W / (2 * cz) - 4, cy - H / (2 * cz) - 4, W / cz + 8, H / cz + 8);
-    if (pitchLayer) { ctx.drawImage(pitchLayer, 0, 0, W, H); }
-    else { DS.Art.drawPitch(ctx, W, H, { landscape: true, crowd: true }); }
-    var arr = [];
-    for (i = 0; i < fr.ps.length; i++) { if (!fr.ps[i].p.off) { arr.push(fr.ps[i]); } }
-    arr.sort(function (a, b) {
-      if (Math.abs(a.x - b.x) > 0.6) { return a.x - b.x; }
-      return b.y - a.y;
-    });
-    for (i = 0; i < arr.length; i++) {
-      s = arr[i]; p = s.p;
-      var bx = p.x, by = p.y, bpo = p.pose, bpt = p.poseT, bdi = p.diveT,
-        bdd = p.diveDir, bfa = p.facing, bpp = p.popT, bp0 = p.popT0, bph = p.phase;
-      p.x = s.x; p.y = s.y; p.pose = s.pose; p.poseT = s.poseT;
-      p.diveT = s.diveT; p.diveDir = s.diveDir; p.facing = s.facing;
-      p.popT = s.popT; p.popT0 = s.popT0; p.phase = s.phase;
-      drawPlayer(p);
-      p.x = bx; p.y = by; p.pose = bpo; p.poseT = bpt; p.diveT = bdi;
-      p.diveDir = bdd; p.facing = bfa; p.popT = bpp; p.popT0 = bp0; p.phase = bph;
-    }
-    var bfp = scr(fr.ball.x, fr.ball.y);
-    var zpx = depthPx(fr.ball.z || 0);
-    var r = Math.max(4.4, W / 108) * (1 + Math.min(0.3, zpx * 0.004));
-    drawMatchBall(bfp.x, bfp.y - zpx - r * 0.35, r, bfp.y);
-    ctx.restore();
-    /* 방송 리플레이 룩 — 비네트 + 살짝 바랜 색 (슬로모션 느낌) */
-    var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.24, W / 2, H / 2, Math.max(W, H) * 0.72);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(2,14,11,0.52)');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.save();
-    ctx.globalAlpha = 0.10;
-    ctx.fillStyle = '#bfe6ff';
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
-  }
-
   function draw() {
     if (!ctx) { return; }
     ctx.clearRect(0, 0, W, H);
-    /* v17 — 리플레이 재생 중에는 저장된 프레임을 그린다 */
-    if (replay.on) { drawReplayFrame(); return; }
 
     /* v21 ③ — 서브프레임 보간: 그리기 직전에만 좌표를 보간값으로 바꿓고 끝나면 되돌린다.
        시뮬레이션 상태는 건드리지 않으므로 물리·판정에는 영향이 없다. */

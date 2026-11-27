@@ -1,4 +1,4 @@
-/*! 꼬마일레븐 FC v26 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
+/*! 꼬마일레븐 FC v27 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
 (function (global) {
   'use strict';
 
@@ -13,7 +13,7 @@
   var MAX_SQUAD = 22;
   var BENCH_SIZE = 7;
   var DIV_SIZE = 20;              /* 1부 · 2부 각 20팀 */
-  var DIV_TV = { 1: 260, 2: 90 }; /* 리그별 경기당 중계권 수입 */
+  var DIV_TV = { 1: 260, 2: 120 }; /* 리그별 경기당 중계권 수입 (v27 — 2부 90→120: 38라운드 누적 +1,140) */
   var DIV_SPONSOR = { 1: 1.6, 2: 1 };
   var CAND_COST = 2200;
   var REROLL_COST = 300;
@@ -392,6 +392,40 @@
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ }
   }
 
+  /* v27 — 구버전 세이브(16명 = 선발 11 + 벤치 5)를 18명 규격(선발 11 + 벤치 7)으로 보충한다.
+     PvP 구단 코드가 16명으로 나가 안내 문구(18명)와 어긋나던 문제의 근본 수정.
+     새로 넣는 선수는 OVR 52~55 동 등급 아카데미생이라 기존 전력·선발은 그대로다. */
+  function padSquadTo18(d) {
+    if (!d || !d.squad || d.squad.length >= 18 || d.squad.length < 11) { return 0; }
+    var needPos = ['GK', 'CB', 'CM', 'ST', 'LB', 'RB', 'CM'], add = 18 - d.squad.length, i, np, ak;
+    /* 세이브 로드 경로에서 불리므로, 어떤 이유로 실패하더라도 원본 선수단은 그대로 두고 넘긴다 */
+    try {
+      for (i = 0; i < add; i++) {
+        np = DS.makePlayer({ pos: needPos[i % needPos.length], rarity: 'dong' });
+        np.age = 19;
+        np.s = 5; np.t = 5; np.p = 5;
+        np.role = null;
+        np.tenure = 1;
+        np.academy = true;
+        np.pot = Math.min(74, DS.ratingOf(np) + 10);
+        for (ak in np.apt) {
+          if (np.apt.hasOwnProperty(ak)) { np.apt[ak] = clamp(Math.round(np.apt[ak] * 0.6), 2, 7); }
+        }
+        np.stats = DS.statSheet(np);
+        d.squad.push(np);
+        if (d.dex && d.dex.players) { d.dex.players[np.name] = 1; }
+      }
+      if (DS.assignUniquePics) { DS.assignUniquePics(d.squad); }
+      if (!d.log) { d.log = []; }
+      d.log.push('선수단 18명 규격 보충 — 아카데미 ' + add + '명 입단');
+      d.squadPadded27 = add;
+      return add;
+    } catch (e) {
+      if (global.__DS_PAD_ERR === undefined) { global.__DS_PAD_ERR = String(e); }
+      return 0;
+    }
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(SAVE_KEY);
@@ -458,6 +492,7 @@
       if (d.divView !== 1 && d.divView !== 2) { d.divView = d.division; }
       if (!('seasonReview' in d)) { d.seasonReview = null; }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
+      if (padSquadTo18(d)) { d.bench = autoBench(d.squad, d.lineup); }
       if (!d.bench || d.bench.length < BENCH_SIZE) { d.bench = autoBench(d.squad, d.lineup); }
       if (!d.roles) { d.roles = {}; }
       if (!d.facilities) { d.facilities = { training: 0, medical: 0, shop: 0, fanclub: 0, cafe: 0 }; }
@@ -1943,6 +1978,21 @@
     toast(p.name + ' 즉시 방출 · ' + fmt(fee) + ' 회수');
   }
 
+  /* v27 — 매물 갱신 주기를 화면에 명시한다. 매물은 라운드(경기) 종료 때 자동으로 새로 올라오고,
+     골드로 지금 바로 교체할 수도 있다. */
+  function mktNextLabel() {
+    if (S.seasonOver) { return '시즌 종료'; }
+    return 'R' + (S.round + 1) + ' 경기 종료 후';
+  }
+  function mktTimerHTML(t) {
+    var left = Math.max(0, t.listings ? t.listings.length : 0);
+    return '<div class="mkt-timer">' +
+      '<span class="mt-l">⏱ 다음 갱신</span>' +
+      '<b>' + mktNextLabel() + '</b>' +
+      '<em>이번 라운드 매물 ' + left + '/' + MKT_SIZE + '명</em>' +
+      '</div>';
+  }
+
   function renderShop() {
     var box = document.getElementById('screen-shop');
     if (!box) { return; }
@@ -1999,11 +2049,12 @@
       '<div class="kpi"><b>' + t.listings.length + '</b><span>매물</span></div>' +
       '<div class="kpi"><b>' + t.myListings.length + '</b><span>내 매물</span></div>' +
       '</div>' +
-      '<div class="tiny" style="color:rgba(233,244,221,.62)">매물은 라운드마다 바뀝니다. 협상으로 이적료를 깎거나, 내 선수를 내놓아 자금을 만들 수 있습니다.</div>' +
+      mktTimerHTML(t) +
+      '<div class="tiny" style="color:rgba(233,244,221,.62)">매물은 <b>라운드(경기)가 끝날 때마다</b> ' + MKT_SIZE + '명 전부 새로 올라옵니다. 협상으로 이적료를 깎거나, 내 선수를 내놓아 자금을 만들 수 있습니다.</div>' +
       '<div class="row between" style="margin-top:6px"><span class="tiny" style="color:rgba(233,244,221,.55)">선수단 ' + S.squad.length + '/' + MAX_SQUAD + '</span>' +
-      '<button class="btn ghost sm" data-act="mktrefresh" ' + (S.money < MKT_REROLL ? 'disabled' : '') + '>매물 갱신 · ' + fmt(MKT_REROLL) + '</button></div>' +
+      '<button class="btn ghost sm" data-act="mktrefresh" ' + (S.money < MKT_REROLL ? 'disabled' : '') + '>지금 갱신 · ' + fmt(MKT_REROLL) + '</button></div>' +
       '</div>' +
-      '<div class="card"><div class="card-head"><b>영입 가능 매물</b><span class="meta">' + t.listings.length + '명</span></div>' +
+      '<div class="card"><div class="card-head"><b>영입 가능 매물</b><span class="meta">이번 라운드 ' + t.listings.length + '/' + MKT_SIZE + '명</span></div>' +
       '<div class="mkt-grid">' + cards + '</div></div>' +
       '<div class="card"><div class="card-head"><b>내 매물</b><span class="meta">다음 라운드에 판매 시도</span></div>' + mine + '</div>' +
       '<div class="card"><div class="card-head"><b>선수 방출 · 내놓기</b><span class="meta">이적료 = OVR·나이·등급</span></div>' +
@@ -2770,7 +2821,8 @@
       '<span class="nm">' + esc(S.club.name) + '</span><span class="st">전력 ' + teamPower() + '</span></div>' +
       '</div>' +
       '<div class="pvp-top">' + rows + '</div>' +
-      '<div class="tiny muted">선수 ' + d.count + '명 · 상대는 AI 감독이 지휘하고, 나는 실시간 전술 카드·교체로 개입합니다.</div>' +
+      '<div class="tiny muted">선수 ' + d.count + '명 (선발 ' + d.starters + ' + 벤치 ' + d.bench + ') · 상대는 AI 감독이 지휘하고, 나는 실시간 전술 카드·교체로 개입합니다.</div>' +
+      (d.padded ? '<div class="tiny muted" style="margin-top:3px">구버전 코드 — 부족한 벤치 ' + d.padded + '자리를 아카데미 선수로 채워 18명 규격으로 맞췄습니다.</div>' : '') +
       (d.clamped ? '<div class="tiny" style="color:#b8452f;margin-top:3px">비정상 수치 ' + d.clamped + '개를 상한(스탯 10 · 레벨 15 · 전력 91)으로 조정했습니다.</div>' : '');
   }
 
@@ -2792,7 +2844,7 @@
     pv.codeAt = Date.now();
     save();
     setSheet('내 구단 코드',
-      '<div class="tiny muted" style="margin-bottom:6px">아래 링크나 코드를 카톡·디스코드로 보내면 친구가 내 구단과 바로 붙을 수 있습니다.</div>' +
+      '<div class="tiny muted" style="margin-bottom:6px">아래 링크나 코드를 카톡·디스코드로 보내면 친구가 내 구단(선발 11 + 벤치 7 = 18명)과 바로 붙을 수 있습니다.</div>' +
       '<div class="pvp-share"><b>공유 링크</b>' +
       '<textarea class="pvp-input" id="pvp-link" readonly rows="5">' + esc(ex.url) + '</textarea></div>' +
       '<div class="pvp-share"><b>짧은 코드</b>' +
@@ -2801,7 +2853,7 @@
       '<button class="btn primary" data-act="pvpcopy" data-which="url">링크 복사</button>' +
       '<button class="btn" data-act="pvpcopy" data-which="code">코드 복사</button>' +
       '<button class="btn ghost" data-act="closemodal">닫기</button></div>' +
-      '<div class="tiny muted" style="margin-top:6px">전력 ' + ex.snap.power + ' · ' + ex.snap.players.length + '명 · ' + esc(ex.snap.formation) +
+      '<div class="tiny muted" style="margin-top:6px">전력 ' + ex.snap.power + ' · ' + esc(ex.snap.formation) +
       ' · ' + esc(DS.tacticStyle(ex.snap.style).name) + ' · 코드 ' + ex.length + '자</div>');
     /* 클릭(사용자 제스처) 안에서 바로 복사까지 시도한다 */
     var taCode = document.getElementById('pvp-code'), taLink = document.getElementById('pvp-link');
@@ -2823,7 +2875,7 @@
         '<div class="pvp-row">' +
         '<canvas data-emblem="' + r.snap.emblem + '" data-kit="' + r.snap.kit.shirt + '|' + r.snap.kit.trim + '" width="26" height="30"></canvas>' +
         '<div class="pvp-id"><b>' + esc(d.formation) + ' · ' + esc(d.styleName) + '</b>' +
-        '<span>전력 ' + d.power + ' · 선수 ' + d.count + '명</span></div>' +
+        '<span>전력 ' + d.power + ' · 선수 ' + d.count + '명 (선발 ' + d.starters + ' + 벤치 ' + d.bench + ')</span></div>' +
         '<button class="btn sm" data-act="pvprival" data-k="' + esc(r.key) + '">도전</button></div>' +
         '<div class="tiny muted">' + esc(r.desc) + '</div></div>';
     }
@@ -2843,7 +2895,7 @@
       '<div class="kpi"><b>' + pv.streak + '</b><span>연승</span></div>' +
       '<div class="kpi"><b>' + Math.max(pv.bestStreak, pv.streak) + '</b><span>최고 연승</span></div>' +
       '</div>' +
-      '<div class="tiny" style="color:rgba(233,244,221,.62)">내 구단 코드/링크를 카톡 등으로 보내 친구와 대결하세요. 리그 승점·일정에는 영향이 없습니다.</div>' +
+      '<div class="tiny" style="color:rgba(233,244,221,.62)">내 구단 코드/링크(선발 11 + 벤치 7 = 18명)를 카톡 등으로 보내 친구와 대결하세요. 리그 승점·일정에는 영향이 없습니다.</div>' +
       '<div class="pvp-btns">' +
       '<button class="btn primary" data-act="pvpmycode">내 구단 코드 복사</button>' +
       '<button class="btn dark" data-act="pvpenter">상대 코드로 도전</button></div>' +
@@ -3309,6 +3361,7 @@
       playoffWinner: rowName(po.winner),
       champion1: rowName(r1[0]),
       champion2: rowName(r2[0]),
+      prize: seasonPrize(S.division, myRank),
       tvFrom: DIV_TV[S.division] || 0,
       tvTo: DIV_TV[nextDiv] || 0,
       sponsorFrom: DIV_SPONSOR[S.division] || 1,
@@ -3343,12 +3396,16 @@
     return out;
   }
 
+  /* v27 — 시즌 상금 표를 한 곳에 모은다(결산 화면과 지급이 같은 값을 쓰게) */
+  function seasonPrize(div, rank) {
+    if (div === 1) { return rank === 1 ? 5200 : (rank === 2 ? 3600 : (rank === 3 ? 2400 : 1400)); }
+    return rank === 1 ? 3600 : (rank === 2 ? 2400 : (rank === 3 ? 1600 : 1000));
+  }
+
   function newSeason() {
     var rv = ensureSeasonReview();
     var rank = ourRank();
-    var prize = S.division === 1
-      ? (rank === 1 ? 5200 : (rank === 2 ? 3600 : (rank === 3 ? 2400 : 1400)))
-      : (rank === 1 ? 3200 : (rank === 2 ? 2100 : (rank === 3 ? 1400 : 800)));
+    var prize = seasonPrize(S.division, rank);
     var promoBonus = rv && rv.outcome === '승격' ? 2500 : 0;
     var me = tableRow('me');
     S.career.push({
@@ -3420,8 +3477,9 @@
       '<div class="tiny muted" style="margin-top:3px">승격 PO 우승 · ' + esc(rv.playoffWinner) + '</div></div>' +
       '<div class="rv-sec"><div class="rv-h">1부 승격 3팀</div><div class="rv-chips">' + proHTML + '</div></div>' +
       '<div class="rv-sec"><div class="rv-h">2부 강등 3팀</div><div class="rv-chips">' + relHTML + '</div></div>' +
-      '<div class="rv-sec"><div class="rv-h">다음 시즌 보상</div>' +
+      '<div class="rv-sec"><div class="rv-h">시즌 보상 <span>새 시즌 시작 때 지급</span></div>' +
       '<div class="rv-rows">' +
+      '<div class="rv-row"><span>리그 상금</span><b>' + fmt(rv.prize || 0) + '</b><em>' + rv.rank + '위</em></div>' +
       '<div class="rv-row"><span>중계권</span><b>' + fmt(rv.tvFrom) + ' → ' + fmt(rv.tvTo) + '</b><em>경기당</em></div>' +
       '<div class="rv-row"><span>스폰서 배율</span><b>×' + rv.sponsorFrom + ' → ×' + rv.sponsorTo + '</b><em>1부 상향</em></div>' +
       '<div class="rv-row"><span>리그</span><b>' + divName(rv.division) + ' → ' + divName(rv.nextDivision) + '</b><em>20팀 · 38라운드</em></div>' +
@@ -4373,7 +4431,7 @@
         '<div class="row" style="gap:5px;margin-top:6px">' +
         '<button class="btn primary" data-act="pvpdecode">코드 확인</button>' +
         '<button class="btn ghost" data-act="closemodal">닫기</button></div>' +
-        '<div class="tiny muted" style="margin-top:6px">· 코드에는 구단명 · 포메이션 · 전술 · 선수 18명이 담깁니다.<br>· 비정상 수치(스탯·레벨)는 자동으로 상한 처리됩니다.<br>· 리그 승점·일정에는 영향이 없습니다.</div>');
+        '<div class="tiny muted" style="margin-top:6px">· 코드에는 구단명 · 포메이션 · 전술 · 선수 18명(선발 11 + 벤치 7)이 담깁니다.<br>· 16명 이하 구버전 코드는 부족한 벤치 자리만 아카데미 선수로 채웁니다.<br>· 비정상 수치(스탯·레벨)는 자동으로 상한 처리됩니다.<br>· 리그 승점·일정에는 영향이 없습니다.</div>');
       return;
     }
     if (act === 'pvpdecode') {
