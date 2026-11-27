@@ -14,19 +14,44 @@
   var VERSION = 1;                 /* 코드 포맷 버전 (비트 3개) */
   var PREFIX = 'DSP1';             /* 사람이 알아보는 접두어 */
   var SEP = '-';
-  var APP_VERSION = '24';
-  var BUILD_TAG = '11';
+  /* v25c (M4) — 공유 링크·캐시 쿼리에 쓰는 버전은 하드코딩하지 않고,
+     index.html이 실제로 불러온 이 스크립트의 쿼리(?v=&b=)에서 읽는다.
+     그래야 배포 때 캐시 버스터를 올리면 공유 링크도 같이 따라온다. */
+  function scriptVer() {
+    var out = { v: '26', b: '18' };
+    try {
+      var doc = global.document, src = '';
+      if (doc && doc.querySelector) {
+        var sc = doc.querySelector('script[src*="pvp.js"]');
+        src = (sc && (sc.getAttribute('src') || sc.src)) || '';
+      }
+      if (!src && global.location && global.location.search) { src = global.location.search; }
+      var mv = /[?&]v=([0-9]+)/.exec(src), mb = /[?&]b=([0-9]+)/.exec(src);
+      if (mv) { out.v = mv[1]; }
+      if (mb) { out.b = mb[1]; }
+    } catch (e) { /* 기본값 */ }
+    return out;
+  }
+  var VER = scriptVer();
+  var APP_VERSION = VER.v;
+  var BUILD_TAG = VER.b;
   var LIVE_BASE = 'https://hojin8811-dev.github.io/Dot-soccer/';
 
   /* ── 치팅 방어 상한 ──
      코드는 누구나 만들 수 있으므로, 읽는 쪽에서 반드시 이 상한으로 자른다.
-     스탯 3종은 1~10(정상 최대치 = 10), 레벨 0~60, 선수 11~18명. */
+     v25c (L5) — 스탯 3종은 1~10 그대로 두되(정상 성장으로도 도달 가능),
+     실제 성장 곡선으로는 나올 수 없는 레벨·총전력을 현실 상한으로 깎는다.
+     · 레벨: expToNext = 520 + 420×Lv → Lv.15까지 약 3.4만 EXP(여러 시즌)
+     · 전력(선발 11인 평균 OVR): 잠재력 상한(유소년 70~92·성인 pot≤95) 안의 값
+   */
   var LIMITS = {
     statMin: 1, statMax: 10,
-    levelMax: 63,
+    levelMax: 15,
+    powerMax: 91,
     playersMin: 11, playersMax: 18,
     clubMax: 14, nameMax: 12,
-    picMax: 511
+    picMax: 511,
+    minCodeLen: 60               /* 11명짜리 실제 코드도 150자 이상 — 잘린 입력은 먼저 걸러진다 */
   };
   P.LIMITS = LIMITS;
   P.VERSION_TAG = 'v' + APP_VERSION;
@@ -38,10 +63,11 @@
     BAD_B64: '구단 코드 형식이 아닙니다. 코드 전체를 정확히 붙여넣어 주세요.',
     TOO_SHORT: '코드가 잘렸습니다. 전체 코드를 붙여넣어 주세요.',
     CHECKSUM: '코드가 손상되었습니다(체크섬 불일치). 다시 복사해 주세요.',
-    UNSUPPORTED: '이 버전에서 읽을 수 없는 코드입니다. 최신 버전(v24)에서 다시 받아 주세요.',
+    UNSUPPORTED: '이 버전에서 읽을 수 없는 코드입니다. 최신 버전(v' + APP_VERSION + ')에서 다시 받아 주세요.',
     PLAYER_COUNT: '선수 수가 11~18명이 아닙니다. 코드를 다시 확인해 주세요.',
     URL_NO_CODE: '주소에 구단 코드(?vs=)가 없습니다.'
   };
+  P.ERRORS = ERRORS;
   function mkErr(code) {
     var e = new Error(ERRORS[code] || '구단 코드를 읽지 못했습니다.');
     e.code = code;
@@ -252,6 +278,34 @@
   }
   P.powerOf = powerOf;
 
+  /* v25c (L5) — 전력 상한 클램프. 전원 10/10/10·Lv.63 같은 코드는 전력 99가 나와
+     정상 육성 구단을 무의미하게 만든다. 가장 센 선수부터 레벨 → 스탯 순으로 깎아
+     전력을 현실 상한(LIMITS.powerMax) 아래로 내린다. 깎은 횟수를 돌려준다. */
+  function clampPower(players, maxPower) {
+    var trimmed = 0, guard = 0, topN = Math.min(11, players.length);
+    while (powerOf(players) > maxPower && guard < 400) {
+      guard++;
+      var bi = -1, br = -1, i;
+      for (i = 0; i < topN; i++) {
+        var q0 = players[i];
+        var r0 = DS.ratingOf({ pos: q0.pos, rarity: q0.rarity, s: q0.s, t: q0.t, p: q0.p, level: q0.level || 0 });
+        if (r0 > br) { br = r0; bi = i; }
+      }
+      if (bi < 0) { break; }
+      var q = players[bi], k2, keys = ['s', 't', 'p'], done = false;
+      if ((q.level || 0) > 0) { q.level -= 1; done = true; }
+      else {
+        for (k2 = 0; k2 < 3; k2++) {
+          if (q[keys[k2]] > LIMITS.statMin) { q[keys[k2]] -= 1; done = true; break; }
+        }
+      }
+      if (!done) { break; }
+      trimmed++;
+    }
+    return trimmed;
+  }
+  P.clampPower = clampPower;
+
   /* ═════════════════  스냅샷 → 코드 ═════════════════ */
   P.encodeSnapshot = function (snap) {
     var w = new BW(), players = snap.players || [], i, p, k;
@@ -304,7 +358,13 @@
   };
 
   P.decode = function (raw) {
+    var input = String(raw === undefined || raw === null ? '' : raw);
+    var looksLikeCode = /DSP1/i.test(input);
     var code = P.normalizeCode(raw);
+    /* v25c (L4) — 형식 검사를 체크섬보다 먼저 한다. 'hello world' 같은 쓰레기 입력이
+       '체크섬 불일치(다시 복사해 주세요)'로 안내되어 원인을 오해하게 했다. */
+    if (!/^[A-Za-z0-9_-]+$/.test(code)) { throw mkErr('BAD_B64'); }
+    if (code.length < LIMITS.minCodeLen) { throw mkErr(looksLikeCode ? 'TOO_SHORT' : 'BAD_B64'); }
     var bytes = unb64url(code);
     if (bytes.length < 3) { throw mkErr('TOO_SHORT'); }
     var body = bytes.slice(0, bytes.length - 2);
@@ -355,6 +415,12 @@
     snap.power = powerOf(snap.players);
     snap.clamped = clamped;
     snap.codeLength = code.length;
+    if (snap.power > LIMITS.powerMax) {
+      snap.trimmed = clampPower(snap.players, LIMITS.powerMax);
+      snap.power = powerOf(snap.players);
+      clamped += snap.trimmed;
+      snap.clamped = clamped;
+    }
     return snap;
   };
 

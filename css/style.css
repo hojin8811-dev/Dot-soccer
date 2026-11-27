@@ -2179,3 +2179,44 @@ body.rot-off .rotate { display: none; }
 .sub-item .sf.f4 { background: #f6dcd5; color: #96341f; }
 .ms-rt { display: inline-flex; flex-direction: column; align-items: center; line-height: 1; }
 .ms-rt em { font-style: normal; font-size: 5.5px; font-weight: 700; opacity: .55; margin-top: 1px; }
+
+/* ═════════════ v25c — 세로 마이팀(M1) · 상단 바(M2) · 큰 화면 손패(L1) ═════════════ */
+
+/* M2 — 부제는 한 줄 고정: 두 줄로 감기면 상단 바 높이를 넘어 구단명 위가 잘렸다 */
+.tb-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-txt { min-width: 0; flex: 0 1 auto; overflow: hidden; }
+
+/* M1 — 390×844 세로: 전술판 위 / 카드 아래로 쌓아 폭 부족으로 인한 잘림을 없앤다 */
+@media (orientation: portrait) and (max-width: 700px) {
+  .topbar { height: 40px; padding: 0 8px 0 58px; gap: 5px; }
+  .tb-name { font-size: 11.5px; max-width: 118px; }
+  .tb-sub { font-size: 8.5px; }
+  .tb-chip { height: 20px; font-size: 9.5px; padding: 0 6px; gap: 3px; }
+  .tb-chip em { display: none; }
+  .tb-chip svg { width: 11px; height: 11px; }
+
+  #screen-squad.on { display: block; }
+  .sq { flex-direction: column; height: auto; gap: 6px; }
+  .sq-left, .sq-right { flex: 0 0 auto; width: 100%; max-width: none; min-height: 0; overflow: visible; }
+  .sq-pitch { flex: 0 0 auto; min-height: 0; height: 300px; }
+  .sq-pitch .tok { width: 52px; }
+  .fwrap { gap: 4px; }
+  .fwrap .fchip { flex: 1 1 calc(33% - 4px); min-width: 0; }
+  .fwrap .fchip b { font-size: 10px; white-space: nowrap; }
+  .fwrap .fchip span { font-size: 7px; }
+  .sq-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sq-actions .btn { min-width: 0; font-size: 10px; padding: 0 4px; }
+  .sq-bench { flex-wrap: wrap; row-gap: 4px; }
+  .sq-bench .pcard { flex: 0 0 auto; min-width: 34px; max-width: 52px; }
+  .sq-bench .pcard .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; font-size: 8px; }
+  .sq-syn { flex-wrap: wrap; }
+  .sq-card .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sq-card .card-head .meta { display: none; }
+  .mgr-wrap .mcard, .mcard { min-width: 0; }
+}
+
+/* L1 — 1920×1080처럼 세로가 큰 가로 화면: 손패 카드가 240px씩 늘어나지 않게 높이를 잡아 준다 */
+@media (min-height: 700px) and (orientation: landscape) {
+  .hand.v7 { flex: 0 0 auto; justify-content: flex-start; }
+  .tcard.v7 { flex: 0 0 auto; max-height: 118px; }
+}

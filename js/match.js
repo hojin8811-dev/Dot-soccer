@@ -1000,8 +1000,9 @@
     }
     return n ? sum / n : (side === 'home' ? 100 : 20);
   }
-  /* 그 팀 수비 라인의 월드 y — 포메이션 line 지표 · 전술 · 카드에 따라 달라진다 */
-  function lineYOf(side) {
+  /* 그 팀 수비 라인의 월드 y — 포메이션 line 지표 · 전술 · 카드에 따라 달라진다
+     v25c (M3) — noTrap을 주면 오프사이드 트랩의 +6을 빼고 계산한다(공격 대형 계산용). */
+  function lineYOf(side, noTrap) {
     var m = metricsOf(side);
     var stl = styleOf(side);
     var depth = 12 + m.line * 0.44 + stl.line;
@@ -1011,7 +1012,7 @@
     else if (t === 'defense') { depth -= 12; }
     /* v20 ① — 수비 라인 지시(내리기/표준/올리기)는 홈팀 라인·블록 높이를 직접 민다 */
     if (side === 'home') { depth += TOUCH_LINE[touch.line] || 0; }
-    if (side === 'home' && buffOf('offside') > 0) { depth += 6; }
+    if (side === 'home' && buffOf('offside') > 0 && !noTrap) { depth += 6; }
     if (side === 'home' && buffOf('press') > 0) { depth += 5; }
     if (side === 'home' && buffOf('def') > 0) { depth -= 6; }
     if (play.counterT > 0 && play.counterSide !== side) { depth -= 6; }
@@ -1023,7 +1024,15 @@
   function anchorOf(p) {
     var w = isDefGroup(p) ? 1 : (isMidGroup(p) ? 0.86 : 0.72);
     var ax = p.baseX;
-    var ay = p.baseY + blockShift(p.side) * w;
+    /* v25c (M3) — 오프사이드 트랩은 '수비 라인'을 올리는 카드다.
+       최전방(그리고 우리가 공을 가진 순간의 중원)까지 같이 밀면, 상대 수비 라인을
+       이미 넘어선 자리에서 패스를 받아 우리 팀 오프사이드가 3~4배로 늘었다. */
+    var noTrap = false;
+    if (p.side === 'home' && buffOf('offside') > 0) {
+      if (!isDefGroup(p) && !isMidGroup(p)) { noTrap = true; }
+      else if (isMidGroup(p) && ball.carrier && ball.carrier.side === 'home') { noTrap = true; }
+    }
+    var ay = p.baseY + (lineYOf(p.side, noTrap) - dfBaseAvg(p.side)) * w;
     /* v14 변칙 포메이션 — 공격 중에는 기본 대형 자체가 변한다 */
     var mo = morphOf(p.side);
     if (mo && ball.carrier && ball.carrier.side === p.side) {
@@ -2723,8 +2732,11 @@
     depth = clamp(depth + (0.34 - threat) * 11, 6, 56);
     if (play.counterT > 0 && play.counterSide !== side) { depth -= 4; }      /* 역습 대비 라인 하강 */
     if (play.recoverT > 0 && play.recoverSide === side) { depth -= 3; }     /* 볼을 잃고 되돌아오는 중 */
-    /* ③ 오프사이드 트랩 — 카드가 살아 있는 동안 4백을 계속 하이 라인으로 민다 (일회성 push 금지) */
+    /* ③ 오프사이드 트랩 — 카드가 살아 있는 동안 4백을 계속 하이 라인으로 민다 (일회성 push 금지)
+       v25c (M3) — 올리는 것은 DF·MF 두 줄까지. 최전방(fwY)은 트랩 전 라인에서 계산해,
+       공을 되찾은 뒤 이미 상대 라인을 넘어선 채로 서 있던 문제를 없앤다. */
     var trap = (side === 'home' && buffOf('offside') > 0);
+    var preTrapDepth = depth;                                   /* 트랩 전 깊이 */
     if (trap) { depth = clamp(depth + 9, 14, 54); }
     var lineY = ownY + dir * depth;
     /* 공이 우리 진영이면 DF 라인은 '공과 골문 사이'로 (트랩 중에는 일자 하이 라인을 그대로 둔다)
@@ -2741,13 +2753,14 @@
     lineY = clamp(lineY, 5, WORLD_H - 5);
     var bank = Math.max(8.2, Math.abs(bankYOf(side, 'MF') - lineYOf(side)));      /* DF↔MF 간격 */
     var fwGap = Math.max(bank * 2.18, Math.abs(bankYOf(side, 'FW') - lineYOf(side)));
+    var fwLineY = trap ? clamp(ownY + dir * preTrapDepth, 5, WORLD_H - 5) : lineY;
     var widthK = clamp(0.93 + (clamp(m.width + sty.width, 20, 99) - 60) / 100 * 0.30, 0.86, 1.04);
     widthK *= sh.width;                                   /* 수비 전술은 폭을 조금 좁힌다 */
     var b = {
       dir: dir, ownY: ownY, threat: threat,
       dfY: lineY,
       mfY: clamp(lineY + dir * bank, 5, WORLD_H - 5),
-      fwY: clamp(lineY + dir * fwGap, 5, WORLD_H - 5),
+      fwY: clamp(fwLineY + dir * fwGap, 5, WORLD_H - 5),
       bank: bank, fwGap: fwGap,
       widthK: clamp(widthK, 0.82, 1.06),
       pull: trap ? 3 : 6,                /* 좌우로 공 쪽에 붙을 수 있는 한계(월드 단위) */
@@ -3346,8 +3359,14 @@
       if (buffOf('build') > 0 && d < 26) { score += 7; }
       if (p.side === 'away' && buffOf('def') > 0 && isFwdGroup(q)) { score -= 16; }
       if (p.side === 'away' && buffOf('offside') > 0 && isBehindLine(q)) { score -= 12; }
-      /* v15 — 이미 오프사이드 위치에 선 동료에게는 패스를 넣지 않는다 (라인을 타는 타이밍) */
-      if (isOffsidePos(q)) { score -= 46; }
+      /* v15 — 이미 오프사이드 위치에 선 동료에게는 패스를 넣지 않는다 (라인을 타는 타이밍)
+         v25c (M3) — 달리는 중(runT)이 아닌데 오프사이드 위치면 아예 후보에서 뺀다.
+         후방에서 걷어낸 볼이 라인을 넘어선 최전방에 걸려 우리 오프사이드만 늘었다. */
+      if (isOffsidePos(q)) {
+        /* 후방(자기 진영)에서 넘기는 볼이면 아예 후보에서 빼고, 그 밖에는 큰 감점만 */
+        if (!(q.runT > 0.2) && progressOf(p.side, ball.y) < 0.5) { continue; }
+        score -= 46;
+      }
       /* 감독 조직력 업: 오프더볼 위치 선정 → 전진 옵션을 먼저 본다(작게) */
       if (p.side === 'home' && mfx('org') > 0) {
         score += Math.min(18, Math.max(0, fwd)) * mfx('org') * 0.03;
@@ -3490,7 +3509,7 @@
     ball.assist = p;
     ball.passFlag = true;              /* v18 ④ 계측: 이 공은 '패스'에서 나왔다 */
     stats.passes++;
-    if (p.side === 'home') { charge(0.5 + (buffOf('tiki') > 0 ? 0.35 : 0) + (buffOf('build') > 0 ? 0.3 : 0)); }
+    if (p.side === 'home') { charge(0.4 + (buffOf('tiki') > 0 ? 0.28 : 0) + (buffOf('build') > 0 ? 0.24 : 0)); }
     play.passLine = {
       x1: p.x, y1: p.y, x2: tx, y2: ty, t: 0.7, t0: 0.7,
       color: type === 'through' ? '#9ff0c4' : (type === 'cross' ? '#ffd98a' : '#c8f169')
@@ -3618,6 +3637,9 @@
       if (q === p || q.side !== p.side || q.off || isGK(q)) { continue; }
       prog = progressOf(p.side, q.y);
       if (prog < 0.30) { continue; }                    /* 전방에 서 있는 선수만 */
+      /* v25c (M3) — 골키퍼 롱킥은 오프사이드 위치에 선 선수를 노리지 않는다.
+         (후방에서 걷어낸 볼이 라인 밖 최전방에 걸려 우리 오프사이드가 급증했다) */
+      if (isOffsidePos(q)) { continue; }
       open = nearestOpponent(q, 26).dist;
       v = prog * 42 + open * 1.1 + (isFwdGroup(q) ? 14 : (isMidGroup(q) ? 6 : 0)) + Math.random() * 4;
       if (v > bv) { bv = v; best = q; }
@@ -3687,7 +3709,8 @@
       /* v21 ① — 박스 안·1:1·하프스페이스의 명확한 찬스는 주저 없이 때린다.
          (예전에는 근접 압박(pressure<2.2)이면 0.45배로 깎여 찬스가 패스로 샜다) */
       var inBox = dist < 11.5;
-      var pShot = inBox ? 0.72 : (dist < 18 ? 0.46 : 0.24);
+      /* v25c (B1) — 슈팅 빈도 소폭 상향: 박스 안 0.72→0.86, 근거리 0.46→0.56, 중거리 0.24→0.30 */
+      var pShot = inBox ? 0.95 : (dist < 18 ? 0.66 : 0.34);
       pShot *= sty.shootBias;
       if (pressure < 2.2 && !inBox && dist > 15) { pShot *= 0.7; }
       if (inBox && pressure > 3) { pShot += 0.10; }        /* 골문 앞에서 마크가 비었을 때 */
@@ -3759,7 +3782,7 @@
   function shoot(p, dist) {
     var gy = attackGoalY(p.side);
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
-    var acc = 0.46 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
+    var acc = 0.50 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
     /* v20 ② — 주발: 강발 쪽에서 치면 파워, 반대쪽에서는 감아차기(정확·약간 느림) */
     var fs = footSideOf(p);
     var sideNow = p.x >= 50 ? 'R' : 'L';
@@ -3771,8 +3794,11 @@
     if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { acc += 0.09; }
     if (p.side === 'home') { acc += mfx('shoot') * 0.008 + mfx('atk') * 0.004; }
     acc -= dist * 0.005;
+    /* v25c (B1) — 박스 안 결정력: 가까운 슛은 골문으로 향할 확률을 조금 더 준다 */
+    if (dist < 11.5) { acc += 0.05; }
     var onTarget = chance(clamp(acc, 0.2, 0.86));
-    var xg = clamp(0.32 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.42);
+    var xg = clamp(0.62 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.52);
+    if (dist < 11.5) { xg += 0.075; }
     if (fit === 'strong') { xg += 0.015; }
     else if (fit === 'curl') { xg += 0.005; }
     v20t.shots[fit] += 1;
@@ -5040,7 +5066,9 @@
         if (buffs[k] <= 0) { buffs[k] = 0; hudDirty = true; }
       }
     }
-    momentum = clamp(momentum + dt * 0.42, 0, 100);
+    /* v25c (B3) — 모멘텀 수급 완화: 시간당 0.42 → 0.34, 패스당 0.5 → 0.4(약 20%).
+       후반에 100/100이 계속 차 있어 카드 선택이 무의미해지던 문제를 줄인다. */
+    momentum = clamp(momentum + dt * 0.34, 0, 100);
     if (autoCards) {
       autoT -= dt;
       if (autoT <= 0) { autoT = 8; tryAutoCard(); }
@@ -5202,6 +5230,8 @@
         if (fk) { giveBall(fk); }
         setSit('fk', '오프사이드 트랩 성공', true);
         v18t.trapCaught += 1;          /* v18 ③ 계측: 일자 하이 라인이 실제로 잡아낸 횟수 */
+        /* v25c (M3) — 트랩이 잡아낸 것도 상대 오프사이드로 집계해 계측·결과가 어긋나지 않게 */
+        if (v15) { v15.offside.away += 1; }
         return;
       }
     }

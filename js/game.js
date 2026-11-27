@@ -907,8 +907,10 @@
 
     var deckHTML = '';
     var dcs = deckCards();
+    /* v25c (L8) — 덱을 1~2장만 편성하면 실제 손패도 그만큼만 뽑힌다. 안내문을 실제와 맞춘다. */
+    var handNow = Math.min(3, dcs.length);
     deckHTML = '<div class="card tight">' +
-      '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '장 편성 · 경기 중 손패 3장</span></div>' +
+      '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '장 편성 · 경기 중 손패 ' + handNow + '장</span></div>' +
       '<div class="deckgrid">' + dcs.map(function (d) {
         return '<div class="deckcard" style="--cc:' + d.color + '">' +
           DS.tacticArtHTML(d.key, 'dc-art') +
@@ -975,14 +977,14 @@
       '<div class="row" style="gap:4px"><button class="btn sm" data-act="pvpmycode">코드 복사</button>' +
       '<button class="btn sm primary" data-act="pvpenter">도전</button></div></div></div>' +
       '<div class="card tight"><div class="row between"><div><div class="b" style="font-size:11.5px">챌린지 매치</div>' +
-      '<div class="tiny muted">최강 구단과 붙어 보상 2배 · 오늘 ' + S.challengeLeft + '회</div></div>' +
+      '<div class="tiny muted">최강 구단과 붙어 보상 2배 · 이번 시즌 ' + S.challengeLeft + '회</div></div>' +
       '<button class="btn sm" data-act="challenge" ' + (S.challengeLeft <= 0 ? 'disabled' : '') + '>도전</button></div></div>';
 
     paintEmblems(box);
   }
 
   function momentumHint() {
-    return '경기 중 3장 손패';
+    return '경기 중 ' + Math.min(3, deckCards().length) + '장 손패';
   }
   function powerStars(v) {
     if (v >= 86) { return 5; }
@@ -1011,12 +1013,17 @@
   }
 
   /* ═════════════════  S매치 ═════════════════ */
+  /* v25c (L3) — 목록에 적는 보상은 실제 지급 공식(finishMatch)의 '승리 기본'과 같아야 한다.
+     공식: 승리 시 (420 + 득점×60 + 득실차×40) × S매치 1.35배 → 1-0 승리 = 702.
+     스폰서·시설 보너스는 구단 상태에 따라 붙으므로 문구에서 따로 안내한다. */
+  function smatchWinBase() { return Math.round((420 + 60 + 40) * 1.35); }
   function smatchList() {
     var pool = DS.TEAMS.slice().sort(function (a, b) { return a.strength - b.strength; });
+    var rw = smatchWinBase();
     return [
-      { key: 's1', name: 'S1 · 연습 경기', team: pool[0], reward: 420, desc: '가볍게 몸을 푸는 매치', starsN: 1 },
-      { key: 's2', name: 'S2 · 친선 경기', team: pool[Math.floor(pool.length / 2)], reward: 760, desc: '중위권과의 진검승부', starsN: 2 },
-      { key: 's3', name: 'S3 · 숙적전', team: pool[pool.length - 1], reward: 1320, desc: '최강 구단과의 자존심 대결', starsN: 3 }
+      { key: 's1', name: 'S1 · 연습 경기', team: pool[0], reward: rw, desc: '가볍게 몸을 푸는 매치', starsN: 1 },
+      { key: 's2', name: 'S2 · 친선 경기', team: pool[Math.floor(pool.length / 2)], reward: rw, desc: '중위권과의 진검승부', starsN: 2 },
+      { key: 's3', name: 'S3 · 숙적전', team: pool[pool.length - 1], reward: rw, desc: '최강 구단과의 자존심 대결', starsN: 3 }
     ];
   }
 
@@ -1033,7 +1040,8 @@
         '<div class="vs-mid"><b>VS</b><span>전력 ' + opp.strength + '</span></div>' +
         '<div class="vs-team"><canvas data-emblem="' + opp.emblem + '" data-kit="' + opp.kit.shirt + '|' + opp.kit.trim + '" width="34" height="40"></canvas><span class="nm">' + esc(opp.short) + '</span></div>' +
         '</div>' +
-        '<div class="tiny muted" style="margin-bottom:6px">' + it.desc + ' · 보상 ' + fmt(it.reward) + (S.smatchStreak >= 3 ? ' (+연승 보너스)' : '') + '</div>' +
+        '<div class="tiny muted" style="margin-bottom:6px">' + it.desc + ' · 승리 시 기본 ' + fmt(it.reward) +
+        ' <span style="opacity:.8">(득점·스폰서·시설 보너스 별도' + (S.smatchStreak >= 3 ? ' · 연승 3연속 +25% 적용' : '') + ')</span></div>' +
         /* v21b ① — 1판 소모량(1장)과 보유량을 분리해 표기 (3장 보유 = 3판 아님) */
         '<button class="btn ' + (i === 2 ? 'red' : '') + ' wide" data-act="smatch" data-k="' + it.key + '" ' + (S.smatchTickets <= 0 ? 'disabled' : '') + ' title="이용권 1장을 쓰고 1판을 치릅니다">' +
         'S매치 시작 · 1장 (보유 ' + S.smatchTickets + ')</button>' +
@@ -1232,10 +1240,13 @@
 
   /* ═════════════════  v25 — 팀 컨디션 · 무료 휴식  ═════════════════
      경기마다 컨디션이 6~10씩 빠지는데 회복 수단이 유료 드링크뿐이라 3~4경기 만에
-     진행이 막혔다. 라운드당 1회 무료 팀 휴식(+16)을 열고, 메디컬룸 회복량을 올렸으며,
+     진행이 막혔다. 라운드당 1회 무료 팀 휴식(+7)을 열고, 메디컬룸 회복량을 올렸으며,
      컨디션 25 미만으로 킥오프가 막힐 때는 조용한 토스트 대신 회복 선택 모달을 연다. */
   var COND_GATE = 25;
-  var REST_GAIN = 16;
+  /* v25c (B2) — 라운드당 무료 휴식 회복량을 +16 → +7로 낮춘다.
+     경기 1회 소모가 -6~10이라 +16이면 매 라운드 눌러 항상 90~100이었고, 600금화 드링크와
+     메디컬룸 업그레이드가 무의미했다. +7이면 연전에서 컨디션 관리 선택이 실제로 생긴다. */
+  var REST_GAIN = 7;
   var COND_WARN = 40;
   var pendingStart = null;
 
@@ -1775,24 +1786,25 @@
     return t;
   }
 
-  /* 내가 내놓은 선수 — 라운드가 바뀔 때 다른 구단이 데려갈 수 있다 */
+  /* 내가 내놓은 선수 — 라운드가 바뀔 때 다른 구단이 데려갈 수 있다
+     v25c (L6) — 매각되면 removeFromSquad가 myListings를 새 배열로 갈아 끼우므로,
+     그 배열을 그대로 순회하면 인덱스가 밀려 같은 라운드 매물을 한 칸씩 건너뗄다.
+     순회는 복사본으로 돌고, 살아남은 매물만 마지막에 추려 넣는다. */
   function marketSellTick() {
-    var t = S.transfer, i, keep = [];
-    for (i = 0; i < t.myListings.length; i++) {
-      var L = t.myListings[i], p = byId(L.id);
+    var t = S.transfer, i;
+    var src = (t.myListings || []).slice();
+    for (i = 0; i < src.length; i++) {
+      var L = src[i], p = byId(L.id);
       if (!p) { continue; }
       if (chance(0.55)) {
         var fee = L.fee;
         S.money += fee;
         t.sold += 1;
         removeFromSquad(p);
-        keep.push(null);
         S.log.push('이적시장 ' + p.name + ' 매각 ' + fmt(fee));
-      } else {
-        keep.push(L);
       }
     }
-    t.myListings = keep.filter(function (x) { return !!x; });
+    t.myListings = (t.myListings || []).filter(function (x) { return !!byId(x.id); });
   }
 
   function removeFromSquad(p) {
@@ -1978,6 +1990,9 @@
     rolePick = null;
     ioState = { candId: null, outId: null };
     deckDraft = null;
+    /* v25c (L7) — 컨디션 모달을 닫으면 '곧 시작할 경기' 예약도 함께 지운다.
+       남겨 두면 클럽 탭 회복 카드에 '킥오프' 버튼이 살아나 경기가 엉뚱하게 시작됐다. */
+    pendingStart = null;
     if (wasReport && currentTab === 'match') { setTab('home'); }
   }
   function setSheet(title, body, cls) {
@@ -2182,7 +2197,9 @@
         '<span class="dstate' + (on ? ' on' : '') + '">' + (on ? '편성' : '추가') + '</span></button>';
     }
     setSheet('전술 카드 덱 · ' + deckDraft.length + '/6',
-      '<div class="tiny muted" style="margin-bottom:6px">경기 중 손패는 덱에서 3장이 뽑힙니다. 모멘텀을 모아 원하는 타이밍에 발동하세요.</div>' +
+      '<div class="tiny muted" style="margin-bottom:6px">경기 중 손패는 덱에서 ' + Math.min(3, deckDraft.length) + '장' +
+      (deckDraft.length < 3 ? '만(덱이 ' + deckDraft.length + '장) 뽑힙니다' : '이 뽑힙니다') +
+      '. 모멘텀을 모아 원하는 타이밍에 발동하세요.</div>' +
       cards +
       '<button class="btn primary wide" style="margin-top:8px" data-act="decksave">덱 저장</button>');
   }
@@ -2715,7 +2732,7 @@
       '</div>' +
       '<div class="pvp-top">' + rows + '</div>' +
       '<div class="tiny muted">선수 ' + d.count + '명 · 상대는 AI 감독이 지휘하고, 나는 실시간 전술 카드·교체로 개입합니다.</div>' +
-      (d.clamped ? '<div class="tiny" style="color:#b8452f;margin-top:3px">비정상 수치 ' + d.clamped + '개를 상한(스탯 10 · 레벨 60)으로 조정했습니다.</div>' : '');
+      (d.clamped ? '<div class="tiny" style="color:#b8452f;margin-top:3px">비정상 수치 ' + d.clamped + '개를 상한(스탯 10 · 레벨 15 · 전력 91)으로 조정했습니다.</div>' : '');
   }
 
   function pvpChallengeModal(snap, note) {
@@ -2910,7 +2927,7 @@
     /* v17 — 경기 시작 클릭(사용자 제스처)에서 오디오 컨텍스트를 연다 */
     if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
     if (kind === 'smatch' && S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
-    if (kind === 'challenge' && S.challengeLeft <= 0) { toast('오늘 챌린지를 모두 소진했습니다.'); return; }
+    if (kind === 'challenge' && S.challengeLeft <= 0) { toast('이번 시즌 챌린지를 모두 소진했습니다.'); return; }
     /* v24 — 유저 대전(PvP)은 리그·S매치와 분리된 별도 경기: 준비된 상대 프렙을 그대로 쓴다 */
     var prep;
     if (kind === 'pvp') {
@@ -2922,7 +2939,6 @@
       if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
     }
     var oppTeam = prep.team, oppId = prep.id, venueHome = prep.venueHome, i;
-    if (kind === 'smatch') { S.smatchTickets--; }
 
     var f = DS.FORMATIONS[S.formation], lineup = [], k, p;
     for (k = 0; k < S.lineup.length; k++) {
@@ -2937,6 +2953,11 @@
       openConditionModal(kind, opt);
       return;
     }
+
+    /* v25c (C1) — 이용권은 '실제로 킥오프까지 간' 경기에서만 1장 차감한다.
+       예전에는 컨디션 모달·라인업 부족으로 되돌아가는 경로에서도 먼저 빠져,
+       '이 컨디션으로 킥오프'를 누르면 한 경기에 2장이 사라졌다. */
+    if (kind === 'smatch') { S.smatchTickets--; }
 
     /* v21b ⑥ — 실제로 킥오프까지 간 경기만 가이드 2단계로 기록 */
     if (kind === 'league') { guideMark('kickoff'); }
@@ -3045,7 +3066,8 @@
     var report = {
       season: S.season,
       roundLabel: kind === 'league' ? (S.round + '라운드') : (kind === 'smatch' ? 'S매치' : (kind === 'pvp' ? '유저 대전' : '챌린지')),
-      competition: kind === 'league' ? '도트 리그' : (kind === 'smatch' ? 'S매치 스페셜' : (kind === 'pvp' ? '비동기 PvP · 유저 대전' : '챌린지 매치')),
+      /* v25c (L2) — 라운드 라벨과 겹쳐 '유저 대전 · 유저 대전'으로 두 번 찍히지 않게 */
+      competition: kind === 'league' ? '도트 리그' : (kind === 'smatch' ? 'S매치 스페셜' : (kind === 'pvp' ? '비동기 PvP' : '챌린지 매치')),
       /* v25 — 고정된 2045년 날짜 대신 지금 시즌·라운드로 표기하고, 원정 경기는 상대 구장을 쓴다 */
       date: '시즌 ' + S.season + ' · ' + (kind === 'league' ? (S.round + '라운드') : roundLabelOf(kind)) +
         ' · ' + ['19:30', '20:00', '21:00'][S.round % 3],
@@ -4159,19 +4181,24 @@
     if (act === 'rest') { restTeam(); return; }
     if (act === 'roletoggle') { clubRoleOpen = !clubRoleOpen; renderClub(); return; }
     if (act === 'condrest') {
+      /* v25c (L7) — 클럽 탭의 인라인 회복 카드에서 누른 것이면 경기 예약(pendingStart)이 없다.
+         그때까지 킥오프 모달을 열면 클럽에서 경기가 시작될 수 있으니, 회복만 하고 끝낸다. */
+      var hadPending = !!pendingStart;
       var rested = restTeam();
-      var pk = pendingStart ? pendingStart.kind : 'league';
-      var po = pendingStart ? pendingStart.opt : {};
-      openConditionModal(pk, po);
-      if (rested) { toast('회복 완료 · 컨디션 ' + S.condition); }
+      if (hadPending) {
+        openConditionModal(pendingStart.kind, pendingStart.opt);
+      } else if (rested) {
+        renderAll();
+      }
       return;
     }
     if (act === 'conddrink') {
       if (S.money < 600) { toast('금화가 부족합니다.'); return; }
       S.money -= 600;
       S.condition = clamp(S.condition + 20, 0, 100);
-      save(); renderAll();
-      openConditionModal(pendingStart ? pendingStart.kind : 'league', pendingStart ? pendingStart.opt : {});
+      save();
+      if (pendingStart) { openConditionModal(pendingStart.kind, pendingStart.opt); }
+      else { renderAll(); }
       toast('컨디션 +20 · 현재 ' + S.condition);
       return;
     }
