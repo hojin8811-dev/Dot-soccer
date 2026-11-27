@@ -1437,12 +1437,16 @@
         want.dist = 47 - 11 * inThird;
         want.pitch = 0.545;
       }
-      var k = 1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt);
+      var k = U.clamp(1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt), 0, 0.95);
       CAM.tx += (want.tx - CAM.tx) * k;
       CAM.ty += (want.ty - CAM.ty) * k;
       CAM.tz += (want.tz - CAM.tz) * k;
       CAM.dist += (want.dist - CAM.dist) * k;
       CAM.pitch += (want.pitch - CAM.pitch) * k;
+      /* 어떤 경우에도 카메라가 발산하지 않도록 고정 */
+      CAM.tx = U.clamp(CAM.tx, -80, 80); CAM.ty = U.clamp(CAM.ty, 0, 6);
+      CAM.tz = U.clamp(CAM.tz, -20, 20); CAM.dist = U.clamp(CAM.dist, 8, 220);
+      CAM.pitch = U.clamp(CAM.pitch, 0.1, 1.25);
       var cp = Math.cos(CAM.pitch), sp = Math.sin(CAM.pitch);
       camera.position.set(CAM.tx, CAM.ty + CAM.dist * sp, CAM.tz + CAM.dist * cp);
       camera.lookAt(CAM.tx, CAM.ty, CAM.tz);       /* up=(0,1,0) → 좌우 기울기 0 */
@@ -1469,8 +1473,8 @@
     }
     global.addEventListener('resize', resize);
     resize();
-    camera.position.set(0, 1.7 + 46 * Math.sin(0.545), 3.2 + 46 * Math.cos(0.545));
-    camera.lookAt(0, 1.7, 3.2);
+    camera.position.set(CAM.tx, CAM.ty + CAM.dist * Math.sin(CAM.pitch), CAM.tz + CAM.dist * Math.cos(CAM.pitch));
+    camera.lookAt(CAM.tx, CAM.ty, CAM.tz);
 
     /* ── 메인 루프 ── */
     var running = false, lastT = 0, raf = 0;
@@ -1520,7 +1524,9 @@
       if (!running) return;
       raf = global.requestAnimationFrame(loop);
       var t = ts / 1000;
-      var dt = Math.min(0.05, t - lastT || 0.016);
+      var dt = t - lastT;
+      if (!(dt > 0)) dt = 0.016;            /* rAF 타임스탬프 역행/0 보호 */
+      dt = Math.min(0.05, dt);
       lastT = t;
       fpsAcc += dt; fpsFrames++;
       if (fpsAcc >= 0.5) {
@@ -1560,7 +1566,8 @@
           fps: Math.round(fps), mode: S.mode, view: CAM.mode, score: S.score.slice(),
           clock: S.clock, players: players.length, meshes: countMeshes(scene),
           triangles: renderer.info.render.triangles, calls: renderer.info.render.calls,
-          quality: quality
+          quality: quality,
+          cam: { tx: +CAM.tx.toFixed(2), ty: +CAM.ty.toFixed(2), tz: +CAM.tz.toFixed(2), dist: +CAM.dist.toFixed(2), pitch: +CAM.pitch.toFixed(3) }
         };
       },
       players: players, scene: scene, camera: camera, renderer: renderer, state: S,
