@@ -753,9 +753,10 @@
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="120" height="80">' +
       '<defs><marker id="a' + mid + '" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">' +
       '<path d="M0 0L10 5L0 10z" fill="' + accent + '"/></marker></defs>' +
-      '<rect width="120" height="80" rx="7" fill="#0b241e"/>' +
-      '<rect x="3" y="3" width="114" height="74" rx="4" fill="#11453a"/>' +
-      '<g stroke="#dfefd2" stroke-opacity=".20" fill="none" stroke-width="1">' +
+      '<rect width="120" height="80" rx="7" fill="#0d2c25"/>' +
+      '<rect x="3" y="3" width="114" height="74" rx="4" fill="#17594a"/>' +
+      '<rect x="3" y="3" width="114" height="74" rx="4" fill="#04140f" opacity=".18"/>' +
+      '<g stroke="#eaffd8" stroke-opacity=".42" fill="none" stroke-width="1.2">' +
       '<rect x="11" y="7" width="98" height="66"/>' +
       '<path d="M11 40h98"/><circle cx="60" cy="40" r="9"/>' +
       '<path d="M38 7v11h44V7M38 73V62h44v11"/>' +

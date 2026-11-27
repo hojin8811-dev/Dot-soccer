@@ -1941,3 +1941,8 @@ body.rot-off .rotate { display: none; }
   .sheet.rv-sheet .rv-hero { padding: 6px 8px; }
   .sheet.rv-sheet .sheet-body > .btn { margin-top: 5px !important; }
 }
+
+/* 세로 화면 손패도 3:2 전술보드 비율 유지 */
+@media (orientation: portrait) and (max-width: 700px) {
+  .m-side .tcard.v7 .tc-face { width: 66px; height: 44px; border-radius: 8px; }
+}
