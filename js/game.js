@@ -401,6 +401,16 @@
       /* v26 — 게임 이름 변경(도트싸커 → 꼬마일레븐 FC). 구단명을 직접 바꾼 세이브는 그대로 두고,
          손대지 않은 옛 기본값 '도트 유나이티드'만 새 기본값으로 옮긴다(세이브 키·진행은 그대로). */
       if (d.club.name === '도트 유나이티드') { d.club.name = '꼬마일레븐 FC'; }
+      /* 같은 이유로 옛 기본값으로 저장된 최근 경기·결과서의 홈팀 표기도 함께 옮긴다 */
+      if (d.lastResult) {
+        if (d.lastResult.homeName === '도트 유나이티드') { d.lastResult.homeName = '꼬마일레븐 FC'; }
+        if (d.lastResult.homeShort === '도트') { d.lastResult.homeShort = '꼬마일레븐'; }
+      }
+      if (d.lastReport) {
+        if (d.lastReport.homeName === '도트 유나이티드') { d.lastReport.homeName = '꼬마일레븐 FC'; }
+        if (d.lastReport.homeShort === '도트') { d.lastReport.homeShort = '꼬마일레븐'; }
+        if (d.lastReport.stadium === '도트 파크') { d.lastReport.stadium = '꼬마일레븐 파크'; }
+      }
       /* v22 — 1부/2부 리그: division 필드가 없는 구버전 세이브는 1부 유지로 안전 처리 */
       if (!d.divs || typeof d.divs !== 'object') { d.divs = {}; }
       DIV_OVERRIDE = d.divs;
