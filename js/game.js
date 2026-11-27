@@ -3325,7 +3325,16 @@
   function onAction(act, t) {
     var id, v, j;
     if (!act) { return; }
-    if (act === 'closemodal') { closeModal(); return; }
+    if (act === 'closemodal') {
+      closeModal();
+      /* v22 — 시즌 최종전 결과서를 닫으면 시즌 결산 모달을 한 번 이어서 보여준다 */
+      if (S.seasonOver && S.seasonReview && !S.seasonReview.seen) {
+        S.seasonReview.seen = 1;
+        save();
+        global.setTimeout(openSeasonReview, 200);
+      }
+      return;
+    }
     if (act === 'maptab' || act === 'mapside') {
       /* v19 ④ — 상세 결과서 미니피치 탭 · 홈/원정 토글 */
       var mcard = t;
