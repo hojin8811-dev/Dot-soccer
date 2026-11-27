@@ -1310,7 +1310,7 @@ body.in-match #toast { bottom: 84px; }
   -webkit-user-select: none; user-select: none; touch-action: none;
 }
 body.rot .rotate { display: flex; }
-/* 가로로 돌리지 않으면 플레이 화면을 덮어 둔다 (예전 'rot-off'를 쓰면 누를 수 있다) */
+/* v30 — 완전 가로 전용: 세로에서는 플레이 화면을 덮고, 회전하면 즉시 걷힌다(탈출 버튼 없음) */
 body.rot .rotate { pointer-events: auto; }
 body.rot { overflow: hidden; }
 .rot-in { text-align: center; padding: 22px 20px; color: #eaf6dd; max-width: 320px; display: flex; flex-direction: column; align-items: center; }
