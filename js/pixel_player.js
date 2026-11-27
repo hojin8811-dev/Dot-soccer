@@ -496,15 +496,15 @@
       }
     }
 
-    /* 눈 · 코 · 입 */
-    var eyeY = hy + 2.2;
+    /* 눈 · 코 · 입 — 큰 검은 눈 + 흰 반짝임 (포켓리그 감성) */
+    var eyeY = hy + 2.0;
     if (side) {
-      g.rect(hx + 2.4, eyeY, hx + 3.5, eyeY + 1.7, '#241c2b');
-      g.put(hx + 2.5, eyeY + 0.3, '#ffffff');
-      g.rect(hx + 1.6, hy + 5.0, hx + 2.8, hy + 5.4, '#a2564f');
+      g.rect(hx + 2.3, eyeY, hx + 3.6, eyeY + 1.9, '#241c2b');
+      g.put(hx + 2.4, eyeY + 0.3, '#ffffff');
+      g.rect(hx + 1.8, hy + 5.0, hx + 3.0, hy + 5.4, '#a2564f');
     } else {
-      g.rect(hx - 3.6, eyeY, hx - 1.9, eyeY + 1.7, '#241c2b');
-      g.rect(hx + 1.9, eyeY, hx + 3.6, eyeY + 1.7, '#241c2b');
+      g.rect(hx - 3.6, eyeY, hx - 1.9, eyeY + 1.9, '#241c2b');
+      g.rect(hx + 1.9, eyeY, hx + 3.6, eyeY + 1.9, '#241c2b');
       g.put(hx - 3.5, eyeY + 0.3, '#ffffff');
       g.put(hx + 2.0, eyeY + 0.3, '#ffffff');
       g.rect(hx - 0.9, hy + 5.0, hx + 0.9, hy + 5.4, '#a2564f');

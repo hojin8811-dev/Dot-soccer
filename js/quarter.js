@@ -185,7 +185,7 @@
           rows.push({
             x: xa + (Math.random() - 0.5) * 0.5,
             y: -14 + 128 * t,
-            z: 0.5 + tier * 1.05 + Math.random() * 0.3,
+            z: 0.45 + tier * 0.95 + Math.random() * 0.25,
             h: 1.0 + Math.random() * 0.28,
             c: CROWD_COLS[(i * 5 + tier * 3 + ((Math.random() * 3) | 0)) % CROWD_COLS.length],
             ph: Math.random() * 6.28
@@ -194,8 +194,8 @@
       }
     }
     /* 먼 터치라인 뒤(화면 위) · 가까운 터치라인 뒤(화면 아래) */
-    band(-24.6, -3.6, 10, 58);
-    band(102.6, 123.6, 10, 56);
+    band(-24.6, -3.6, 11, 76);
+    band(102.6, 123.6, 11, 74);
     /* 골 뒤 */
     for (i = 0; i < 40; i++) {
       var tz = (Math.random() * 4) | 0;
@@ -233,10 +233,10 @@
       p = Q.project(c.x, c.y, c.z || 0);
       if (p.x < -20 || p.x > W + 20 || p.y < -14 || p.y > H + 14) { continue; }
       s = p.s;
-      hpx = Math.max(2.2, c.h * PPM * s * 0.46);
+      hpx = Math.max(2.2, c.h * PPM * s * 0.42);
       rpx = Math.max(1.0, hpx * 0.34);
       bob = Math.sin((t || 0) * 2.1 + c.ph) * hpx * 0.08;
-      bw = Math.max(2, Math.round(rpx * 2.0));
+      bw = Math.max(2, Math.round(rpx * 2.4));
       bh = Math.max(2, Math.round(hpx * 0.66));
       hd = Math.max(1.4, Math.round(rpx * 1.5));
       ctx.fillStyle = c.c;

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>v35 픽셀 도트 시트</title>
+<style>
+  body { margin: 0; background: #17351f; font: 12px system-ui, sans-serif; color: #d8f5c8; }
+  .band { padding: 8px 12px 2px; }
+  .band h4 { margin: 0 0 4px; font-size: 12px; color: #c8f169; letter-spacing: .3px; }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .cell { text-align: center; }
+  .cell canvas { display: block; background: #4cba52; image-rendering: pixelated; border-radius: 3px; }
+  .lab { font-size: 10px; color: #a9cea0; padding-top: 2px; }
+</style>
+</head>
+<body>
+<div class="band"><h4>① 머리 스타일 · 액세서리 (앞모습)</h4><div class="row" id="r1"></div></div>
+<div class="band"><h4>② 뒷모습 · 옆모습 · 유니폼</h4><div class="row" id="r2"></div></div>
+<div class="band"><h4>③ 달리기 4프레임 (옆모습)</h4><div class="row" id="r3"></div></div>
+<div class="band"><h4>④ 슛 · 태클 · 다이빙 · 점프 · 세리머니</h4><div class="row" id="r4"></div></div>
+<script src="../../js/data.js"></script>
+<script src="../../js/pixel_player.js"></script>
+<script>
+var P = DS.PIXEL, SC = 5;
+function add(host, look, dir, pose, f, label) {
+  var cv = P.render(look, dir, pose, f, 0.4);
+  var c = document.createElement('canvas');
+  c.width = cv.width * SC; c.height = cv.height * SC;
+  c.getContext('2d').drawImage(cv, 0, 0, c.width, c.height);
+  var d = document.createElement('div'); d.className = 'cell';
+  d.appendChild(c);
+  var l = document.createElement('div'); l.className = 'lab'; l.textContent = label; d.appendChild(l);
+  host.appendChild(d);
+}
+var B = { kit: 'home', hair: 'spiky', hairColor: '#23262e', skin: 1, acc: 'none' };
+function L(o) { var v = {}; for (var k in B) { v[k] = B[k]; } for (var k2 in o) { v[k2] = o[k2]; } return v; }
+var r1 = document.getElementById('r1');
+add(r1, L({ hair: 'spiky', hairColor: '#23262e' }), 'down', 'idle', 0, '스파이크 · 흑발');
+add(r1, L({ hair: 'swoop', hairColor: '#e3c169', skin: 0 }), 'down', 'idle', 0, '스웹 · 금발');
+add(r1, L({ hair: 'ponytail', hairColor: '#d9b06a', skin: 1 }), 'down', 'idle', 0, '포니테일');
+add(r1, L({ hair: 'afro', hairColor: '#241f1c', skin: 3 }), 'down', 'idle', 0, '아프로 · 흑피부');
+add(r1, L({ hair: 'mohawk', hairColor: '#2b3a63' }), 'down', 'idle', 0, '모호크');
+add(r1, L({ hair: 'wavy', hairColor: '#7a4a24', acc: 'glasses' }), 'down', 'idle', 0, '웨이브 + 안경');
+add(r1, L({ hair: 'braids', hairColor: '#d9b471', acc: 'headband' }), 'down', 'idle', 0, '브레이드 + 머리띠');
+add(r1, L({ hair: 'buzz', hairColor: '#1e2028', acc: 'shades' }), 'down', 'idle', 0, '버즈 + 선글라스');
+
+var r2 = document.getElementById('r2');
+add(r2, L({ hair: 'spiky' }), 'up', 'idle', 0, '뒷모습');
+add(r2, L({ hair: 'ponytail' }), 'up', 'idle', 0, '뒷모습 · 포니');
+add(r2, L({ hair: 'spiky' }), 'side', 'idle', 0, '옆모습');
+add(r2, L({ kit: 'away', hair: 'swoop', hairColor: '#e6cf8a' }), 'down', 'idle', 0, '원정 유니폼');
+add(r2, L({ kit: 'gk', hair: 'buzz' }), 'down', 'idle', 0, 'GK');
+add(r2, L({ kit: 'ref', hair: 'buzz', hairColor: '#2b2b36' }), 'down', 'idle', 0, '심판');
+
+var r3 = document.getElementById('r3');
+[0, 1, 2, 3].forEach(function (f) { add(r3, B, 'side', 'run', f, 'run ' + f); });
+r3.appendChild(document.createElement('div')).style.width = '14px';
+[0, 1, 2, 3].forEach(function (f) { add(r3, B, 'down', 'run', f, 'front ' + f); });
+
+var r4 = document.getElementById('r4');
+add(r4, B, 'side', 'kick', 1, '슛');
+add(r4, B, 'side', 'kick', 2, '슛 팔로우');
+add(r4, B, 'side', 'tackle', 1, '태클');
+add(r4, L({ kit: 'gk' }), 'side', 'dive', 1, 'GK 다이빙');
+add(r4, B, 'down', 'jump', 1, '점프');
+add(r4, B, 'down', 'celebrate', 0, '세리머니');
+</script>
+</body>
+</html>
