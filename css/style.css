@@ -2220,3 +2220,36 @@ body.rot-off .rotate { display: none; }
 .tb-chip.tb-snd:active { transform: scale(.93); }
 @media (max-height: 460px) { .tb-chip.tb-snd { width: 24px; font-size: 11px; } }
 @media (orientation: portrait) and (max-width: 700px) { .tb-chip.tb-snd { width: 22px; font-size: 10.5px; } }
+
+/* ═════════════════ v27b — 낮은 가로 화면(844×390 등): 우측 전술 카드가 찌그러지거나
+   아래 스탯 박스에 가려 잘리던 문제 수정 ═════════════════ */
+/* ① 카드 영역은 절대 찌그러지지 않는다. 높이가 모자라면 사이드바 전체가 스크롤되고,
+      카드는 언제나 온전한 크기(min-height)를 지킨다. */
+.m-side { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.m-side > .hand.v7 { flex: 1 1 auto; min-height: -webkit-min-content; min-height: min-content; overflow: visible; }
+.m-side .tcard.v7 { flex: 1 1 auto; min-height: 40px; }
+/* 높은 가로 화면(높이 700+)은 지금처럼 카드가 자기 크기(최대 118px)를 지킨다 */
+@media (min-height: 700px) and (orientation: landscape) {
+  .m-side .tcard.v7 { flex: 0 0 auto; max-height: 118px; }
+}
+/* ② 390 안팎 낮은 가로 화면 — 여백을 조여 전술 카드 3장 + 스탯 박스가
+      스크롤 없이 한 화면에 들어오게 한다. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .m-side { gap: 3px; padding: 4px 5px 4px; }
+  .m-side .mom { padding: 4px 6px 4px; margin-bottom: 0; }
+  .m-side .mom-buffs { margin-top: 3px; }
+  .m-side .mom-top { margin-bottom: 3px; }
+  .m-side .mom-top .val { font-size: 12px; }
+  .m-side .mom-bar { height: 5px; }
+  .m-side .mom-hint { margin-top: 2px; font-size: 7px; line-height: 1.2; }
+  .m-side .m-live { gap: 2px; padding: 3px 5px 4px; }
+  .m-side .m-live .lv-row { height: 12px; }
+  /* 지친 선수가 없을 때의 안내 줄은 자리만 차지한다 — 낮은 화면에서는 접는다 */
+  .m-side .m-live .lv-tired.none { display: none; }
+  .m-side .tcard.v7 { min-height: 40px; max-height: 54px; padding: 2px 5px; gap: 5px; }
+  .m-side .tcard.v7 .tc-face { width: 48px; height: 32px; }
+  .m-side .tcard.v7 .nm { font-size: 10px; }
+  .m-side .tcard.v7 .cd { height: 9px; }
+  .m-side .tl-strip { height: 24px; }
+  .m-side .m-acts .btn { height: 24px; }
+}

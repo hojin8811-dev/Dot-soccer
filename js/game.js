@@ -2024,7 +2024,7 @@
       mine += '<div class="ml-row"><b>' + esc(ml.name) + '</b><span class="tiny muted">' + ml.pos + ' · ' + fmt(ml.fee) + '</span>' +
         '<button class="btn ghost sm" data-act="unlist" data-id="' + ml.id + '">철회</button></div>';
     }
-    if (!mine) { mine = '<div class="tiny muted">내놓은 선수가 없습니다. 아래에서 선수를 골라 내놓으면 다음 라운드에 다른 구단이 데려갑니다.</div>'; }
+    if (!mine) { mine = '<div class="tiny muted">내놓은 선수가 없습니다. 아래에서 선수를 골라 내놓으면 라운드가 끝날 때마다 55% 확률로 다른 구단이 데려갑니다.</div>'; }
 
     var sq = S.squad.slice().sort(function (a, b) { return DS.marketValue(b) - DS.marketValue(a); });
     var sellRows = '';
@@ -2056,7 +2056,7 @@
       '</div>' +
       '<div class="card"><div class="card-head"><b>영입 가능 매물</b><span class="meta">이번 라운드 ' + t.listings.length + '/' + MKT_SIZE + '명</span></div>' +
       '<div class="mkt-grid">' + cards + '</div></div>' +
-      '<div class="card"><div class="card-head"><b>내 매물</b><span class="meta">다음 라운드에 판매 시도</span></div>' + mine + '</div>' +
+      '<div class="card"><div class="card-head"><b>내 매물</b><span class="meta">라운드 종료마다 55% 확률 매각</span></div>' + mine + '</div>' +
       '<div class="card"><div class="card-head"><b>선수 방출 · 내놓기</b><span class="meta">이적료 = OVR·나이·등급</span></div>' +
       '<div class="sl-list">' + sellRows + '</div></div>' +
       '<div class="card tight"><div class="card-head"><b>아이템</b></div>' +
