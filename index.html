@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v23 — 감독별 육성 · 유소년 2군 출전 · 나이 성장 곡선</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v23은 감독 50명에게 육성 특성(유소년 EXP·능력치 성장 가중)을 주고, 유소년 아카데미 유망주를 2군 리그에 내보내 리그 라운드마다 실전 경험을 쌓게 한다. 유소년 출신은 1군에서도 경기 EXP ×2.2, 나이 곡선(급성장·성숙기·정체기·하락기)과 32세 이후 피지컬 하락까지 FM식 성장을 따른다.">
+<title>도트싸커 v24 — 비동기 PvP 유저 대전 · 유소년 잠재력 확장</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v24는 내 구단을 코드(공유 링크 ?vs=)로 내보내 친구의 구단과 1:1로 붙는 비동기 유저 대전(PvP)을 연다 — 상대는 AI 감독이 지휘하고 나는 실시간 전술 카드로 개입하며, 리그 승점과는 분리된다. 유소년 잠재력은 70~92로 넓어져 특급·원더키드는 드물게 등장한다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=23">
-<link rel="icon" href="icons/icon-192.png?v=23">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=23">
-<link rel="stylesheet" href="css/style.css?v=23&b=10">
+<link rel="manifest" href="manifest.webmanifest?v=24">
+<link rel="icon" href="icons/icon-192.png?v=24">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=24">
+<link rel="stylesheet" href="css/style.css?v=24&b=11">
 </head>
 <body>
 <div id="app">
@@ -51,21 +51,22 @@
     <div class="rot-in">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="4" width="14" height="26" rx="3"/><path d="M24 38a14 14 0 1 0-12-6.8"/><path d="M6 26l5 6 6-4"/></svg>
       <b>가로로 돌려 주세요</b>
-      <span>도트싸커 v23은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
+      <span>도트싸커 v24는 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
       <button class="btn primary" data-act="rotgo">가로 화면으로 보기</button>
       <button class="btn ghost sm" data-act="rotstay">세로로 계속 보기</button>
     </div>
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=23&b=10"></script>
-<script src="js/match.js?v=23&b=10"></script>
-<script src="js/game.js?v=23&b=10"></script>
+<script src="js/data.js?v=24&b=11"></script>
+<script src="js/pvp.js?v=24&b=11"></script>
+<script src="js/match.js?v=24&b=11"></script>
+<script src="js/game.js?v=24&b=11"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=23').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=24').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });

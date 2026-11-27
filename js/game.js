@@ -355,6 +355,8 @@
       youth: { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 },
       /* v23 — 2군 리그(아카데미 출전) · 시즌 전환 노화 알림 */
       reserve: { ids: [], log: [], last: null, played: 0 },
+      /* v24 — 비동기 PvP(유저 대전) 전적 · 최근 대결 기록 */
+      pvp: defaultPvp(),
       ageNotices: [],
       expLog: [],
       dex: { players: {}, emblems: {}, kits: {} },
@@ -363,6 +365,13 @@
       log: []
     };
     S = st;
+    /* v24 — 새 게임 상태를 만들 때는 이전 플레이의 리그 소속 매핑(divs)이 남지 않게 한다.
+       (S 를 새 상태로 바꾼 뒤에 표·대진표를 다시 만들어 21팀·42라운드가 생기지 않게) */
+    DIV_OVERRIDE = st.divs;
+    st.table = makeTable(st.division, true);
+    st.fixtures = makeFixtures(st.division, true);
+    st.otherTable = makeTable(3 - st.division, false);
+    st.otherFixtures = makeFixtures(3 - st.division, false);
     st.lineup = autoLineup(squad, st.formation);
     st.bench = autoBench(squad, st.lineup);
     autoRoles();
@@ -391,6 +400,8 @@
       if (!d.divs || typeof d.divs !== 'object') { d.divs = {}; }
       DIV_OVERRIDE = d.divs;
       if (!d.log) { d.log = []; }
+      /* v24 — 기존 세이브에는 PvP 전적이 없다: 기본값으로 채운다(리그·세이브 호환 유지) */
+      ensurePvp(d);
       if (d.division !== 1 && d.division !== 2) {
         d.division = 1;
         d.migrated22 = 1;
@@ -936,6 +947,10 @@
       '<div class="kpi"><b>' + S.totals.goals + '</b><span>득점</span></div>' +
       '<div class="kpi"><b>' + S.totals.conceded + '</b><span>실점</span></div>' +
       '</div></div>' +
+      '<div class="card tight"><div class="row between"><div><div class="b" style="font-size:11.5px">유저 대전 · 비동기 PvP</div>' +
+      '<div class="tiny muted">내 구단 코드를 보내 친구와 붙기 · 전적 ' + ensurePvp().w + '-' + ensurePvp().d + '-' + ensurePvp().l + '</div></div>' +
+      '<div class="row" style="gap:4px"><button class="btn sm" data-act="pvpmycode">코드 복사</button>' +
+      '<button class="btn sm primary" data-act="pvpenter">도전</button></div></div></div>' +
       '<div class="card tight"><div class="row between"><div><div class="b" style="font-size:11.5px">챌린지 매치</div>' +
       '<div class="tiny muted">최강 구단과 붙어 보상 2배 · 오늘 ' + S.challengeLeft + '회</div></div>' +
       '<button class="btn sm" data-act="challenge" ' + (S.challengeLeft <= 0 ? 'disabled' : '') + '>도전</button></div></div>';
@@ -1012,7 +1027,7 @@
       '</div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.6)">리그와 별개로 치르는 특별 경기. 실시간 모멘텀 카드가 그대로 적용됩니다.</div>' +
       '<button class="btn dark wide" style="margin-top:7px" data-act="smatchticket" ' + (S.money < 800 ? 'disabled' : '') + '>이용권 충전 · ' + fmt(800) + '</button>' +
-      '</div>' + cards +
+      '</div>' + pvpSectionHTML() + cards +
       '<div class="card tight"><div class="card-head"><b>S매치 안내</b></div>' +
       '<div class="tiny muted">· 이용권은 시즌마다 3장 지급됩니다.<br>· 하프타임에 선수 교체가 가능합니다.<br>· 3연승부터 보상이 25% 늘어납니다.</div></div>';
 
@@ -1417,8 +1432,12 @@
   }
 
   function youthStars(pot) {
-    var n = pot >= 90 ? 5 : (pot >= 82 ? 4 : (pot >= 72 ? 3 : 2));
-    return stars(n) + '<span class="tiny muted"> 잠재 ' + pot + '</span>';
+    /* v24 — 잠재 구간 70~92를 티어와 1:1로: 70~78 ★2 · 79~84 ★3 · 85~88 ★4 · 89~92 ★5 */
+    var n = pot >= 89 ? 5 : (pot >= 85 ? 4 : (pot >= 79 ? 3 : 2));
+    var t = DS.youthPotTier ? DS.youthPotTier(pot) : null;
+    return stars(n) + '<span class="tiny muted"> 잠재 ' + pot + '</span>' +
+      (t && (t.key === 'elite' || t.key === 'wonderkid')
+        ? '<span class="pot-tag" style="color:' + t.color + ';border-color:' + t.color + '55">' + t.name + '</span>' : '');
   }
 
   function youthHTML() {
@@ -1446,7 +1465,8 @@
       for (k in sel.apt) { if (sel.apt.hasOwnProperty(k) && sel.apt[k] > bv) { bv = sel.apt[k]; bestApt = k; } }
       var stage = DS.ageStage(sel.age);
       aptLine = '<div class="tiny muted" style="margin-top:3px">주 적성 ' + bestApt + ' ' + bv + '/9 · 롤 적성 ' +
-        ((DS.rolesFor(sel.pos).length) ? DS.rolesFor(sel.pos)[0].name : '—') + ' · OVR ' + DS.ratingOf(sel) + ' / 잠재 ' + (sel.pot || 0) + '</div>' +
+        ((DS.rolesFor(sel.pos).length) ? DS.rolesFor(sel.pos)[0].name : '—') + ' · OVR ' + DS.ratingOf(sel) + ' / 잠재 ' + (sel.pot || 0) +
+        (DS.youthPotTier ? ' (' + DS.youthPotTier(sel.pot || 70).name + ')' : '') + '</div>' +
         '<div class="tiny" style="margin-top:2px"><span class="age-badge" style="color:' + stage.color + ';border-color:' + stage.color + '55">' + stage.name + '</span>' +
         '<span class="age-badge youth">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</span>' +
         '<span class="tiny muted">2군 1경기 +' + Math.round(140 * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외</span></div>';
@@ -2399,6 +2419,10 @@
       '<div class="kpi"><b>' + r.cards + '</b><span>전술 카드</span></div>' +
       '</div>' +
       '<div class="band">SCORE<span>' + esc(r.competition) + ' · ' + r.roundLabel + '</span></div>' +
+      (r.pvp ? '<div class="band">유저 대전 <span>' + (r.pvp.res === 'W' ? '승리' : (r.pvp.res === 'D' ? '무승부' : '패배')) +
+        ' · ' + r.pvp.record + (r.pvp.streak > 1 ? ' · ' + r.pvp.streak + '연승' : '') + '</span></div>' +
+        '<div class="card tight" style="margin:0 0 8px"><div class="rline"><span>상대 구단</span><b style="margin-left:auto">' + esc(r.pvp.opp) + '</b></div>' +
+        '<div class="rline"><span>내 PvP 전적</span><b style="margin-left:auto">승 ' + r.pvp.w + ' · 무 ' + r.pvp.d + ' · 패 ' + r.pvp.l + '</b></div></div>' : '') +
       '<div class="card tight" style="margin:0 0 8px"><div class="rline"><span>일시</span><b style="margin-left:auto">' + r.date + '</b></div>' +
       '<div class="rline"><span>장소</span><b style="margin-left:auto">' + esc(r.stadium) + '</b></div>' +
       '<div class="rline"><span>관중</span><b style="margin-left:auto">' + fmt(r.attendance) + '명</b></div>' +
@@ -2443,6 +2467,216 @@
       '<div class="sheet-body">' + reportHTML(r) + '</div></div>';
     paintEmblems(m);
     paintShotMaps(m);
+  }
+
+  /* ═════════════════  v24 — 비동기 PvP (유저 대전) ═════════════════
+     내 구단을 코드(?vs=)로 내보내고, 받은 코드로 상대 구단과 1:1 챌린지 매치를 치른다.
+     리그 라운드·승점·S매치 이용권과 완전히 분리된 별도 경기이며, 유저 간 거래는 없다. */
+  var pvpPreview = null;          /* 도전 확인 창에 떠 있는 상대 {snap, code} */
+
+  function defaultPvp() {
+    return { w: 0, d: 0, l: 0, streak: 0, bestStreak: 0, plays: 0, history: [], codeAt: 0 };
+  }
+  function ensurePvp(st) {
+    st = st || S;
+    if (!st.pvp || typeof st.pvp !== 'object') { st.pvp = defaultPvp(); }
+    var pv = st.pvp, k = ['w', 'd', 'l', 'streak', 'bestStreak', 'plays', 'codeAt'], i;
+    for (i = 0; i < k.length; i++) { if (typeof pv[k[i]] !== 'number') { pv[k[i]] = 0; } }
+    if (!pv.history || typeof pv.history.length !== 'number') { pv.history = []; }
+    return pv;
+  }
+
+  /* 내 구단 스냅샷 재료 — 선발 11 + 벤치 7 */
+  function myPvpContext() {
+    var list = [], i, p, bp;
+    for (i = 0; i < S.lineup.length; i++) {
+      p = byId(S.lineup[i]);
+      if (p) { list.push(p); }
+    }
+    bp = benchPlayers();
+    for (i = 0; i < bp.length && list.length < 18; i++) { list.push(bp[i]); }
+    return { club: S.club, formation: S.formation, style: mgr().tacticStyle, players: list };
+  }
+  function myPvpCode() {
+    if (!DS.Pvp) { return { ok: false, error: 'PvP 모듈을 불러오지 못했습니다.' }; }
+    return DS.Pvp.exportSquadCode(myPvpContext());
+  }
+
+  /* 클립보드 — 실패하면 폴백 모달의 입력창에서 직접 복사하게 안내한다 */
+  function fallbackCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', 'readonly');
+      ta.style.position = 'fixed'; ta.style.left = '-9999px'; ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      if (ta.setSelectionRange) { ta.setSelectionRange(0, text.length); }
+      var ok = document.execCommand ? document.execCommand('copy') : false;
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) { return false; }
+  }
+  function copyText(text, done) {
+    var nav = global.navigator;
+    if (nav && nav.clipboard && nav.clipboard.writeText) {
+      try {
+        nav.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+        return;
+      } catch (e) { /* 아래 폴백 */ }
+    }
+    done(fallbackCopy(text));
+  }
+
+  /* 상대 코드 → 챌린지 매치 준비물(스카우팅 포함) */
+  function pvpPrep(snap) {
+    var team = DS.Pvp.toTeam(snap);
+    var squad = DS.Pvp.toAwaySquad(snap);
+    var om = DS.Pvp.virtualManager(snap);
+    var prep = {
+      kind: 'pvp', team: team, id: 'pvp', venueHome: true,
+      formation: snap.formation, mgr: om, squad: squad, snap: snap
+    };
+    prep.scout = DS.scoutReport({
+      formation: snap.formation, style: snap.style, players: squad, managerName: om.name
+    });
+    return prep;
+  }
+  function startPvp(snap) {
+    if (!snap) { toast('상대 구단 정보가 없습니다.'); return; }
+    pvpPreview = null;
+    startMatch('pvp', { prep: pvpPrep(snap) });
+  }
+
+  /* 경기 종료 → 내 PvP 전적·최근 대결·레지스트리 기록 */
+  function recordPvp(oppTeam, gf, ga) {
+    var pv = ensurePvp();
+    var win = gf > ga, draw = gf === ga;
+    pv.plays += 1;
+    if (win) { pv.w++; pv.streak++; }
+    else if (draw) { pv.d++; pv.streak = 0; }
+    else { pv.l++; pv.streak = 0; }
+    if (pv.streak > pv.bestStreak) { pv.bestStreak = pv.streak; }
+    var row = {
+      opp: oppTeam.name, oppShort: oppTeam.short, gf: gf, ga: ga,
+      res: win ? 'W' : (draw ? 'D' : 'L'), power: oppTeam.strength || 0, ts: Date.now()
+    };
+    pv.history.unshift(row);
+    if (pv.history.length > 12) { pv.history.length = 12; }
+    if (DS.Pvp && DS.Pvp.registry && DS.Pvp.registry.reportResult) {
+      try {
+        DS.Pvp.registry.reportResult({ opp: row.opp, gf: gf, ga: ga, res: row.res, power: row.power });
+      } catch (e) { /* 기록 실패가 경기 결과를 막지는 않는다 */ }
+    }
+    return {
+      opp: row.opp, res: row.res, gf: gf, ga: ga,
+      w: pv.w, d: pv.d, l: pv.l, streak: pv.streak, bestStreak: pv.bestStreak,
+      record: pv.w + '-' + pv.d + '-' + pv.l
+    };
+  }
+
+  /* ?vs= 링크로 들어온 도전장 */
+  function pvpIncoming(code) {    var res = DS.Pvp.importSquadCode(code);
+    if (!res.ok) { toast(res.error); return; }
+    pvpPreview = { snap: res.snap, code: res.code };
+    pvpChallengeModal(res.snap, '링크로 도착한 도전장입니다.');
+  }
+
+  function pvpOpponentCard(snap) {
+    var d = DS.Pvp.describe(snap), i, rows = '';
+    for (i = 0; i < d.top.length; i++) {
+      rows += '<div class="pvp-pl"><span class="pb ' + DS.posGroup(d.top[i].pos).toLowerCase() + '">' + d.top[i].pos + '</span>' +
+        '<b>' + esc(d.top[i].name) + '</b><span class="pvp-ovr">' + d.top[i].ovr + '</span></div>';
+    }
+    return '<div class="pvp-vs">' +
+      '<div class="pvp-vs-team"><canvas data-emblem="' + snap.emblem + '" data-kit="' + snap.kit.shirt + '|' + snap.kit.trim + '" width="34" height="40"></canvas>' +
+      '<span class="nm">' + esc(d.club) + '</span><span class="st">전력 ' + d.power + '</span></div>' +
+      '<div class="vs-mid"><b>VS</b><span>' + esc(d.formation) + ' · ' + esc(d.styleName) + '</span></div>' +
+      '<div class="pvp-vs-team"><canvas data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="34" height="40"></canvas>' +
+      '<span class="nm">' + esc(S.club.name) + '</span><span class="st">전력 ' + teamPower() + '</span></div>' +
+      '</div>' +
+      '<div class="pvp-top">' + rows + '</div>' +
+      '<div class="tiny muted">선수 ' + d.count + '명 · 상대는 AI 감독이 지휘하고, 나는 실시간 전술 카드·교체로 개입합니다.</div>' +
+      (d.clamped ? '<div class="tiny" style="color:#b8452f;margin-top:3px">비정상 수치 ' + d.clamped + '개를 상한(스탯 10 · 레벨 60)으로 조정했습니다.</div>' : '');
+  }
+
+  function pvpChallengeModal(snap, note) {
+    var d = DS.Pvp.describe(snap);
+    setSheet('도전장 · ' + esc(d.club),
+      '<div class="tiny muted" style="margin-bottom:7px">' + esc(note || '') + '</div>' +
+      pvpOpponentCard(snap) +
+      '<div class="row" style="gap:5px;margin-top:9px">' +
+      '<button class="btn primary" data-act="pvpstart">킥오프 · 유저 대전</button>' +
+      '<button class="btn ghost" data-act="closemodal">나중에</button></div>');
+    paintEmblems(document.getElementById('modal'));
+  }
+
+  function pvpMyCodeModal() {
+    var ex = myPvpCode();
+    if (!ex || !ex.ok) { toast((ex && ex.error) || '구단 코드를 만들지 못했습니다.'); return; }
+    var pv = ensurePvp();
+    pv.codeAt = Date.now();
+    save();
+    setSheet('내 구단 코드',
+      '<div class="tiny muted" style="margin-bottom:6px">아래 링크나 코드를 카톡·디스코드로 보내면 친구가 내 구단과 바로 붙을 수 있습니다.</div>' +
+      '<div class="pvp-share"><b>공유 링크</b>' +
+      '<textarea class="pvp-input" id="pvp-link" readonly rows="5">' + esc(ex.url) + '</textarea></div>' +
+      '<div class="pvp-share"><b>짧은 코드</b>' +
+      '<textarea class="pvp-input" id="pvp-code" readonly rows="5">' + esc(ex.code) + '</textarea></div>' +
+      '<div class="row" style="gap:5px;margin-top:4px">' +
+      '<button class="btn primary" data-act="pvpcopy" data-which="url">링크 복사</button>' +
+      '<button class="btn" data-act="pvpcopy" data-which="code">코드 복사</button>' +
+      '<button class="btn ghost" data-act="closemodal">닫기</button></div>' +
+      '<div class="tiny muted" style="margin-top:6px">전력 ' + ex.snap.power + ' · ' + ex.snap.players.length + '명 · ' + esc(ex.snap.formation) +
+      ' · ' + esc(DS.tacticStyle(ex.snap.style).name) + ' · 코드 ' + ex.length + '자</div>');
+    /* 클릭(사용자 제스처) 안에서 바로 복사까지 시도한다 */
+    var taCode = document.getElementById('pvp-code'), taLink = document.getElementById('pvp-link');
+    if (taLink) { taLink.style.height = Math.min(200, (taLink.scrollHeight || 0) + 8) + 'px'; }
+    if (taCode) { taCode.style.height = Math.min(200, (taCode.scrollHeight || 0) + 8) + 'px'; }
+    copyText(ex.url, function (ok) {
+      toast(ok ? '공유 링크를 복사했습니다. 카톡에 붙여넣으세요.' : '자동 복사가 막혔습니다 — 링크를 길게 눌러 복사하세요.');
+    });
+  }
+
+  function pvpSectionHTML() {
+    var pv = ensurePvp(), total = pv.w + pv.d + pv.l;
+    var rivals = DS.Pvp.presets(), i, r, d, rc = '', hc = '';
+    for (i = 0; i < rivals.length; i++) {
+      r = rivals[i];
+      d = DS.Pvp.describe(r.snap);
+      rc += '<div class="card pvp-rival">' +
+        '<div class="card-head"><b>' + esc(d.club) + '</b><span class="meta">' + esc(r.tag) + '</span></div>' +
+        '<div class="pvp-row">' +
+        '<canvas data-emblem="' + r.snap.emblem + '" data-kit="' + r.snap.kit.shirt + '|' + r.snap.kit.trim + '" width="26" height="30"></canvas>' +
+        '<div class="pvp-id"><b>' + esc(d.formation) + ' · ' + esc(d.styleName) + '</b>' +
+        '<span>전력 ' + d.power + ' · 선수 ' + d.count + '명</span></div>' +
+        '<button class="btn sm" data-act="pvprival" data-k="' + esc(r.key) + '">도전</button></div>' +
+        '<div class="tiny muted">' + esc(r.desc) + '</div></div>';
+    }
+    for (i = 0; i < pv.history.length && i < 5; i++) {
+      var h = pv.history[i];
+      var cls = h.res === 'W' ? 'w' : (h.res === 'D' ? 'd' : 'l');
+      var ko = h.res === 'W' ? '승' : (h.res === 'D' ? '무' : '패');
+      hc += '<div class="pvp-rec"><span class="t-' + cls + '">' + ko + '</span><b>' + esc(h.opp) + '</b>' +
+        '<em>' + h.gf + ' : ' + h.ga + '</em></div>';
+    }
+    if (!hc) { hc = '<div class="tiny muted">아직 유저 대전 기록이 없습니다. 내 코드를 보내거나 아래 라이벌에게 먼저 도전해 보세요.</div>'; }
+
+    return '<div class="card dark">' +
+      '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">유저 대전 · 비동기 PvP</b><span class="meta">ASYNC PVP 1단계</span></div>' +
+      '<div class="kpis" style="margin-bottom:7px">' +
+      '<div class="kpi"><b class="lime">' + pv.w + '-' + pv.d + '-' + pv.l + '</b><span>승-무-패</span></div>' +
+      '<div class="kpi"><b>' + pv.streak + '</b><span>연승</span></div>' +
+      '<div class="kpi"><b>' + Math.max(pv.bestStreak, pv.streak) + '</b><span>최고 연승</span></div>' +
+      '</div>' +
+      '<div class="tiny" style="color:rgba(233,244,221,.62)">내 구단 코드/링크를 카톡 등으로 보내 친구와 대결하세요. 리그 승점·일정에는 영향이 없습니다.</div>' +
+      '<div class="pvp-btns">' +
+      '<button class="btn primary" data-act="pvpmycode">내 구단 코드 복사</button>' +
+      '<button class="btn dark" data-act="pvpenter">상대 코드로 도전</button></div>' +
+      '<div class="tiny" style="color:rgba(233,244,221,.45);margin-top:5px">전적 ' + total + '경기 · ' + (total ? '승률 ' + Math.round(pv.w / total * 100) + '%' : '첫 대전을 기다리는 중') + '</div>' +
+      '</div>' +
+      rc +
+      '<div class="card"><div class="card-head"><b>내 PvP 전적</b><span class="meta">최근 5경기</span></div>' + hc + '</div>';
   }
 
   /* ═════════════════  경기 ═════════════════ */
@@ -2559,9 +2793,16 @@
     if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
     if (kind === 'smatch' && S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
     if (kind === 'challenge' && S.challengeLeft <= 0) { toast('오늘 챌린지를 모두 소진했습니다.'); return; }
-    /* v20 ③ — 미리 만든 상대(스카우팅 리포트의 그 스쿼드)를 그대로 쓴다 */
-    var prep = prepareOpp(kind, opt);
-    if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
+    /* v24 — 유저 대전(PvP)은 리그·S매치와 분리된 별도 경기: 준비된 상대 프렙을 그대로 쓴다 */
+    var prep;
+    if (kind === 'pvp') {
+      if (!opt.prep) { toast('상대 구단 정보가 없습니다.'); return; }
+      prep = opt.prep;
+    } else {
+      /* v20 ③ — 미리 만든 상대(스카우팅 리포트의 그 스쿼드)를 그대로 쓴다 */
+      prep = prepareOpp(kind, opt);
+      if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
+    }
     var oppTeam = prep.team, oppId = prep.id, venueHome = prep.venueHome, i;
     if (kind === 'smatch') { S.smatchTickets--; }
 
@@ -2630,6 +2871,9 @@
     var base = win ? (420 + gf * 60 + (gf - ga) * 40) : (draw ? 210 : 110 + gf * 30);
     if (kind === 'challenge') { base = Math.round(base * 2); }
     if (kind === 'smatch') { base = Math.round(base * 1.35); }
+    /* v24 — 유저 대전은 티켓 없이 몇 번이든 치를 수 있으므로, 리그 경기보다 적게 준다(0.9배).
+       무한 파밍으로 경제가 틀어지지 않게 하는 장치. */
+    if (kind === 'pvp') { base = Math.round(base * 0.9); }
     /* v22 — 1부는 스폰서 배율·중계권 수입이 커진다 */
     var spBonus = 0, i, tv = 0;
     for (i = 0; i < DS.SPONSORS.length; i++) {
@@ -2647,12 +2891,15 @@
     S.morale = clamp(S.morale + (win ? 6 : (draw ? 0 : -5)), 0, 100);
     S.condition = clamp(S.condition - U.irange(6, 10) + facValue('medical'), 12, 100);
     S.money += reward;
-    S.totals.matches++;
-    S.totals.goals += gf;
-    S.totals.conceded += ga;
-    if (win) { S.totals.wins++; } else if (draw) { S.totals.draws++; } else { S.totals.losses++; }
+    /* v24 — 유저 대전(PvP)은 시즌 기록(전적·득실)에 넣지 않고 별도 PvP 전적에만 남긴다 */
+    if (kind !== 'pvp') {
+      S.totals.matches++;
+      S.totals.goals += gf;
+      S.totals.conceded += ga;
+      if (win) { S.totals.wins++; } else if (draw) { S.totals.draws++; } else { S.totals.losses++; }
+    }
 
-    var points = null, reserveOut = null;
+    var points = null, reserveOut = null, pvpOut = null;
     if (kind === 'league') {
       playMatchRows(gf, ga, oppId);
       S.round++;
@@ -2664,6 +2911,8 @@
       S.challengeLeft = Math.max(0, S.challengeLeft - 1);
     } else if (kind === 'smatch') {
       S.smatchStreak = win ? S.smatchStreak + 1 : 0;
+    } else if (kind === 'pvp') {
+      pvpOut = recordPvp(oppTeam, gf, ga);
     }
 
     var stadiums = ['도트 파크', '에메랄드 아레나', '한강 경기장', '벽산 스타디움'];
@@ -2672,8 +2921,8 @@
     var expGain = awardMatchExp(res, kind);
     var report = {
       season: S.season,
-      roundLabel: kind === 'league' ? (S.round + '라운드') : (kind === 'smatch' ? 'S매치' : '챌린지'),
-      competition: kind === 'league' ? '도트 리그' : (kind === 'smatch' ? 'S매치 스페셜' : '챌린지 매치'),
+      roundLabel: kind === 'league' ? (S.round + '라운드') : (kind === 'smatch' ? 'S매치' : (kind === 'pvp' ? '유저 대전' : '챌린지')),
+      competition: kind === 'league' ? '도트 리그' : (kind === 'smatch' ? 'S매치 스페셜' : (kind === 'pvp' ? '비동기 PvP · 유저 대전' : '챌린지 매치')),
       date: '2045/11/' + (14 + (S.round % 12)) + ' ' + ['19:30', '20:00', '21:00'][S.round % 3],
       stadium: stadiums[S.round % stadiums.length],
       attendance: 380 + Math.floor(S.fans / 12),
@@ -2709,6 +2958,7 @@
       points: points,
       expGain: expGain,
       reserve: reserveOut,
+      pvp: pvpOut,
       kind: kind,
       venueHome: venueHome !== false
     };
@@ -2728,7 +2978,7 @@
 
   /* ─────────────────────────  v21 — 경기 EXP · 자동 레벨업 (v23에서 data.js로 이동)  ───────────────────────── */
   function awardMatchExp(res, kind) {
-    var mult = kind === 'league' ? 1 : (kind === 'challenge' ? 1.3 : 0.9);
+    var mult = kind === 'league' ? 1 : (kind === 'challenge' ? 1.3 : (kind === 'pvp' ? 0.8 : 0.9));
     var goalsBy = {}, assistsBy = {}, i, out = [];
     var gs = (res && res.goals) || [];
     for (i = 0; i < gs.length; i++) {
@@ -3835,6 +4085,54 @@
       startMatch('league'); return;
     }
     if (act === 'challenge') { startMatch('challenge'); return; }
+    /* ── v24 — 유저 대전 (비동기 PvP) ── */
+    if (act === 'pvpmycode') { pvpMyCodeModal(); return; }
+    if (act === 'pvpcopy') {
+      var pvWhich = t.getAttribute('data-which');
+      var pvField = document.getElementById(pvWhich === 'code' ? 'pvp-code' : 'pvp-link');
+      var pvVal = pvField ? pvField.value : '';
+      copyText(pvVal, function (ok) {
+        toast(ok ? '복사했습니다. 카톡에 붙여넣으세요.' : '복사가 막혔습니다. 입력창을 길게 눌러 직접 복사하세요.');
+      });
+      return;
+    }
+    if (act === 'pvpenter') {
+      setSheet('상대 구단 코드로 도전',
+        '<div class="tiny muted" style="margin-bottom:6px">친구에게 받은 구단 코드나 링크(?vs=)를 붙여넣으세요. 링크 전체를 넣어도 됩니다.</div>' +
+        '<textarea class="pvp-input" id="pvp-in" rows="4" spellcheck="false" autocomplete="off" placeholder="DSP1-... 또는 https://...?vs=DSP1-..."></textarea>' +
+        '<div class="row" style="gap:5px;margin-top:6px">' +
+        '<button class="btn primary" data-act="pvpdecode">코드 확인</button>' +
+        '<button class="btn ghost" data-act="closemodal">닫기</button></div>' +
+        '<div class="tiny muted" style="margin-top:6px">· 코드에는 구단명 · 포메이션 · 전술 · 선수 18명이 담깁니다.<br>· 비정상 수치(스탯·레벨)는 자동으로 상한 처리됩니다.<br>· 리그 승점·일정에는 영향이 없습니다.</div>');
+      return;
+    }
+    if (act === 'pvpdecode') {
+      var pvpIn = document.getElementById('pvp-in');
+      var pvpRaw = pvpIn ? pvpIn.value : '';
+      var pvpRes = DS.Pvp.importSquadCode(pvpRaw);
+      if (!pvpRes.ok) { toast(pvpRes.error); return; }
+      pvpPreview = { snap: pvpRes.snap, code: pvpRes.code };
+      pvpChallengeModal(pvpRes.snap, '붙여넣은 코드를 확인했습니다.');
+      return;
+    }
+    if (act === 'pvprival') {
+      var prKey = t.getAttribute('data-k'), prList = DS.Pvp.presets(), pi;
+      for (pi = 0; pi < prList.length; pi++) {
+        if (prList[pi].key === prKey) {
+          pvpPreview = { snap: prList[pi].snap, code: prList[pi].code };
+          pvpChallengeModal(prList[pi].snap, prList[pi].tag + ' · ' + prList[pi].desc);
+          return;
+        }
+      }
+      return;
+    }
+    if (act === 'pvpstart') {
+      if (!pvpPreview) { toast('상대 구단 정보가 없습니다. 코드를 다시 넣어 주세요.'); return; }
+      var pvpSnap = pvpPreview.snap;
+      closeModal();
+      startPvp(pvpSnap);
+      return;
+    }
     if (act === 'smatch') {
       var key2 = t.getAttribute('data-k'), list = smatchList(), i2;
       for (i2 = 0; i2 < list.length; i2++) { if (list[i2].key === key2) { startMatch('smatch', { teamId: list[i2].team.id }); return; } }
@@ -4068,6 +4366,12 @@
     renderHeader();
     setTab('home');
 
+    /* v24 — ?vs= 공유 링크로 들어오면 도전장을 바로 띄운다 */
+    var vsCode = (DS.Pvp && DS.Pvp.codeFromUrl) ? DS.Pvp.codeFromUrl(global.location && global.location.href) : '';
+    if (vsCode) {
+      global.setTimeout(function () { pvpIncoming(vsCode); }, 320);
+    }
+
     document.addEventListener('click', function (e) {
       var t = e.target;
       while (t && t !== document && !(t.getAttribute && t.getAttribute('data-act'))) { t = t.parentNode; }
@@ -4129,6 +4433,27 @@
     playReserveRound: playReserveRound,
     ageSeason: ageSeason,
     youthReserve: doYouthReserve,
+    /* v24 — 비동기 PvP 검증용 */
+    pvpExport: function () { return myPvpCode(); },
+    pvpImport: function (code) { return DS.Pvp.importSquadCode(code); },
+    pvpPresets: function () {
+      return DS.Pvp.presets().map(function (x) {
+        return { key: x.key, tag: x.tag, club: x.snap.club, power: x.snap.power, code: x.code };
+      });
+    },
+    pvpStart: function (code) {
+      var r = DS.Pvp.importSquadCode(code);
+      if (!r.ok) { return r; }
+      startPvp(r.snap);
+      return { ok: true, power: r.snap.power, club: r.snap.club };
+    },
+    pvpStartPreset: function (key) {
+      var list = DS.Pvp.presets(), i;
+      for (i = 0; i < list.length; i++) { if (list[i].key === key) { startPvp(list[i].snap); return { ok: true }; } }
+      return { ok: false, error: '프리셋을 찾지 못했습니다.' };
+    },
+    pvpState: function () { return ensurePvp(); },
+    pvpIncoming: pvpIncoming,
     load: load,
     defaultState: defaultState,
     saveKey: SAVE_KEY,

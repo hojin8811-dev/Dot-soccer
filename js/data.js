@@ -2047,9 +2047,40 @@
   };
 
   /* 유소년 후보 — 15~18세. v23부터는 2군 로테이션급(OVR 55~62)에서 출발해
-     2군 출전으로 2시즌에 걸쳐 1군 전력(OVR 74~78+)까지 자란다. */
-  DS.YOUTH_POT_MIN = 77;
-  DS.YOUTH_POT_MAX = 82;
+     2군 출전으로 2시즌에 걸쳐 1군 전력(OVR 74~78+)까지 자란다.
+     v24 — 잠재력 풀을 70~92로 넓히고, 잠재가 높을수록 드물게 뽑는다.
+        일반 유망주 70~78 (62%) · 준수한 유망주 79~84 (27%) · 특급 유망주 85~88 (8.5%) · 초특급 원더키드 89~92 (2.5%) */
+  DS.YOUTH_POT_MIN = 70;
+  DS.YOUTH_POT_MAX = 92;
+  DS.YOUTH_POT_TIERS = [
+    { key: 'normal',    name: '일반 유망주',   min: 70, max: 78, pct: 62,  color: '#7d8b99', stars: 2 },
+    { key: 'good',      name: '준수한 유망주', min: 79, max: 84, pct: 27,  color: '#2f8f62', stars: 3 },
+    { key: 'elite',     name: '특급 유망주',   min: 85, max: 88, pct: 8.5, color: '#c1911b', stars: 4 },
+    { key: 'wonderkid', name: '초특급 원더키드', min: 89, max: 92, pct: 2.5, color: '#8248bf', stars: 5 }
+  ];
+  /* 구간 확률 추첨 → 구간 안에서 균등 추첨. rnd 를 넘기면 QA·재현용으로 쓸 수 있다. */
+  DS.rollYouthPot = function (rnd) {
+    var r = typeof rnd === 'number' ? rnd : Math.random();
+    var list = DS.YOUTH_POT_TIERS, acc = 0, i, t;
+    if (!(r >= 0 && r < 1)) { r = Math.random(); }
+    for (i = 0; i < list.length; i++) {
+      t = list[i];
+      acc += t.pct / 100;
+      if (r < acc || i === list.length - 1) {
+        return t.min + Math.floor(Math.random() * (t.max - t.min + 1));
+      }
+    }
+    return DS.YOUTH_POT_MIN;
+  };
+  /* 잠재력 → 구간 정보(별·이름·색) */
+  DS.youthPotTier = function (pot) {
+    var list = DS.YOUTH_POT_TIERS, i;
+    pot = typeof pot === 'number' ? pot : DS.YOUTH_POT_MIN;
+    for (i = 0; i < list.length; i++) {
+      if (pot >= list[i].min && pot <= list[i].max) { return list[i]; }
+    }
+    return pot < list[0].min ? list[0] : list[list.length - 1];
+  };
   DS.makeYouthProspect = function (opts) {
     opts = opts || {};
     var p = makePlayer({ rarity: opts.rarity || (Math.random() < 0.16 ? 'eun' : 'dong') });
@@ -2065,7 +2096,8 @@
     }
     p.level = 0;
     p.exp = 0;
-    p.pot = opts.pot || (DS.YOUTH_POT_MIN + Math.floor(Math.random() * (DS.YOUTH_POT_MAX - DS.YOUTH_POT_MIN + 1)));
+    p.pot = opts.pot || DS.rollYouthPot();
+    p.potTier = DS.youthPotTier(p.pot).key;
     p.youth = true;
     p.originYouth = true;
     p.stats = statSheet(p);

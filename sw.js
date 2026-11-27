@@ -1,12 +1,12 @@
-/*! 도트싸커 v23 — 1부·2부 리그 승격/강등 · 벤치 7명 · 전술 카드 일러스트 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v23-20261127a';
+/*! 도트싸커 v24 — 비동기 PvP(유저 대전) · 유소년 잠재력 확장 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v24-20261127a';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=23&b=10', './js/data.js?v=23&b=10', './js/match.js?v=23&b=10', './js/game.js?v=23&b=10',
+        './css/style.css?v=24&b=11', './js/data.js?v=24&b=11', './js/pvp.js?v=24&b=11', './js/match.js?v=24&b=11', './js/game.js?v=24&b=11',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

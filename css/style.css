@@ -2009,3 +2009,43 @@ body.rot-off .rotate { display: none; }
 .mkt .mt { gap: 2px; }
 .mkt .mt .chip { font-size: 6.5px; padding: 0 4px; height: 14px; line-height: 14px; border-radius: 5px; }
 .mkt .mt .pb { font-size: 7px; padding: 0 4px; height: 14px; line-height: 14px; border-radius: 5px; }
+
+/* ═════════════════ v24 — 유저 대전(비동기 PvP) ═════════════════ */
+.pvp-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 7px; }
+.pvp-btns .btn { width: 100%; height: 34px; font-size: 11px; }
+.pvp-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+.pvp-row canvas { flex: 0 0 auto; }
+.pvp-id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pvp-id b { font-size: 11px; letter-spacing: -.2px; }
+.pvp-id span { font-size: 9.5px; color: var(--ink2); }
+.pvp-rival .tiny.muted { line-height: 1.45; }
+.pvp-rec { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.pvp-rec:last-child { border-bottom: 0; }
+.pvp-rec span { width: 17px; height: 17px; border-radius: 6px; flex: 0 0 auto; font-size: 9px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+.pvp-rec span.t-w { background: #e4f6c8; color: #3f6b12; }
+.pvp-rec span.t-d { background: #ece9dd; color: #6b6b5c; }
+.pvp-rec span.t-l { background: #f7ddd6; color: #a3392a; }
+.pvp-rec b { font-size: 10.5px; font-weight: 800; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvp-rec em { font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: -.3px; }
+.pvp-vs { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.pvp-vs-team { display: flex; flex-direction: column; align-items: center; gap: 1px; flex: 1 1 0; min-width: 0; }
+.pvp-vs-team .nm { font-size: 10.5px; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pvp-vs-team .st { font-size: 9px; color: var(--ink2); }
+.pvp-top { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin-bottom: 6px; }
+.pvp-pl { display: flex; align-items: center; gap: 4px; font-size: 10px; }
+.pvp-pl b { font-weight: 700; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvp-ovr { font-weight: 900; font-size: 10.5px; color: var(--ink2); }
+.pvp-share { margin-bottom: 6px; }
+.pvp-share b { display: block; font-size: 9.5px; color: var(--ink2); margin-bottom: 2px; }
+.pvp-input {
+  width: 100%; box-sizing: border-box; resize: none;
+  border: 1px solid var(--line); border-radius: 9px; background: #fffdf7;
+  padding: 6px 7px; font: 600 9.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink); word-break: break-all; overflow-x: hidden;
+}
+.pvp-input:focus { outline: none; border-color: #a8da4e; }
+.pot-tag {
+  display: inline-block; margin-left: 3px; padding: 0 4px;
+  border: 1px solid currentColor; border-radius: 5px;
+  font-size: 7.5px; font-weight: 900; letter-spacing: -.1px; vertical-align: 1px;
+}
