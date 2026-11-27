@@ -3985,7 +3985,8 @@
      벤치 7명 중 같은/비슷한 포지션이면서 OVR이 가장 높은 미출전 선수를 1:1로 붙인다.
      [원클릭 교체]는 DS.Match.substitute()를 바로 호출해 후반 라인업에 즉시 반영된다. */
   var ADV = {
-    formAbs: 5.95,      /* 이 아래면 전반 부진으로 본다 (6.0이 기준 평점) */
+    formAbs: 5.95,      /* 이 아래면 전반 부진 (6.0이 기준 평점) */
+    formSoft: 5.99,     /* 팀 하위 2명이면 이 안에서도 부진으로 본다 — 6.0(기준)은 부진이 아니다 */
     formRank: 2,        /* 팀 하위 2명 — 팀 평균보다 낮으면 부진으로 함께 본다 */
     aptGap: 2,          /* 슬롯 적성이 자기 최고 적성보다 2 이상 낮으면 전술 부적응 */
     stam: 62,           /* 체력 62% 이하 → 고갈 위험 (하프타임 +11 회복 뒤 값) */
@@ -4002,10 +4003,10 @@
   }
 
   /* 추천 1건에 붙일 '왜' — 부진·체력·경고를 한 사람에 여러 개 붙일 수 있다 */
-  function advTagsOf(p, lowCut, avg) {
+  function advTagsOf(p, lowCut) {
     var tags = [], score = 0, flags = { form: false, slot: false, stam: false, card: false };
     var formLow = (p.rating <= ADV.formAbs) ||
-      (p.rating <= lowCut + 0.001 && p.rating < avg - 0.05);
+      (p.rating <= lowCut + 0.001 && p.rating <= ADV.formSoft);
     var slotBad = ((p.aptBest || 0) - (p.aptSlot || 0)) >= ADV.aptGap;
     if (formLow && slotBad) { tags.push('📉 경기력 저하 · 전술 부적응'); }
     else if (formLow) { tags.push('📉 경기력 저하'); }
@@ -4037,18 +4038,15 @@
 
   /* 현재 라인업에서 추천 행을 다시 계산한다(교체할 때마다 새로) */
   function advRows(st) {
-    var on = st.onPitch.slice(), i, p, t, cands = [], rows = [], taken = {}, lowCut = 6, rts = [], avg = 6;
+    var on = st.onPitch.slice(), i, p, t, cands = [], rows = [], taken = {}, lowCut = 6, rts = [];
     for (i = 0; i < on.length; i++) { rts.push(on[i].rating); }
     if (rts.length) {
-      var sum = 0;
-      for (i = 0; i < rts.length; i++) { sum += rts[i]; }
-      avg = sum / rts.length;
       rts.sort(function (a, b) { return a - b; });
       lowCut = rts[Math.min(ADV.formRank, rts.length) - 1];
     }
     for (i = 0; i < on.length; i++) {
       p = on[i];
-      t = advTagsOf(p, lowCut, avg);
+      t = advTagsOf(p, lowCut);
       if (!t.tags.length) { continue; }
       cands.push({ p: p, tags: t.tags, score: t.score, flags: t.flags });
     }
