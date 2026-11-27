@@ -649,6 +649,26 @@
     for (i = 0; i < ROLES.length; i++) { if (ROLES[i].pos.indexOf(pos) >= 0) { out.push(ROLES[i]); } }
     return out;
   };
+  /* v23 — 이적시장 매물은 포지션·등급·나이에 맞는 롤을 달고 나온다 (전부 '롤 없음'이던 문제 수정).
+     등급이 높고 경험이 많을수록 상위 롤(need 높은 롤)이 붙는다. */
+  DS.pickRoleFor = function (p) {
+    if (!p) { return null; }
+    var list = DS.rolesFor(p.pos) || [], i, pool = [], hi = [], lo = [];
+    if (!list.length) { return null; }
+    var rar = { dong: 0, eun: 1, geum: 2, legend: 3 }[p.rarity];
+    if (typeof rar !== 'number') { rar = 0; }
+    var age = p.age || 24;
+    /* 상위 롤을 달 확률: 전설 90% · 금 70% · 은 45% · 동 20% (30세 이상은 +15%p) */
+    var pHi = (rar >= 3 ? 0.9 : (rar === 2 ? 0.7 : (rar === 1 ? 0.45 : 0.2))) + (age >= 30 ? 0.15 : 0);
+    for (i = 0; i < list.length; i++) {
+      if (list[i].need >= 4) { hi.push(list[i]); } else { lo.push(list[i]); }
+    }
+    if (!hi.length) { pool = lo; }
+    else if (!lo.length) { pool = hi; }
+    else { pool = (Math.random() < pHi) ? hi : lo; }
+    if (!pool.length) { pool = list; }
+    return pool[Math.floor(Math.random() * pool.length)].key;
+  };
 
   /* ─────────────────────────  라커룸 성향  ───────────────────────── */
   var LOCKER = [
@@ -1138,6 +1158,84 @@
       traits: [{ k: 'press', v: 8 }, { k: 'speed', v: 7 }] }
   ];
 
+  /* ─────────────────────────  v23 — 감독별 육성(growth) 특성  ─────────────────────────
+     감독은 경기 중 전술 보정만 주던 v22까지와 달리, 이제 선수를 "어떻게 키우는지"도 갖는다.
+       youthMult — 유소년(아카데미·유소년 출신) EXP 추가 배율 (1.30 = +30%)
+       expMult   — 전 선수 경기 EXP 배율 (1.16 = +16%)
+       bias      — 레벨업 시 능력치가 오를 확률 가중 (s=스피드 · t=테크닉 · p=파워)
+     감독의 특기·철학·등급에 맞춰 50명 전원에게 부여한다. */
+  var GROWTH_KIND = {
+    youth:     { key: 'youth',     name: '유소년 육성', line: '유소년을 집중 육성',       icon: '🌱' },
+    attack:    { key: 'attack',    name: '공격 육성',   line: '스피드·테크닉 성장 가중', icon: '⚡' },
+    defense:   { key: 'defense',   name: '수비 육성',   line: '파워·몸싸움 성장 가중',   icon: '🛡️' },
+    technique: { key: 'technique', name: '기술 육성',   line: '테크닉·패스 성장 가중',   icon: '🎯' },
+    allround:  { key: 'allround',  name: '균형 육성',   line: '전 능력치 고른 성장',     icon: '🧭' }
+  };
+  var GROWTH_BIAS = {
+    youth:     { s: 1.05, t: 1.20, p: 1.00 },
+    attack:    { s: 1.50, t: 1.30, p: 0.70 },
+    defense:   { s: 0.80, t: 0.75, p: 1.50 },
+    technique: { s: 0.75, t: 1.50, p: 1.00 },
+    allround:  { s: 1.10, t: 1.10, p: 1.10 }
+  };
+  DS.GROWTH_KIND = GROWTH_KIND;
+  DS.GROWTH_BIAS = GROWTH_BIAS;
+
+  /* [성장 유형, EXP 배율, 유소년 배율(없으면 1)] */
+  var MGR_GROWTH = {
+    /* 동급 */
+    m01: ['allround', 1.06], m02: ['defense', 1.06], m03: ['defense', 1.06], m04: ['technique', 1.06],
+    m05: ['defense', 1.08], m06: ['attack', 1.08], m07: ['youth', 1.08, 1.30], m08: ['attack', 1.08],
+    /* 은급 */
+    m09: ['allround', 1.10], m10: ['attack', 1.12], m11: ['youth', 1.10, 1.32], m12: ['defense', 1.12],
+    m13: ['attack', 1.10], m14: ['defense', 1.12], m15: ['allround', 1.10], m16: ['youth', 1.12, 1.35],
+    m17: ['defense', 1.10], m18: ['technique', 1.10],
+    /* 금급 */
+    m19: ['allround', 1.18], m20: ['attack', 1.20], m21: ['youth', 1.16, 1.36], m22: ['defense', 1.20],
+    m23: ['attack', 1.18], m24: ['defense', 1.16], m25: ['allround', 1.20], m26: ['attack', 1.20],
+    m27: ['defense', 1.18],
+    /* 전설 */
+    m28: ['technique', 1.30], m29: ['defense', 1.30], m30: ['attack', 1.30], m31: ['attack', 1.28],
+    m32: ['allround', 1.30],
+    /* v21 확장 18명 */
+    m33: ['allround', 1.05], m34: ['defense', 1.06], m35: ['youth', 1.06, 1.30], m36: ['technique', 1.06],
+    m37: ['defense', 1.08], m38: ['technique', 1.10], m39: ['attack', 1.12], m40: ['youth', 1.12, 1.34],
+    m41: ['attack', 1.10], m42: ['defense', 1.10], m43: ['allround', 1.10], m44: ['attack', 1.18],
+    m45: ['allround', 1.18], m46: ['youth', 1.18, 1.32], m47: ['defense', 1.18], m48: ['attack', 1.20],
+    m49: ['technique', 1.28], m50: ['defense', 1.26]
+  };
+  (function () {
+    var i, row, kind;
+    for (i = 0; i < MANAGERS.length; i++) {
+      row = MGR_GROWTH[MANAGERS[i].id] || ['allround', 1];
+      kind = GROWTH_KIND[row[0]] ? row[0] : 'allround';
+      MANAGERS[i].growth = {
+        kind: kind,
+        expMult: row[1] || 1,
+        youthMult: row[2] || 1,
+        bias: {
+          s: GROWTH_BIAS[kind].s, t: GROWTH_BIAS[kind].t, p: GROWTH_BIAS[kind].p
+        }
+      };
+    }
+  })();
+
+  /* 감독의 육성 특성 — 기본값(구버전 감독 데이터)도 안전하게 돌려준다 */
+  DS.growthOf = function (m) {
+    if (m && m.growth && m.growth.bias) { return m.growth; }
+    return { kind: 'allround', expMult: 1, youthMult: 1, bias: GROWTH_BIAS.allround };
+  };
+  /* 화면 표기용 — 예: ['유소년 EXP +35%', '유소년을 집중 육성'] */
+  DS.growthChips = function (m) {
+    var g = DS.growthOf(m), k = GROWTH_KIND[g.kind] || GROWTH_KIND.allround, out = [];
+    if (g.youthMult > 1) { out.push('유소년 EXP +' + Math.round((g.youthMult - 1) * 100) + '%'); }
+    if (g.expMult > 1) { out.push('선수 EXP +' + Math.round((g.expMult - 1) * 100) + '%'); }
+    out.push(k.line);
+    return out;
+  };
+  DS.growthLine = function (m) { return DS.growthChips(m).join(' · '); };
+  DS.growthKind = function (m) { var g = DS.growthOf(m); return GROWTH_KIND[g.kind] || GROWTH_KIND.allround; };
+
   /* 감독이 보유한 변칙 포메이션 (고유 + 두 번째) — 마이팀에서 선택 가능 */
   DS.managerAnomalies = function (m) {
     var out = [], i, k;
@@ -1269,7 +1367,7 @@
     { id: 'pohang',   name: '포항 제철',      short: '포항', division: 1, kit: { shirt: '#b8461e', shorts: '#1a1512', trim: '#ffd0a0' }, emblem: 'bolt', strength: 83 },
     { id: 'changwon', name: '창원 기계',      short: '창원', division: 1, kit: { shirt: '#4a4f7a', shorts: '#1a1c2c', trim: '#c8ccf0' }, emblem: 'ball', strength: 78 },
     { id: 'ilsan',    name: '일산 호수',      short: '일산', division: 1, kit: { shirt: '#2f8f62', shorts: '#12241c', trim: '#b6f0cf' }, emblem: 'star', strength: 84 },
-    /* ── 2부 리그 (20팀 · 우리 구단 포함) ── */
+    /* ── 2부 리그 (19팀 · 우리 구단 'me'를 더해 20팀 = 38라운드) ── */
     { id: 'hangang',  name: '한강 FC',        short: '한강', division: 2, kit: { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' }, emblem: 'wave', strength: 69 },
     { id: 'cheongchun', name: '청춘 FC',      short: '청춘', division: 2, kit: { shirt: '#c85a1e', shorts: '#2b2622', trim: '#ffd8a8' }, emblem: 'flame', strength: 66 },
     { id: 'byeolbit', name: '별빛 레인저스',  short: '별빛', division: 2, kit: { shirt: '#6a34c0', shorts: '#241634', trim: '#dcc8f8' }, emblem: 'star', strength: 71 },
@@ -1707,6 +1805,192 @@
   /* 레벨업에 필요한 EXP. 레벨이 오를수록 선형으로 늘어나 성장이 느려진다. */
   DS.expToNext = function (level) { return 520 + (level || 0) * 420; };
 
+  /* ─────────────────────────  v23 — 나이 곡선 · 유소년/감독 성장 가중  ─────────────────────────
+     FM처럼 나이 구간에 따라 성장 속도가 달라지고, 32세부터는 시즌마다 피지컬이 빠진다. */
+  var AGE_STAGES = [
+    { key: 'bloom',   name: '급성장', max: 21, expMult: 1.35, color: '#2f8f62', age: '16~21세', desc: '경기 EXP ×1.35' },
+    { key: 'mature',  name: '성숙기', max: 27, expMult: 1.00, color: '#3f7fb8', age: '22~27세', desc: '표준 성장 ×1.0' },
+    { key: 'plateau', name: '정체기', max: 31, expMult: 0.45, color: '#b07d1f', age: '28~31세', desc: '성장 둔화 ×0.45' },
+    { key: 'decline', name: '하락기', max: 99, expMult: 0.20, color: '#c0432f', age: '32세+', desc: '성장 ×0.2 · 피지컬 하락' }
+  ];
+  DS.AGE_STAGES = AGE_STAGES;
+  DS.ageStage = function (age) {
+    var a = (typeof age === 'number' && age > 0) ? age : 24, i;
+    for (i = 0; i < AGE_STAGES.length; i++) { if (a <= AGE_STAGES[i].max) { return AGE_STAGES[i]; } }
+    return AGE_STAGES[AGE_STAGES.length - 1];
+  };
+  DS.ageStageText = function (p) {
+    var st = DS.ageStage(p && p.age);
+    return st.name + ' · ' + st.desc;
+  };
+
+  /* 유소년(아카데미·승격 후에도 유지) EXP 가중 */
+  DS.YOUTH_EXP_MULT = 2.2;
+  DS.isYouthOrigin = function (p) { return !!(p && (p.originYouth || p.youth)); };
+
+  function weightedKey(keys, adj) {
+    var tot = 0, i, r;
+    for (i = 0; i < keys.length; i++) { tot += Math.max(0, adj[keys[i]] || 0); }
+    if (tot <= 0) { return keys[rnd(keys.length)]; }
+    r = Math.random() * tot;
+    for (i = 0; i < keys.length; i++) {
+      r -= Math.max(0, adj[keys[i]] || 0);
+      if (r <= 0) { return keys[i]; }
+    }
+    return keys[keys.length - 1];
+  }
+
+  /* 레벨업 1회의 능력치 성장 — 감독 growth.bias 가 실제로 분배 확률을 바꿉는다.
+     mode: 'first'(1군) = 기존 v21 속도 유지 · 'reserve'(2군) = 두 시즌 완만 성장 곡선 */
+  DS.growOnLevel = function (p, mgr, mode) {
+    if (!p) { return; }
+    var w = (POS[p.pos] && POS[p.pos].w) || { s: 0.3, t: 0.3, p: 0.4 };
+    var g = DS.growthOf(mgr), bias = g.bias || {}, keys = ['s', 't', 'p'], adj = {}, i;
+    for (i = 0; i < keys.length; i++) { adj[keys[i]] = (w[keys[i]] || 0) * (bias[keys[i]] || 1); }
+    var best = keys[0];
+    for (i = 1; i < keys.length; i++) { if (adj[keys[i]] > adj[best]) { best = keys[i]; } }
+    var pot = p.pot || 99, cur = ratingOf(p);
+    var head = clamp((pot - cur) / 40, 0.03, 1);   /* 잠재력에 가까울수록 더디게 */
+    var o, v;
+    if (mode === 'reserve') {
+      if (chance(0.70 * head)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
+      if (chance(0.38 * head)) { o = weightedKey(keys, adj); p[o] = clamp((p[o] || 1) + 1, 1, 10); }
+      if (chance(0.20)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
+    } else {
+      if (cur < pot || chance(0.35)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
+      if (chance(0.4)) { o = weightedKey(keys, adj); p[o] = clamp((p[o] || 1) + 1, 1, 10); }
+      if (chance(0.22)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
+    }
+    p.stats = statSheet(p);
+  };
+
+  /* 경기 EXP 계산 — 기본 EXP × 종류 배율 × 나이 배율 × 감독 EXP × (유소년 ×2.2 · 감독 유소년 배율) */
+  DS.matchExpGain = function (p, o) {
+    o = o || {};
+    var g = DS.growthOf(o.mgr), stage = DS.ageStage(p && p.age);
+    var youth = DS.isYouthOrigin(p);
+    var base = typeof o.base === 'number' ? o.base : 70;
+    var rating = typeof o.rating === 'number' ? o.rating : 6;
+    var goals = o.goals || 0, assists = o.assists || 0;
+    var raw = base + Math.max(0, rating - 5.5) * 55 + goals * 80 + assists * 45;
+    var youthMult = youth ? (DS.YOUTH_EXP_MULT * (g.youthMult || 1)) : 1;
+    var mult = (o.kindMult || 1) * stage.expMult * (g.expMult || 1) * youthMult;
+    return {
+      exp: Math.max(1, Math.round(raw * mult)),
+      base: Math.round(raw),
+      mult: Math.round(mult * 100) / 100,
+      stage: stage.key, stageName: stage.name, stageMult: stage.expMult,
+      youth: youth, youthMult: Math.round(youthMult * 100) / 100,
+      mgrExp: g.expMult || 1, mgrYouth: youth ? (g.youthMult || 1) : 1,
+      headroom: DS.headroom(p)
+    };
+  };
+
+  /* EXP 적립 + 자동 레벨업(레벨업마다 growOnLevel). 오른 레벨 수 반환 */
+  DS.addExp = function (p, exp, mgr, mode) {
+    if (!p || !(exp > 0)) { return 0; }
+    var ups = 0, guard = 0;
+    p.exp = (p.exp || 0) + Math.round(exp);
+    if (typeof p.pot !== 'number') { p.pot = Math.min(95, Math.max(60, ratingOf(p) + 8)); }
+    while (p.exp >= DS.expToNext(p.level || 0) && guard < 8) {
+      p.exp -= DS.expToNext(p.level || 0);
+      p.level = (p.level || 0) + 1;
+      DS.growOnLevel(p, mgr, mode);
+      ups++; guard++;
+    }
+    return ups;
+  };
+
+  /* ── v23 — 2군 경기 시뮬레이션 (리그 라운드마다 1회) ──
+     아카데미 유망주들이 상대 구단 2군과 한 경기를 치르고 평점·골·도움·EXP를 받는다. */
+  var RESERVE_EXP_BASE = 70;
+  DS.RESERVE_EXP_BASE = RESERVE_EXP_BASE;
+  /* 2군은 1군 리그와 같은 공식이되 경기 수준이 낮아 EXP가 40% 수준이다 */
+  DS.RESERVE_KIND_MULT = 0.25;
+  function reserveGoals(atk, def) {
+    var e = clamp(1.35 * Math.pow(atk / Math.max(35, def), 1.9), 0.25, 4.2), g = 0, i;
+    for (i = 0; i < 7; i++) { if (Math.random() < e / 7) { g++; } }
+    return g;
+  }
+  function posWeightForGoal(pos) {
+    var grp = (POS[pos] && POS[pos].group) || 'MF';
+    if (pos === 'GK') { return 0.02; }
+    if (grp === 'FW') { return 3.2; }
+    if (grp === 'MF') { return 1.4; }
+    return 0.5;
+  }
+  DS.reservePower = function (list) {
+    var i, sum = 0;
+    if (!list || !list.length) { return 45; }
+    for (i = 0; i < list.length; i++) { sum += ratingOf(list[i]); }
+    /* 참가 인원이 적으면 아카데미 잔여 인원이 메우는 셈으로 본다 */
+    var avg = sum / list.length;
+    return clamp(Math.round(avg + 4 - Math.max(0, 3 - list.length) * 2), 35, 95);
+  };
+  DS.reserveMatch = function (list, opp, mgr, opts) {
+    opts = opts || {};
+    var out = { rows: [], gf: 0, ga: 0, opp: opp, power: 0 };
+    if (!list || !list.length) { return out; }
+    var power = DS.reservePower(list);
+    out.power = power;
+    var oppPower = opp && typeof opp.strength === 'number' ? opp.strength : 55;
+    var gf = reserveGoals(power, oppPower), ga = reserveGoals(oppPower, power), i, j;
+    out.gf = gf; out.ga = ga;
+    var goals = {}, assists = {}, w = [], tot = 0, picker;
+    for (i = 0; i < list.length; i++) { w.push(posWeightForGoal(list[i].pos)); tot += w[i]; goals[list[i].id] = 0; assists[list[i].id] = 0; }
+    for (j = 0; j < gf; j++) {
+      var r = Math.random() * tot, sc = 0;
+      for (i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) { sc = i; break; } }
+      picker = list[sc] || list[0];
+      goals[picker.id] = (goals[picker.id] || 0) + 1;
+      if (list.length > 1 && Math.random() < 0.72) {
+        var a = list[Math.floor(Math.random() * list.length)];
+        if (a.id !== picker.id) { assists[a.id] = (assists[a.id] || 0) + 1; }
+      }
+    }
+    for (i = 0; i < list.length; i++) {
+      var p = list[i];
+      var gl = goals[p.id] || 0, as = assists[p.id] || 0;
+      var ovrFrom = ratingOf(p);
+      var rating = clamp(6.05 + (ovrFrom - oppPower) / 22 + (Math.random() - 0.5) * 1.7 +
+        gl * 0.35 + as * 0.22 + (gf > ga ? 0.25 : (gf < ga ? -0.2 : 0)), 4.2, 9.8);
+      rating = Math.round(rating * 10) / 10;
+      var calc = DS.matchExpGain(p, {
+        rating: rating, goals: gl, assists: as, base: RESERVE_EXP_BASE, kindMult: DS.RESERVE_KIND_MULT, mgr: mgr
+      });
+      /* 수비수·골키퍼는 골·도움이 적어 EXP가 뒤지는 만큼 2군에서 따로 더 준다 */
+      var grp = (POS[p.pos] && POS[p.pos].group) || 'MF';
+      var posK = p.pos === 'GK' ? 1.5 : (grp === 'DF' ? 1.45 : (grp === 'MF' ? 1.15 : 1));
+      var expGain = Math.max(1, Math.round(calc.exp * posK));
+      var ups = DS.addExp(p, expGain, mgr, 'reserve');
+      p.apps = (p.apps || 0) + 1;
+      p.goals = (p.goals || 0) + gl;
+      p.assists = (p.assists || 0) + as;
+      out.rows.push({
+        id: p.id, name: p.name, pos: p.pos, rating: rating, goals: gl, assists: as,
+        exp: expGain, mult: calc.mult, levels: ups, level: p.level || 0,
+        expLeft: Math.round(p.exp || 0), need: DS.expToNext(p.level || 0),
+        ovrFrom: ovrFrom, ovrTo: ratingOf(p), youth: calc.youth
+      });
+    }
+    out.rows.sort(function (a, b) { return (b.levels - a.levels) || (b.rating - a.rating); });
+    return out;
+  };
+
+  /* 32세 이상 — 시즌 전환마다 피지컬(스피드·파워)이 -1~-2 하락. 파생 스피드가 40 아래로 내려가지 않게 하한을 둔다. */
+  DS.declinePhysical = function (p) {
+    if (!p || (p.age || 0) < 32) { return null; }
+    var before = ratingOf(p), s0 = p.s || 1, p0 = p.p || 1, lost = [];
+    var ds = 1 + (chance(0.5) ? 1 : 0);
+    p.s = clamp(s0 - ds, 2, 10);
+    if (chance(0.65)) { p.p = clamp(p0 - 1, 2, 10); }
+    if (p.s < s0) { lost.push('스피드 -' + (s0 - p.s)); }
+    if (p.p < p0) { lost.push('파워 -' + (p0 - p.p)); }
+    p.stats = statSheet(p);
+    if (!lost.length) { return null; }
+    return { id: p.id, name: p.name, ovrFrom: before, ovrTo: ratingOf(p), lost: lost.join(' · ') };
+  };
+
   /* 이적료 — OVR·등급·나이·레벨. 20대 중반이 정점, 33세 이상은 급락. */
   DS.marketValue = function (p) {
     if (!p) { return 0; }
@@ -1750,6 +2034,8 @@
       }
       fee = Math.round(DS.marketValue(p) * (0.92 + R() * 0.34) / 50) * 50;
       from = teams[Math.floor(R() * teams.length)];
+      /* v23 — 매물도 포지션·등급에 맞는 롤을 달고 나온다 */
+      if (!p.role) { p.role = DS.pickRoleFor(p); }
       out.push({
         id: p.id, player: p, fee: Math.max(300, fee),
         wage: DS.wageOf(p), fromId: from.id || 'fa', fromName: from.short || from.name,
@@ -1760,18 +2046,28 @@
     return out;
   };
 
-  /* 유소년 후보 — 15~18세, 현재 능력치는 낮고 잠재력(pot)은 높다. */
+  /* 유소년 후보 — 15~18세. v23부터는 2군 로테이션급(OVR 55~62)에서 출발해
+     2군 출전으로 2시즌에 걸쳐 1군 전력(OVR 74~78+)까지 자란다. */
+  DS.YOUTH_POT_MIN = 77;
+  DS.YOUTH_POT_MAX = 82;
   DS.makeYouthProspect = function (opts) {
     opts = opts || {};
     var p = makePlayer({ rarity: opts.rarity || (Math.random() < 0.16 ? 'eun' : 'dong') });
     p.age = opts.age || (15 + Math.floor(Math.random() * 4));
-    p.s = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
-    p.t = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
-    p.p = clamp(1 + Math.floor(Math.random() * 3), 1, 10);
+    var keys = ['s', 't', 'p'], i, ovr, guard = 0;
+    for (i = 0; i < 3; i++) { p[keys[i]] = clamp(4 + Math.floor(Math.random() * 3), 3, 7); }
+    /* 초기 OVR을 55~62로 고정 — 포지션 가중치에 따라 조금씩 다르다 */
+    for (guard = 0; guard < 16; guard++) {
+      ovr = ratingOf(p);
+      if (ovr <= 62 && ovr >= 55) { break; }
+      var k = keys[Math.floor(Math.random() * 3)];
+      p[k] = clamp((p[k] || 1) + (ovr > 62 ? -1 : 1), 2, 10);
+    }
     p.level = 0;
     p.exp = 0;
-    p.pot = opts.pot || (58 + Math.floor(Math.random() * 38));       /* 58~95 */
+    p.pot = opts.pot || (DS.YOUTH_POT_MIN + Math.floor(Math.random() * (DS.YOUTH_POT_MAX - DS.YOUTH_POT_MIN + 1)));
     p.youth = true;
+    p.originYouth = true;
     p.stats = statSheet(p);
     DS.assignUniquePics([p]);
     return p;

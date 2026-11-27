@@ -67,6 +67,12 @@
     return s;
   }
   function rarityColor(p) { return DS.RARITY[p.rarity].color; }
+  /* v23 — 금·은·동·전설 원형 등급 배지 */
+  function tierDot(p) {
+    var key = (p && p.rarity && DS.RARITY[p.rarity]) ? p.rarity : 'dong';
+    var r = DS.RARITY[key];
+    return '<span class="tier t-' + r.key + '" title="' + r.name + ' 등급">' + r.name.charAt(0) + '</span>';
+  }
 
   /* ═════════════════  상태  ═════════════════ */
   /* v22 — 리그 표. 1부·2부 각 20팀이고, 우리 구단은 소속 리그 표에만 들어간다. */
@@ -197,6 +203,42 @@
     for (i = 0; i < DS.TEAMS.length; i++) { if (teamDiv(DS.TEAMS[i].id) === division) { out.push(DS.TEAMS[i]); } }
     return out;
   }
+  /* v23 — 리그 정원 20팀 유지: 우리 리그는 AI 19팀 + 'me' = 20팀, 반대 리그는 20팀(각 38라운드).
+     v22 세이브 중 2부에 AI 20팀이 들어가 21팀·42라운드가 되고 1라운드가 부전승이던 것을 바로잡는다. */
+  function normalizeDivs(d) {
+    if (!d || (d.division !== 1 && d.division !== 2) || !d.divs) { return 0; }
+    var mine = d.division, other = 3 - mine, moved = 0, guard = 0, list, t, cand, i;
+    function pick(division, wantDefault, strongest) {
+      var src = divTeams(division), cs = [], all = src.slice();
+      for (var k = 0; k < src.length; k++) {
+        if ((src[k].division || 1) === wantDefault) { cs.push(src[k]); }
+      }
+      list = (cs.length ? cs : all).sort(function (a, b) {
+        return strongest ? (b.strength - a.strength) : (a.strength - b.strength);
+      });
+      return list[0] || null;
+    }
+    while (divTeams(mine).length > DIV_SIZE - 1 && guard < 6) {
+      /* 우리 리그가 21팀이 되었다면 — 원래 반대 리그 소속이던 팀을 먼저 돌려보낸다 */
+      t = pick(mine, other, false);
+      if (!t) { break; }
+      d.divs[t.id] = other;
+      guard++;
+      if (d.log) { d.log.push('리그 정원 정리 — ' + t.name + ' ' + divName(mine) + ' → ' + divName(other)); }
+      moved++;
+    }
+    while (divTeams(other).length > DIV_SIZE && guard < 12) {
+      t = pick(other, mine, true);
+      if (!t) { break; }
+      d.divs[t.id] = mine;
+      guard++;
+      if (d.log) { d.log.push('리그 정원 정리 — ' + t.name + ' ' + divName(other) + ' → ' + divName(mine)); }
+      moved++;
+    }
+    if (moved) { d.divFixed = (d.divFixed || 0) + moved; }
+    return moved;
+  }
+
   function teamDiv(id) {
     var map = (S && S.divs) ? S.divs : DIV_OVERRIDE;
     if (map && map[id]) { return map[id]; }
@@ -311,6 +353,9 @@
       /* v21 — 이적시장 · 유소년 아카데미 */
       transfer: { round: -1, listings: [], myListings: [], sold: 0, bought: 0 },
       youth: { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 },
+      /* v23 — 2군 리그(아카데미 출전) · 시즌 전환 노화 알림 */
+      reserve: { ids: [], log: [], last: null, played: 0 },
+      ageNotices: [],
       expLog: [],
       dex: { players: {}, emblems: {}, kits: {} },
       /* v21b ⑥ — 초보자 3단계 가이드 진행 상태 (localStorage 세이브에 함께 저장) */
@@ -354,6 +399,9 @@
         if (weakD1) { d.divs[weakD1.id] = 2; }
         d.log.push('S' + (d.season || 1) + ' 1·2부 리그 도입 — 기존 구단은 1부로 이어받고 ' + (weakD1 ? weakD1.name + '은(는) 2부로' : ''));
       }
+      /* v23 — 리그 정원 정리: 우리 디비전은 AI 19팀 + me = 20팀, 반대 리그는 20팀 (각 38라운드).
+         v22에서 2부에 AI 20팀이 있어 21팀·42라운드가 되고 1라운드가 부전승이던 세이브를 여기서 바로잡는다. */
+      normalizeDivs(d);
       if (!tableFits(d.table, d.division)) {
         d.table = makeTable(d.division, true);
         d.round = 0;
@@ -365,12 +413,14 @@
       if (!d.fixtures || !d.fixtures.length) {
         d.fixtures = makeFixtures(d.division, true);
         d.round = 0; d.seasonOver = false;
-      } else if (!fixturesValid(d.fixtures, d.division, true)) {
+      } else if (d.fixtures.length !== 38 || !fixturesValid(d.fixtures, d.division, true)) {
+        var badR = d.fixtures.length;
         d.fixtures = makeFixtures(d.division, true);
         d.round = 0;
         d.seasonOver = false;
+        d.seasonReview = null;
         d.fixtureFixed = 1;
-        d.log.push('S' + (d.season || 1) + ' ' + d.division + '부 ' + d.fixtures.length + '라운드 대진표 재생성');
+        d.log.push('S' + (d.season || 1) + ' ' + d.division + '부 ' + badR + '라운드 대진표 → 38라운드로 자동 복구');
       }
       /* 반대 리그(1부↔2부) 표·대진표 — 관전·순위표 탭용. 없으면 새로 만든다 */
       if (!d.otherTable || d.otherTable.length !== divTeams(3 - d.division).length) {
@@ -394,7 +444,22 @@
       if (typeof d.smatchTickets !== 'number') { d.smatchTickets = 3; }
       if (!d.transfer || !d.transfer.listings) { d.transfer = { round: -1, listings: [], myListings: [], sold: 0, bought: 0 }; }
       if (!d.transfer.myListings) { d.transfer.myListings = []; }
+      /* v23 — 기존 세이브의 매물도 롤이 비어 있으면 포지션·등급에 맞춰 보정 */
+      var mk0;
+      for (i2 = 0; i2 < d.transfer.listings.length; i2++) {
+        mk0 = d.transfer.listings[i2];
+        if (mk0 && mk0.player && !mk0.player.role) { mk0.player.role = DS.pickRoleFor(mk0.player); }
+      }
       if (!d.youth || !d.youth.intake) { d.youth = { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 }; }
+      /* v23 — 2군 · 나이 · 유소년 출신 표식 마이그레이션 */
+      if (!d.reserve || !d.reserve.ids) { d.reserve = { ids: [], log: [], last: null, played: 0 }; }
+      if (!d.reserve.log) { d.reserve.log = []; }
+      if (!d.ageNotices) { d.ageNotices = []; }
+      var yk;
+      for (i2 = 0; i2 < d.youth.intake.length; i2++) {
+        yk = d.youth.intake[i2];
+        if (yk) { yk.originYouth = true; if (typeof yk.age !== 'number') { yk.age = 16; } }
+      }
       if (!d.expLog) { d.expLog = []; }
       /* v21b ⑥ — 기존 세이브: 이미 경기를 치른 구단에는 가이드를 접어 둔다 */
       if (!d.guide) { d.guide = { done: {}, open: true, hidden: !!(d.totals && d.totals.matches > 0) }; }
@@ -530,7 +595,9 @@
       '<span class="mgr-main"><span class="mgr-top"><b>' + esc(m.name) + ' 감독</b>' +
       '<span class="chip" style="background:' + DS.RARITY[m.rarity].color + '22;color:' + DS.RARITY[m.rarity].color + '">' + DS.RARITY[m.rarity].name + '</span></span>' +
       '<span class="mgr-sub">' + esc(DS.tacticStyle(m.tacticStyle).name) + ' · 고유 ' + m.formation + (mgrSync() ? ' <em class="sync">시너지 ON</em>' : '') + '</span>' +
-      '<span class="mgr-tags">' + tags + '</span></span>' +
+      '<span class="mgr-tags">' + tags + '</span>' +
+      (cls === 'club' ? '<span class="mgr-grow">🌱 육성: ' + esc(DS.growthLine(m)) + '</span>' : '') +
+      '</span>' +
       '</div>';
   }
   function pickMgrCandidates() {
@@ -999,10 +1066,11 @@
     for (i = 0; i < BENCH_SIZE; i++) {
       var b = bench[i];
       if (b) {
-        benchHTML += '<button class="pcard ' + (selId === b.id ? 'sel' : '') + '" data-act="bench" data-id="' + b.id + '">' +
+        benchHTML += '<button class="pcard ' + (selId === b.id ? 'sel' : '') + (DS.isYouthOrigin(b) ? ' yth' : '') + '" data-act="bench" data-id="' + b.id + '">' +
           '<span class="ph"><img src="' + DS.Art.headSrc(b) + '" alt=""></span>' +
           '<span class="pn">' + esc(shortName(b.name)) + '</span>' +
           '<span class="pm">' + posBadge(b.pos, master ? b.pos : DS.posGroup(b.pos)) + '<span class="ov">' + DS.ratingOf(b) + '</span></span>' +
+          (DS.isYouthOrigin(b) ? '<em class="pc-yt">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</em>' : '') +
           '</button>';
       } else {
         benchHTML += '<div class="pcard" style="opacity:.5"><span class="ph"></span><span class="pn">공석</span><span class="pm tiny">BENCH</span></div>';
@@ -1131,14 +1199,26 @@
   var youthSel = { id: null, pos: null };
 
   function ensureYouth() {
-    if (!S.youth) { S.youth = { intake: [], season: -1, promoted: 0 }; }
+    if (!S.youth) { S.youth = { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 }; }
     var y = S.youth;
     if (!y.intake) { y.intake = []; }
-    /* 시즌마다 3명이 새로 들어온다 */
-    if (y.season !== S.season || !y.intake.length) {
-      y.intake = [];
-      for (var i = 0; i < YOUTH_SIZE; i++) { y.intake.push(DS.makeYouthProspect({})); }
+    /* v23 — 시즌이 바뀌면 기존 유망주는 나이를 한 살 먹고 남는다.
+       20세를 넘긴 유망주는 아카데미를 떠나고, 빈자리만 새 후보로 채운다. */
+    if (y.season !== S.season) {
+      var keep = [], k;
+      for (k = 0; k < y.intake.length; k++) {
+        if ((y.intake[k].age || 16) <= 20) { keep.push(y.intake[k]); }
+      }
+      y.intake = keep;
       y.season = S.season;
+      if (S.reserve && S.reserve.ids) {
+        S.reserve.ids = S.reserve.ids.filter(function (id) { return keep.some(function (q) { return q.id === id; }); });
+      }
+    }
+    if (!y.intake.length) {
+      for (var i = 0; i < YOUTH_SIZE; i++) { y.intake.push(DS.makeYouthProspect({})); }
+    } else {
+      while (y.intake.length < YOUTH_SIZE) { y.intake.push(DS.makeYouthProspect({})); }
     }
     if (!youthSel.id || !y.intake.some(function (q) { return q.id === youthSel.id; })) {
       youthSel.id = y.intake.length ? y.intake[0].id : null;
@@ -1202,11 +1282,16 @@
     if (!p) { return; }
     if (S.squad.length >= MAX_SQUAD) { toast('1군 자리가 없습니다. 선수를 내놓은 뒤 승격하세요.'); return; }
     p.youth = false;
+    /* v23 — 유소년 출신 표식을 남긴다. 1군에서도 경기 EXP ×2.2를 계속 받는다. */
+    p.originYouth = true;
     p.pot = p.pot || Math.min(95, Math.max(60, DS.ratingOf(p) + 10));
     S.squad.push(p);
     EXTRA[p.id] = p;
     S.dex.players[p.name] = 1;
     y.intake = y.intake.filter(function (q) { return q.id !== p.id; });
+    if (S.reserve && S.reserve.ids) {
+      S.reserve.ids = S.reserve.ids.filter(function (q) { return q !== p.id; });
+    }
     y.promoted = (y.promoted || 0) + 1;
     S.bench = autoBench(S.squad, S.lineup);
     save();
@@ -1226,6 +1311,111 @@
     toast(p.name + ' 이적시장 매각 · ' + fmt(fee));
   }
 
+  /* ═════════════════  v23 — 2군 리그 (아카데미 유망주 출전) ═════════════════
+     리그 라운드를 한 경기 치를 때마다 2군도 같은 라운드를 한 번 치른다.
+     출전 등록한 아카데미 유망주는 상대 구단 2군과 경기해 평점·골·도움·EXP를 받는다. */
+  function ensureReserve() {
+    if (!S.reserve || !S.reserve.ids) { S.reserve = { ids: [], log: [], last: null, played: 0 }; }
+    if (!S.reserve.log) { S.reserve.log = []; }
+    if (typeof S.reserve.played !== 'number') { S.reserve.played = 0; }
+    return S.reserve;
+  }
+  function reserveList() {
+    var y = ensureYouth(), r = ensureReserve(), out = [], i;
+    for (i = 0; i < y.intake.length; i++) {
+      if (r.ids.indexOf(y.intake[i].id) >= 0) { out.push(y.intake[i]); }
+    }
+    return out;
+  }
+  function isReserve(id) { return ensureReserve().ids.indexOf(id) >= 0; }
+
+  function doYouthReserve(id) {
+    var y = ensureYouth(), r = ensureReserve();
+    var p = youthById(id || youthSel.id);
+    if (!p) { toast('선수를 고르세요.'); return; }
+    var at = r.ids.indexOf(p.id), on;
+    if (at >= 0) { r.ids.splice(at, 1); on = false; } else { r.ids.push(p.id); on = true; }
+    save();
+    renderClub();
+    toast(p.name + (on ? ' 2군 출전 등록 — 리그 라운드마다 함께 뛰어요.' : ' 2군 대기로 돌렸습니다.'));
+  }
+
+  /* 상대 2군 — 같은 리그 구단의 전력에서 12를뺐은 수준. 라운드마다 다른 구단 */
+  function reserveOpponent() {
+    var pool = divTeams(S.division), i, t, idx;
+    if (!pool.length) { pool = DS.TEAMS.slice(0, 4); }
+    idx = (S.round + ensureReserve().played) % pool.length;
+    t = pool[idx] || pool[0];
+    return {
+      id: t.id, name: t.name, short: t.short || t.name,
+      strength: Math.max(38, Math.round((t.strength || 60) - 12))
+    };
+  }
+
+  function playReserveRound() {
+    var list = reserveList(), r = ensureReserve();
+    if (!list.length) { return null; }
+    var opp = reserveOpponent();
+    var res = DS.reserveMatch(list, opp, mgr(), {});
+    r.played++;
+    var entry = {
+      season: S.season, round: S.round, oppId: opp.id, oppName: opp.short || opp.name,
+      oppStrength: opp.strength, gf: res.gf, ga: res.ga, power: res.power,
+      rows: res.rows.map(function (x) {
+        return {
+          id: x.id, name: x.name, pos: x.pos, rating: x.rating, goals: x.goals, assists: x.assists,
+          exp: x.exp, levels: x.levels, level: x.level, ovrFrom: x.ovrFrom, ovrTo: x.ovrTo
+        };
+      })
+    };
+    r.last = entry;
+    r.log.unshift(entry);
+    if (r.log.length > 8) { r.log.pop(); }
+    return entry;
+  }
+
+  function reserveHTML() {
+    var r = ensureReserve(), y = ensureYouth(), i, p, on, chips = '', rows = '', log = '', last = r.last;
+    for (i = 0; i < y.intake.length; i++) {
+      p = y.intake[i];
+      on = r.ids.indexOf(p.id) >= 0;
+      chips += '<button class="rvp' + (on ? ' on' : '') + '" data-act="youthreserve" data-id="' + p.id + '">' +
+        '<span class="rvp-n">' + (on ? '▶ ' : '') + esc(shortName(p.name)) + '</span>' +
+        '<span class="rvp-o">' + DS.ratingOf(p) + '</span></button>';
+    }
+    if (!chips) { chips = '<span class="tiny muted">아카데미 유망주가 없습니다.</span>'; }
+    if (last) {
+      for (i = 0; i < last.rows.length; i++) {
+        var x = last.rows[i];
+        rows += '<div class="rl-row' + (x.levels ? ' up' : '') + '">' +
+          '<span class="rl-nm">' + tierDot(x) + ' ' + esc(shortName(x.name)) + '<em>' + x.pos + '</em></span>' +
+          '<span class="rl-rt">' + x.rating.toFixed(1) + '</span>' +
+          '<span class="rl-g">' + (x.goals ? x.goals + '골' : '') + (x.assists ? ' ' + x.assists + '도움' : '') + (x.goals || x.assists ? '' : '—') + '</span>' +
+          '<span class="rl-ex">+' + x.exp + '</span>' +
+          '<span class="rl-ov">' + x.ovrFrom + '→' + x.ovrTo + '</span>' +
+          (x.levels ? '<span class="rl-up">LV.' + x.level + ' ▲' + x.levels + '</span>' : '<span class="rl-lv">Lv.' + x.level + '</span>') +
+          '</div>';
+      }
+    } else {
+      rows = '<div class="tiny muted">' + (r.ids.length
+        ? '다음 리그 라운드에서 2군 경기가 자동으로 치러집니다.'
+        : '유망주를 2군 출전으로 올리면 리그 라운드마다 2군 경기를 치릅니다.') + '</div>';
+    }
+    for (i = 0; i < r.log.length && i < 4; i++) {
+      var L = r.log[i];
+      log += '<span class="rlg">S' + L.season + ' ' + L.round + 'R · ' + esc(L.oppName) + ' <b>' + L.gf + ':' + L.ga + '</b></span>';
+    }
+    return '<div class="card">' +
+      '<div class="card-head"><b>2군 리그</b><span class="meta">리그 라운드마다 1경기 · 출전 ' + r.ids.length + '명</span></div>' +
+      '<div class="rvp-wrap">' + chips + '</div>' +
+      (last ? '<div class="rl-head"><span>최근 2군 경기</span><b>vs ' + esc(last.oppName) + '</b>' +
+        '<span class="rl-sc">' + last.gf + ' : ' + last.ga + '</span>' +
+        '<em>' + last.round + 'R</em></div>' : '') +
+      '<div class="rl-rows">' + rows + '</div>' +
+      (log ? '<div class="rl-log">' + log + '</div>' : '') +
+      '</div>';
+  }
+
   function youthStars(pot) {
     var n = pot >= 90 ? 5 : (pot >= 82 ? 4 : (pot >= 72 ? 3 : 2));
     return stars(n) + '<span class="tiny muted"> 잠재 ' + pot + '</span>';
@@ -1233,11 +1423,13 @@
 
   function youthHTML() {
     var y = ensureYouth(), i, p, cards = '', sel = youthById(youthSel.id);
+    var rv = ensureReserve();
     for (i = 0; i < y.intake.length; i++) {
       p = y.intake[i];
+      var inRv = rv.ids.indexOf(p.id) >= 0;
       cards += '<button class="yth' + (youthSel.id === p.id ? ' on' : '') + '" data-act="youthpick" data-id="' + p.id + '">' +
         '<span class="ph"><img src="' + DS.Art.headSrc(p) + '" alt=""></span>' +
-        '<span class="nm">' + esc(shortName(p.name)) + '</span>' +
+        '<span class="nm">' + tierDot(p) + ' ' + esc(shortName(p.name)) + (inRv ? '<em class="yth-rv">2군</em>' : '') + '</span>' +
         '<span class="mt">' + posBadge(p.pos) + '<span class="chip">' + p.age + '세</span></span>' +
         '<span class="mt">' + footChip(p) + '<span class="ov">' + DS.ratingOf(p) + '</span></span>' +
         '<span class="pot">' + youthStars(p.pot || 70) + '</span></button>';
@@ -1252,10 +1444,15 @@
     if (sel) {
       var bestApt = '', bv = -1, k;
       for (k in sel.apt) { if (sel.apt.hasOwnProperty(k) && sel.apt[k] > bv) { bv = sel.apt[k]; bestApt = k; } }
+      var stage = DS.ageStage(sel.age);
       aptLine = '<div class="tiny muted" style="margin-top:3px">주 적성 ' + bestApt + ' ' + bv + '/9 · 롤 적성 ' +
-        ((DS.rolesFor(sel.pos).length) ? DS.rolesFor(sel.pos)[0].name : '—') + ' · OVR ' + DS.ratingOf(sel) + ' / 잠재 ' + (sel.pot || 0) + '</div>';
+        ((DS.rolesFor(sel.pos).length) ? DS.rolesFor(sel.pos)[0].name : '—') + ' · OVR ' + DS.ratingOf(sel) + ' / 잠재 ' + (sel.pot || 0) + '</div>' +
+        '<div class="tiny" style="margin-top:2px"><span class="age-badge" style="color:' + stage.color + ';border-color:' + stage.color + '55">' + stage.name + '</span>' +
+        '<span class="age-badge youth">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</span>' +
+        '<span class="tiny muted">2군 1경기 +' + Math.round(140 * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외</span></div>';
     }
     var cost = sel ? youthCost(sel) : 0;
+    var inRes = sel ? (ensureReserve().ids.indexOf(sel.id) >= 0) : false;
 
     return '<div class="card">' +
       '<div class="card-head"><b>유소년 아카데미</b><span class="meta">U-18 · ' + y.intake.length + '명 · 시즌 ' + S.season + '</span></div>' +
@@ -1264,10 +1461,26 @@
       aptLine +
       '<div class="row" style="gap:4px;margin-top:5px;flex-wrap:wrap">' +
       '<button class="btn primary sm" data-act="youthcoach" ' + (!sel || S.money < cost ? 'disabled' : '') + '>코칭 · ' + fmt(cost) + '</button>' +
+      '<button class="btn ' + (inRes ? 'primary' : 'dark') + ' sm" data-act="youthreserve" data-id="' + (sel ? sel.id : '') + '" ' + (!sel ? 'disabled' : '') + '>' +
+      (inRes ? '2군 출전중' : '2군 출전') + '</button>' +
       '<button class="btn dark sm" data-act="youthpromote" ' + (!sel ? 'disabled' : '') + '>1군 승격</button>' +
       '<button class="btn ghost sm" data-act="youthsell" ' + (!sel ? 'disabled' : '') + '>이적시장 매각</button>' +
       '<button class="btn ghost sm" data-act="youthreroll" ' + (S.money < YOUTH_REROLL ? 'disabled' : '') + '>새 후보 · ' + fmt(YOUTH_REROLL) + '</button>' +
       '</div></div>';
+  }
+
+  /* 시즌 전환 때 나이를 먹으며 피지컬이 빠진 선수 — 클럽 화면에 간단히 알린다 */
+  function ageNoticeHTML() {
+    var list = S.ageNotices || [], i, rows = '';
+    if (!list.length) { return ''; }
+    for (i = 0; i < list.length; i++) {
+      rows += '<div class="rl-row"><span class="rl-nm">' + esc(list[i].name) + '</span>' +
+        '<span class="rl-rt">' + list[i].ovrFrom + '→' + list[i].ovrTo + '</span>' +
+        '<span class="rl-g">' + esc(list[i].lost) + '</span></div>';
+    }
+    return '<div class="card"><div class="card-head"><b>노화 리포트</b><span class="meta">S' + S.season + ' · 32세 이상</span></div>' +
+      '<div class="rl-rows">' + rows + '</div>' +
+      '<div class="tiny muted" style="margin-top:3px">32세부터는 시즌마다 피지컬(스피드·파워)이 떨어집니다. 하락기는 EXP도 ×0.2.</div></div>';
   }
 
   function renderClub() {
@@ -1311,7 +1524,7 @@
       var canEvo = canEvolve(st[i]), needLv = evoNeed(st[i]);
       roleHTML += '<div class="role-row">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
-        '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
+        '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + tierDot(st[i]) + ' ' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
         '<div class="ds">' + (r ? r.name + ' — ' + r.desc : (canEvo ? '아직 롤 없음 · 진화 가능' : '아직 롤 없음 · Lv.' + needLv + '부터 진화 가능')) + '</div></div>' +
         '<button class="btn sm ' + (canEvo ? (r ? 'ghost' : 'primary') : 'ghost locked') + '" data-act="evolve" data-id="' + st[i].id + '"' + (canEvo ? '' : ' disabled aria-disabled="true"') + '>' +
         (canEvo ? (r ? '변경' : '진화') : 'Lv.' + needLv) + '</button>' +
@@ -1344,12 +1557,14 @@
 
     box.innerHTML =
       youthHTML() +
+      reserveHTML() +
+      ageNoticeHTML() +
       '<div class="card dark">' +
       '<div class="card-head"><span class="dot"></span><b style="color:#eaf6dd">클럽 하우스</b><span class="meta">FACILITIES</span></div>' +
       '<div class="grid2">' + facHTML + '</div></div>' +
       '<div class="card">' +
       '<div class="card-head"><b>특훈 콤보</b><span class="meta">훈련 2개 조합 · Lv.상승</span></div>' +
-      '<div class="row between" style="margin-bottom:6px"><span class="tiny muted">대상 선수</span>' +
+      '<div class="row between" style="margin-bottom:6px"><span class="tiny muted">대상 선수 ' + (tp ? tierDot(tp) : '') + '</span>' +
       '<select id="train-player" class="pick" style="max-width:190px;height:28px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:10.5px;font-weight:700;padding:0 6px">' + playerOptions(tp ? tp.id : '') + '</select></div>' +
       '<div class="menu2">' + menuHTML + '</div>' +
       (combo ? '<div class="row between" style="margin-top:6px"><span class="chip lime">콤보 ' + combo.name + '</span><span class="tiny muted">' + combo.desc + '</span></div>' : '') +
@@ -1401,6 +1616,7 @@
     var s = '', i;
     for (i = 0; i < list.length; i++) {
       s += '<option value="' + list[i].id + '"' + (list[i].id === sel ? ' selected' : '') + '>' +
+        '[' + (DS.RARITY[list[i].rarity] ? DS.RARITY[list[i].rarity].name : '동') + '] ' +
         esc(list[i].name) + ' · ' + list[i].pos + ' ' + DS.ratingOf(list[i]) + '</option>';
     }
     return s;
@@ -1572,10 +1788,9 @@
       cards += '<div class="mkt">' +
         '<span class="art"><img src="' + DS.Art.portraitSrc(p) + '" alt="" draggable="false"></span>' +
         '<div class="mm">' +
-        '<div class="nm">' + esc(p.name) + '<span class="pv">' + ovr + '</span></div>' +
+        '<div class="nm">' + tierDot(p) + ' ' + esc(p.name) + '<span class="pv">' + ovr + '</span></div>' +
         '<div class="mt">' + posBadge(p.pos) +
-        '<span class="chip" style="background:' + rc + '22;color:' + rc + '">' + DS.RARITY[p.rarity].name + '</span>' +
-        '<span class="chip">' + p.age + '세</span>' + footChip(p) + '</div>' +
+        '<span class="chip" style="background:' + rc + '22;color:' + rc + '">' + p.age + '세</span>' + footChip(p) + '</div>' +
         '<div class="mt"><span class="chip">' + (DS.roleOf(p.role) ? DS.roleOf(p.role).name : '롤 없음') + '</span>' +
         '<span class="from">' + esc(L.fromName) + '</span></div>' +
         '<div class="fee"><b>' + fmt(L.fee) + '</b><span>주급 ' + fmt(L.wage) + '</span></div>' +
@@ -1601,7 +1816,7 @@
       for (k = 0; k < myList.length; k++) { if (myList[k].id === sp.id) { listed = true; } }
       sellRows += '<div class="sl-row' + (listed ? ' listed' : '') + '">' +
         '<span class="ph"><img src="' + DS.Art.headSrc(sp) + '" alt=""></span>' +
-        '<span class="nm">' + esc(shortName(sp.name)) + '<em>' + sp.pos + ' · ' + DS.ratingOf(sp) + '</em></span>' +
+        '<span class="nm">' + tierDot(sp) + ' ' + esc(shortName(sp.name)) + '<em>' + sp.pos + ' · ' + DS.ratingOf(sp) + '</em></span>' +
         '<span class="val">' + fmt(DS.marketValue(sp)) + '</span>' +
         (listed ? '<span class="tag">매물</span>' :
           '<button class="btn ghost sm" data-act="list" data-id="' + sp.id + '">내놓기</button>' +
@@ -1703,6 +1918,12 @@
       fxHTML += '<div class="mfx"><span class="mfx-ico" style="background:' + t.color + '22;color:' + t.color + '">' + t.icon + '</span>' +
         '<div class="mfx-tx"><b>' + t.name + ' +' + m.traits[i].v + '</b><em>' + traitFxText(m.traits[i].k, m.traits[i].v) + '</em></div></div>';
     }
+    /* v23 — 육성 특성: 경기 EXP·유소년 · 레벨업 능력치 분배에 실제 적용되는 값 */
+    var gk = DS.growthKind(m), gg = DS.growthOf(m);
+    fxHTML += '<div class="mfx"><span class="mfx-ico" style="background:rgba(200,241,105,.22);color:#3d6b12">' + gk.icon + '</span>' +
+      '<div class="mfx-tx"><b>육성 · ' + gk.name + '</b><em>' + esc(DS.growthLine(m)) + '</em></div></div>';
+    fxHTML += '<div class="mfx"><span class="mfx-ico" style="background:rgba(63,127,184,.18);color:#26648f">📈</span>' +
+      '<div class="mfx-tx"><b>레벨업 능력치 분배</b><em>스피드 ×' + gg.bias.s.toFixed(2) + ' · 테크닉 ×' + gg.bias.t.toFixed(2) + ' · 파워 ×' + gg.bias.p.toFixed(2) + '</em></div></div>';
 
     for (i = 0; i < S.managers.length; i++) {
       var om = DS.managerOf(S.managers[i]);
@@ -1712,7 +1933,8 @@
         '<span class="mrow-art"><img src="' + DS.Art.managerHead(om) + '" alt=""></span>' +
         '<span class="mrow-main"><b>' + esc(om.name) + '</b>' +
         '<span class="mrow-sub">' + esc(DS.tacticStyle(om.tacticStyle).name) + ' · ' + om.formation + '</span>' +
-        '<span class="mrow-tr">' + DS.managerTraitText(om) + '</span></span>' +
+        '<span class="mrow-tr">' + DS.managerTraitText(om) + '</span>' +
+        '<span class="mrow-gr">🌱 ' + esc(DS.growthLine(om)) + '</span></span>' +
         '<span class="mrow-side" style="color:' + DS.RARITY[om.rarity].color + '">' + DS.RARITY[om.rarity].name +
         (on ? '<em class="on">선임중</em>' : '<em>선임</em>') + '</span></button>';
     }
@@ -1729,7 +1951,8 @@
         '<span class="chip" style="background:' + DS.RARITY[cm.rarity].color + '22;color:' + DS.RARITY[cm.rarity].color + '">' + DS.RARITY[cm.rarity].name + '</span>' +
         '<span class="tiny muted">' + cm.age + '세</span></span>' +
         '<span class="mcard-sub">' + esc(DS.tacticStyle(cm.tacticStyle).name) + ' · 고유 ' + cm.formation + '</span>' +
-        '<span class="mcard-tr">' + DS.managerTraitText(cm) + '</span></span>' +
+        '<span class="mcard-tr">' + DS.managerTraitText(cm) + '</span>' +
+        '<span class="mcard-gr">🌱 ' + esc(DS.growthLine(cm)) + '</span></span>' +
         '<button class="btn sm primary" data-act="mgrsign" data-id="' + cm.id + '" ' + (S.money < price ? 'disabled' : '') + '>' + fmt(price) + '</button></div>';
     }
     if (!cands) { candHTML = '<div class="tiny muted" style="padding:8px 2px">영입 가능한 후보가 없습니다. 후보를 다시 뽑아보세요.</div>'; }
@@ -1785,14 +2008,21 @@
       '<div class="pd-art"><img src="' + DS.Art.portraitSrc(p) + '" alt=""></div>' +
       '<div class="pd-info">' +
       '<div class="pd-nick">\'' + esc(p.nickname) + '\'</div>' +
-      '<div class="pd-name">' + esc(p.name) + ' <small>' + p.age + '세</small></div>' +
+      '<div class="pd-name">' + tierDot(p) + ' ' + esc(p.name) + ' <small>' + p.age + '세</small></div>' +
       '<div class="pd-line">' + posBadge(p.pos, p.pos + ' · ' + DS.POS[p.pos].name) +
       footChip(p) +
       '<span class="chip" style="background:' + L.color + '26;color:' + L.color + '">' + L.name + '</span>' +
-      (role ? '<span class="chip lime">' + role.name + '</span>' : '') + '</div>' +
+      (role ? '<span class="chip lime">' + role.name + '</span>' : '') +
+      (function () {
+        var st = DS.ageStage(p.age);
+        return '<span class="age-badge" style="color:' + st.color + ';border-color:' + st.color + '66">' + st.name + ' ×' + st.expMult + '</span>' +
+          (DS.isYouthOrigin(p) ? '<span class="age-badge youth">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</span>' : '');
+      })() + '</div>' +
       '<div class="row" style="align-items:flex-end;gap:8px"><div class="pd-ov">' + rt + '<small>OVR</small></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.6);padding-bottom:2px">' + DS.RARITY[p.rarity].name + ' · ' + p.tenure + '기수 · Lv.' + (p.level || 0) + '</div></div>' +
       '<div class="pd-rows"><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
+      '<div class="pd-rows"><div><span>성장 곡선</span>' + DS.ageStage(p.age).age + ' · ' + DS.ageStage(p.age).desc + '</div>' +
+      '<div><span>잠재</span>' + (p.pot || '—') + '</div></div>' +
       '</div></div>' +
 
       '<div class="band">STATUS<span>능력치 · 적성</span></div>' +
@@ -1912,7 +2142,7 @@
       var canEvo2 = canEvolve(st[i]), needLv2 = evoNeed(st[i]);
       rows += '<div class="role-row">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
-        '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
+        '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + tierDot(st[i]) + ' ' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
         '<div class="ds">' + (r ? r.name : (canEvo2 ? '롤 없음 · 진화 가능' : '롤 없음 · Lv.' + needLv2 + ' 필요')) + '</div></div>' +
         '<button class="btn sm ' + (canEvo2 ? (r ? 'ghost' : 'primary') : 'ghost locked') + '" data-act="evolve" data-id="' + st[i].id + '"' + (canEvo2 ? '' : ' disabled aria-disabled="true"') + '>' +
         (canEvo2 ? (r ? '변경' : '진화') : 'Lv.' + needLv2) + '</button></div>';
@@ -2115,7 +2345,10 @@
     for (i = 0; i < list.length; i++) {
       var e = list[i], pct = Math.max(2, Math.min(100, Math.round(e.expLeft / Math.max(1, e.need) * 100)));
       rows += '<div class="ex-row' + (e.levels ? ' up' : '') + '">' +
-        '<span class="ex-nm">' + esc(e.name) + '<em>' + e.pos + '</em></span>' +
+        '<span class="ex-nm">' + esc(e.name) + '<em>' + e.pos + '</em>' +
+        (e.youth ? '<span class="ex-tag yth">유망주 ×' + (e.youthMult || 2.2) + '</span>' : '') +
+        (e.stage && e.stage !== 'mature' ? '<span class="ex-tag ' + e.stage + '">' + e.stageName + '</span>' : '') +
+        '</span>' +
         '<span class="ex-bar"><i style="width:' + pct + '%"></i></span>' +
         '<span class="ex-v">+' + e.exp + '</span>' +
         (e.levels ? '<span class="ex-up">LV.' + e.level + ' ▲' + e.levels + '</span>' : '<span class="ex-lv">Lv.' + e.level + '</span>') +
@@ -2181,6 +2414,17 @@
       '<div class="band">CAUTIONS</div><div class="card tight" style="margin:0 0 8px">' + caut + '</div>' +
       '<div class="band">PLAYER RATING</div><div class="card tight" style="margin:0 0 8px">' + pts + '</div>' +
       expHTML(r) +
+      (r.reserve ? '<div class="band">2군 리그 <span>vs ' + esc(r.reserve.oppName) + ' ' + r.reserve.gf + ':' + r.reserve.ga + '</span></div>' +
+        '<div class="card tight" style="margin:0 0 8px">' +
+        r.reserve.rows.map(function (x) {
+          return '<div class="rl-row' + (x.levels ? ' up' : '') + '"><span class="rl-nm">' + esc(shortName(x.name)) + '<em>' + x.pos + '</em></span>' +
+            '<span class="rl-rt">' + x.rating.toFixed(1) + '</span>' +
+            '<span class="rl-ex">+' + x.exp + '</span>' +
+            '<span class="rl-ov">' + x.ovrFrom + '→' + x.ovrTo + '</span>' +
+            (x.levels ? '<span class="rl-up">LV.' + x.level + ' ▲' + x.levels + '</span>' : '<span class="rl-lv">Lv.' + x.level + '</span>') +
+            '</div>';
+        }).join('') +
+        '<div class="tiny muted" style="margin-top:3px">2군 경기는 리그 라운드마다 자동으로 치러집니다. 클럽 > 유소년에서 확인하세요.</div></div>' : '') +
       '<div class="band">CAREER</div><div class="card tight" style="margin:0 0 8px">' +
       '<table class="tbl"><thead><tr><th>시즌</th><th>순위</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th></tr></thead><tbody>' + car + '</tbody></table></div>' +
       '<div class="row between"><span class="tiny muted">보상 ' + fmt(r.reward) + (r.points ? ' · 승점 +' + r.points : '') + '</span>' +
@@ -2235,6 +2479,22 @@
       out.id = best.id;
     } else {
       o = currentOpponent();
+      /* v23 — 부전승(bye)·42라운드 세이브 등으로 상대가 비어 있으면 38라운드로 자동 복구 */
+      if (!o && !S.seasonOver) {
+        normalizeDivs(S);
+        S.table = makeTable(S.division, true);
+        S.fixtures = makeFixtures(S.division, true);
+        S.otherTable = makeTable(3 - S.division, false);
+        S.otherFixtures = makeFixtures(3 - S.division, false);
+        S.round = 0;
+        S.seasonOver = false;
+        S.seasonReview = null;
+        S.log.push('S' + S.season + ' ' + divName(S.division) + ' 대진표 복구 — 20팀 38라운드');
+        save();
+        if (currentTab === 'home') { renderHome(); }
+        o = currentOpponent();
+        if (o) { toast('리그 대진표를 20팀 38라운드로 복구했습니다.'); }
+      }
       if (!o) { return null; }
       out.team = opponentTeam(o.id);
       out.id = o.id;
@@ -2392,10 +2652,12 @@
     S.totals.conceded += ga;
     if (win) { S.totals.wins++; } else if (draw) { S.totals.draws++; } else { S.totals.losses++; }
 
-    var points = null;
+    var points = null, reserveOut = null;
     if (kind === 'league') {
       playMatchRows(gf, ga, oppId);
       S.round++;
+      /* v23 — 리그 라운드가 돌면 2군도 같은 라운드를 치른다 */
+      reserveOut = playReserveRound();
       points = win ? 3 : (draw ? 1 : 0);
       if (S.round >= S.fixtures.length) { S.seasonOver = true; ensureSeasonReview(); }
     } else if (kind === 'challenge') {
@@ -2446,6 +2708,7 @@
       reward: reward,
       points: points,
       expGain: expGain,
+      reserve: reserveOut,
       kind: kind,
       venueHome: venueHome !== false
     };
@@ -2463,23 +2726,7 @@
     global.setTimeout(function () { showReport(report); }, 420);
   }
 
-  /* ─────────────────────────  v21 — 경기 EXP · 자동 레벨업  ───────────────────────── */
-  function growOnLevel(p) {
-    if (!p) { return; }
-    var w = DS.POS[p.pos].w || { s: 0.3, t: 0.3, p: 0.4 };
-    var keys = ['s', 't', 'p'], best = 's', i;
-    for (i = 1; i < keys.length; i++) { if ((w[keys[i]] || 0) > (w[best] || 0)) { best = keys[i]; } }
-    var pot = p.pot || 99, cur = DS.ratingOf(p);
-    /* 잠재력에 닿으면 성장이 둔해진다 (유소년은 여유가 커서 빨리 큰다) */
-    if (cur < pot || chance(0.35)) { p[best] = clamp((p[best] || 1) + 1, 1, 10); }
-    if (chance(0.4)) {
-      var o = keys[Math.floor(Math.random() * keys.length)];
-      p[o] = clamp((p[o] || 1) + 1, 1, 10);
-    }
-    if (chance(0.22)) { p.set.cap = clamp((p.set.cap || 1) + 1, 1, 10); }
-    p.stats = DS.statSheet(p);
-  }
-
+  /* ─────────────────────────  v21 — 경기 EXP · 자동 레벨업 (v23에서 data.js로 이동)  ───────────────────────── */
   function awardMatchExp(res, kind) {
     var mult = kind === 'league' ? 1 : (kind === 'challenge' ? 1.3 : 0.9);
     var goalsBy = {}, assistsBy = {}, i, out = [];
@@ -2495,17 +2742,12 @@
       var rr = rs[i], p = byId(rr.id);
       if (!p) { continue; }
       var gl = goalsBy[rr.name] || 0, as = assistsBy[rr.name] || 0;
-      var exp = Math.round((70 + Math.max(0, rr.rating - 5.5) * 55 + gl * 80 + as * 45) * mult);
-      p.exp = (p.exp || 0) + exp;
-      if (typeof p.pot !== 'number') { p.pot = Math.min(95, Math.max(60, DS.ratingOf(p) + 8)); }
-      var ups = 0, guard = 0;
-      while (p.exp >= DS.expToNext(p.level || 0) && guard < 6) {
-        p.exp -= DS.expToNext(p.level || 0);
-        p.level = (p.level || 0) + 1;
-        growOnLevel(p);
-        ups++;
-        guard++;
-      }
+      /* v23 — 나이 곡선 · 감독 growth · 유소년 ×2.2 를 한곳(DS.matchExpGain)에서 계산한다 */
+      var calc = DS.matchExpGain(p, {
+        rating: rr.rating, goals: gl, assists: as, kindMult: mult, base: 70, mgr: mgr()
+      });
+      var exp = calc.exp;
+      var ups = DS.addExp(p, exp, mgr(), 'first');
       p.apps = (p.apps || 0) + 1;
       p.goals = (p.goals || 0) + gl;
       p.assists = (p.assists || 0) + as;
@@ -2513,7 +2755,10 @@
         id: p.id, name: p.name, pos: p.pos,
         exp: exp, levels: ups, level: p.level || 0,
         expLeft: Math.round(p.exp), need: DS.expToNext(p.level || 0),
-        rating: rr.rating
+        rating: rr.rating,
+        youth: calc.youth, youthMult: calc.youthMult,
+        stage: calc.stage, stageName: calc.stageName, stageMult: calc.stageMult,
+        mult: calc.mult
       });
     }
     out.sort(function (a, b) { return (b.levels - a.levels) || (b.exp - a.exp); });
@@ -2636,6 +2881,32 @@
     return S.seasonReview;
   }
 
+  /* v23 — 시즌 전환: 1군·아카데미 전원 나이 +1, 32세 이상은 피지컬 하락 */
+  function ageSeason() {
+    var i, p, d, out = { count: 0, rows: [] };
+    for (i = 0; i < S.squad.length; i++) {
+      p = S.squad[i];
+      p.age = (p.age || 20) + 1;
+      d = DS.declinePhysical(p);
+      if (d) { out.rows.push(d); }
+    }
+    var y = S.youth;
+    if (y && y.intake) {
+      for (i = 0; i < y.intake.length; i++) {
+        p = y.intake[i];
+        p.age = (p.age || 16) + 1;
+        d = DS.declinePhysical(p);
+        if (d) { out.rows.push(d); }
+      }
+    }
+    out.count = out.rows.length;
+    S.ageNotices = out.rows;
+    if (out.count) {
+      S.log.push('S' + S.season + ' 노화 — ' + out.count + '명 피지컬 하락 (' + out.rows.slice(0, 3).map(function (r) { return r.name; }).join(', ') + (out.count > 3 ? ' 외' : '') + ')');
+    }
+    return out;
+  }
+
   function newSeason() {
     var rv = ensureSeasonReview();
     var rank = ourRank();
@@ -2660,6 +2931,8 @@
       }
       if (rv.nextDivision && rv.nextDivision !== S.division) { S.division = rv.nextDivision; }
     }
+    /* v23 — 승격·강등 뒤에도 우리 리그 19 AI + me · 반대 리그 20 AI 정원을 맞춘다 */
+    normalizeDivs(S);
     S.season++;
     S.seasonOver = false;
     S.round = 0;
@@ -2672,6 +2945,8 @@
     S.challengeLeft = 1;
     S.smatchTickets = 3;
     S.smatchStreak = 0;
+    /* v23 — 시즌이 바뀌면 전원이 한 살을 먹는다 (32세 이상은 피지컬 하락) */
+    var aged = ageSeason();
     S.fans += 120;
     S.morale = clamp(S.morale + 4, 0, 100);
     S.condition = clamp(S.condition + 20, 0, 100);
@@ -2680,6 +2955,7 @@
     var msg = '시즌 ' + S.season + ' 시작 · ' + divName(S.division) + ' 리그';
     if (rv && rv.outcome === '승격') { msg = '시즌 ' + S.season + ' · 1부 리그 승격! 중계권과 스폰서 수입이 올랐습니다'; }
     if (rv && rv.outcome === '강등') { msg = '시즌 ' + S.season + ' · 2부 리그로 강등 · 다시 올라가야 합니다'; }
+    if (aged && aged.count) { msg += ' · 노화 ' + aged.count + '명 피지컬 하락'; }
     toast(msg);
     renderAll();
   }
@@ -3480,6 +3756,7 @@
     if (act === 'youthpos') { youthSel.pos = t.getAttribute('data-k'); renderClub(); return; }
     if (act === 'youthcoach') { doYouthCoach(); return; }
     if (act === 'youthpromote') { doYouthPromote(youthSel.id); return; }
+    if (act === 'youthreserve') { doYouthReserve(t.getAttribute('data-id') || youthSel.id); return; }
     if (act === 'youthsell') { doYouthSell(youthSel.id); return; }
     if (act === 'youthreroll') { doYouthReroll(); return; }
     if (act === 'trainmenu') {
@@ -3846,6 +4123,12 @@
     roundInfo: roundInfo,
     ensureMarket: ensureMarket,
     ensureYouth: ensureYouth,
+    /* v23 — 2군 리그 · 나이 곡선 검증용 */
+    ensureReserve: ensureReserve,
+    reserveList: reserveList,
+    playReserveRound: playReserveRound,
+    ageSeason: ageSeason,
+    youthReserve: doYouthReserve,
     load: load,
     defaultState: defaultState,
     saveKey: SAVE_KEY,
@@ -3869,6 +4152,8 @@
       var g1 = simGoals(teamPower(), sa), g2 = simGoals(sa, teamPower());
       playMatchRows(g1, g2, o.id);
       S.round++;
+      /* QA 시즌 시뮬레이션에서도 2군 라운드를 함께 진행한다 */
+      playReserveRound();
       if (S.round >= S.fixtures.length) { S.seasonOver = true; ensureSeasonReview(); }
       save();
       return { me: g1, opp: g2, round: S.round };

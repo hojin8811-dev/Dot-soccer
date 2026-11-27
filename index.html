@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도트싸커 v22 — 1부·2부 리그 · 승격/강등 · 벤치 7명 · 전술 카드 일러스트</title>
-<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v22는 리그를 1부·2부 각 20팀(총 40팀)으로 나누고, 우리 구단은 동(브론즈) 18명으로 2부에서 출발한다. 38라운드 뒤 1~2위 자동 승격과 3~6위 승격 플레이오프, 1부 18~20위 강등이 시즌 결산에 반영되고, 1부에 오르면 중계권·스폰서 수입이 오른다. 벤치가 7명으로 늘고 경기당 교체는 5회, 전술 카드는 카드마다 고유한 전략 일러스트로 표시된다.">
+<title>도트싸커 v23 — 감독별 육성 · 유소년 2군 출전 · 나이 성장 곡선</title>
+<meta name="description" content="100% 오리지널 축구 구단 경영 RPG. v23은 감독 50명에게 육성 특성(유소년 EXP·능력치 성장 가중)을 주고, 유소년 아카데미 유망주를 2군 리그에 내보내 리그 라운드마다 실전 경험을 쌓게 한다. 유소년 출신은 1군에서도 경기 EXP ×2.2, 나이 곡선(급성장·성숙기·정체기·하락기)과 32세 이후 피지컬 하락까지 FM식 성장을 따른다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도트싸커">
-<link rel="manifest" href="manifest.webmanifest?v=22">
-<link rel="icon" href="icons/icon-192.png?v=22">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=22">
-<link rel="stylesheet" href="css/style.css?v=22&b=9">
+<link rel="manifest" href="manifest.webmanifest?v=23">
+<link rel="icon" href="icons/icon-192.png?v=23">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=23">
+<link rel="stylesheet" href="css/style.css?v=23&b=10">
 </head>
 <body>
 <div id="app">
@@ -51,21 +51,21 @@
     <div class="rot-in">
       <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="17" y="4" width="14" height="26" rx="3"/><path d="M24 38a14 14 0 1 0-12-6.8"/><path d="M6 26l5 6 6-4"/></svg>
       <b>가로로 돌려 주세요</b>
-      <span>도트싸커 v22는 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
+      <span>도트싸커 v23은 16:9 가로 경기장에 맞춰 설계했습니다.<br>기기를 가로로 잡으면 한 화면에 꽉 차게 보입니다.</span>
       <button class="btn primary" data-act="rotgo">가로 화면으로 보기</button>
       <button class="btn ghost sm" data-act="rotstay">세로로 계속 보기</button>
     </div>
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=22&b=9"></script>
-<script src="js/match.js?v=22&b=9"></script>
-<script src="js/game.js?v=22&b=9"></script>
+<script src="js/data.js?v=23&b=10"></script>
+<script src="js/match.js?v=23&b=10"></script>
+<script src="js/game.js?v=23&b=10"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=22').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=23').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });
