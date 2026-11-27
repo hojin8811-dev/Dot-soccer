@@ -1,4 +1,4 @@
-/*! 도트싸커 × 포켓리그 v2 — 게임 데이터 · 선수 생성 · 픽셀 아트 (data.js) */
+/*! 꼬마일레븐 FC v26 — 게임 데이터 · 선수 생성 · 픽셀 아트 (data.js) */
 (function (global) {
   'use strict';
 

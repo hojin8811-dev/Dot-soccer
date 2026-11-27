@@ -1,12 +1,12 @@
-/*! 도트싸커 v25 — 실시간 전술카드 대입 · 캐릭터 연출 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v25-20261127b';
+/*! 꼬마일레븐 FC v26 — 현대 전술 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v26-20261127a';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=25&b=13', './js/data.js?v=25&b=13', './js/pvp.js?v=25&b=13', './js/match.js?v=25&b=13', './js/game.js?v=25&b=13',
+        './css/style.css?v=26&b=14', './js/data.js?v=26&b=14', './js/pvp.js?v=26&b=14', './js/match.js?v=26&b=14', './js/game.js?v=26&b=14',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

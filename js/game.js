@@ -1,4 +1,4 @@
-/*! 도트싸커 v3 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
+/*! 꼬마일레븐 FC v26 — 우리만의 현대 전술 축구 RPG · 게임 상태 · UI (game.js) */
 (function (global) {
   'use strict';
 
@@ -78,7 +78,7 @@
   /* v22 — 리그 표. 1부·2부 각 20팀이고, 우리 구단은 소속 리그 표에만 들어간다. */
   function makeTable(division, withMe) {
     var rows = [], list = divTeams(division), i;
-    if (withMe) { rows.push({ id: 'me', name: '도트 유나이티드', short: '도트', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }); }
+    if (withMe) { rows.push({ id: 'me', name: '꼬마일레븐 FC', short: '꼬마', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }); }
     for (i = 0; i < list.length; i++) {
       rows.push({ id: list[i].id, name: list[i].name, short: list[i].short, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
     }
@@ -310,7 +310,7 @@
     var squad = DS.makeInitialSquad();
     var st = {
       v: 6,
-      club: { name: '도트 유나이티드', emblem: 'bolt', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
+      club: { name: '꼬마일레븐 FC', emblem: 'bolt', kit: { shirt: '#c8432f', shorts: '#16241f', trim: '#f0e6cc' } },
       money: 7200,
       fans: 1280,
       morale: 66,
@@ -398,6 +398,9 @@
       if (!raw) { return null; }
       var d = JSON.parse(raw);
       if (!d || (d.v !== 3 && d.v !== 4 && d.v !== 5 && d.v !== 6 && d.v !== 7) || !d.squad || !d.lineup || !d.club) { return null; }
+      /* v26 — 게임 이름 변경(도트싸커 → 꼬마일레븐 FC). 구단명을 직접 바꾼 세이브는 그대로 두고,
+         손대지 않은 옛 기본값 '도트 유나이티드'만 새 기본값으로 옮긴다(세이브 키·진행은 그대로). */
+      if (d.club.name === '도트 유나이티드') { d.club.name = '꼬마일레븐 FC'; }
       /* v22 — 1부/2부 리그: division 필드가 없는 구버전 세이브는 1부 유지로 안전 처리 */
       if (!d.divs || typeof d.divs !== 'object') { d.divs = {}; }
       DIV_OVERRIDE = d.divs;
@@ -922,7 +925,7 @@
       '<img class="hero-img" src="assets/hero-banner.jpg" alt="">' +
       '<div class="hero-badge"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/></svg>' + S.formation + ' · ' + DS.FORMATIONS[S.formation].tag + '</div>' +
       '<div class="hero-in">' +
-      '<div class="hero-kicker">MODERN TACTICAL SOCCER RPG</div>' +
+      '<div class="hero-kicker"><b class="brand">꼬마일레븐 FC</b> · MODERN TACTICAL SOCCER RPG</div>' +
       '<div class="hero-title">' + esc(S.club.name) + '</div>' +
       '<div class="hero-sub">' + divName(S.division) + ' 리그 ' + rank + '위 · 전력 ' + power + ' · 조직력 ' + chem + ' · 시즌 ' + S.season + '</div>' +
       '</div></div>' +
