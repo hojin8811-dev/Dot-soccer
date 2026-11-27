@@ -18,7 +18,7 @@
      index.html이 실제로 불러온 이 스크립트의 쿼리(?v=&b=)에서 읽는다.
      그래야 배포 때 캐시 버스터를 올리면 공유 링크도 같이 따라온다. */
   function scriptVer() {
-    var out = { v: '27', b: '21' };
+    var out = { v: '27', b: '22' };
     try {
       var doc = global.document, src = '';
       if (doc && doc.querySelector) {
