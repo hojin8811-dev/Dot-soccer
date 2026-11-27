@@ -243,6 +243,8 @@
       youth: { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 },
       expLog: [],
       dex: { players: {}, emblems: {}, kits: {} },
+      /* v21b ⑥ — 초보자 3단계 가이드 진행 상태 (localStorage 세이브에 함께 저장) */
+      guide: { done: {}, open: true, hidden: false },
       log: []
     };
     S = st;
@@ -311,6 +313,9 @@
       if (!d.transfer.myListings) { d.transfer.myListings = []; }
       if (!d.youth || !d.youth.intake) { d.youth = { intake: [], intakeRound: -1, coachTarget: null, coachPos: null, promoted: 0 }; }
       if (!d.expLog) { d.expLog = []; }
+      /* v21b ⑥ — 기존 세이브: 이미 경기를 치른 구단에는 가이드를 접어 둔다 */
+      if (!d.guide) { d.guide = { done: {}, open: true, hidden: !!(d.totals && d.totals.matches > 0) }; }
+      if (!d.guide.done) { d.guide.done = {}; }
       var i2;
       for (i2 = 0; i2 < d.squad.length; i2++) {
         var sq0 = d.squad[i2];
@@ -548,12 +553,84 @@
   }
 
   /* ═════════════════  홈 (공식전) ═════════════════ */
+  /* v21b ④ — 개막 전(전 팀 0경기)에는 승점이 모두 0이라 가나다순으로 늘어서
+     전력 1위 구단이 19위로 보였다. 경기가 하나도 없을 때는 전력(OVR) 내림차순,
+     동률이면 가나다순으로 초기 순위를 잡고, 1경기부터는 승점/득실/다득점 정렬을 쓴다. */
+  function rowStrength(r) {
+    if (!r) { return 0; }
+    if (r.id === 'me') { return teamPower(); }
+    var i;
+    for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].id === r.id) { return DS.TEAMS[i].strength; } }
+    return 0;
+  }
+  function tablePreseason() {
+    var i;
+    for (i = 0; i < S.table.length; i++) { if (S.table[i].p > 0) { return false; } }
+    return true;
+  }
+  /* v21b ⑥ — 첫 방문자를 위한 3단계 가이드. 진행은 S.guide 에 저장되고
+     완료/접기/다시 보지 않기가 모두 기억된다. */
+  var GUIDE_STEPS = [
+    { k: 'team', n: '①', t: '마이팀 포메이션 확인', d: '선발 11인과 포메이션을 본다', tab: 'squad' },
+    { k: 'kickoff', n: '②', t: '공식전 첫 경기 킥오프', d: '첫 경기를 치러 승점을 쌓는다', kick: true },
+    { k: 'club', n: '③', t: '클럽 시설·유소년 둘러보기', d: '훈련장과 U-18 아카데미를 확인한다', tab: 'club' }
+  ];
+  function guideState() {
+    if (!S.guide) { S.guide = { done: {}, open: true, hidden: false }; }
+    if (!S.guide.done) { S.guide.done = {}; }
+    if (typeof S.guide.open !== 'boolean') { S.guide.open = true; }
+    return S.guide;
+  }
+  function guideDone(key) {
+    var g = guideState();
+    if (g.done[key]) { return true; }
+    return key === 'kickoff' && S.totals && S.totals.matches > 0;
+  }
+  function guideMark(key) {
+    var g = guideState(), was = guideDone(key);
+    g.done[key] = 1;
+    save();
+    if (!was && currentTab === 'home') { renderHome(); }
+  }
+  function guideHTML() {
+    var g = guideState(), i, done = 0, s, on, rows = '';
+    if (g.hidden) { return ''; }
+    for (i = 0; i < GUIDE_STEPS.length; i++) { if (guideDone(GUIDE_STEPS[i].k)) { done++; } }
+    if (!g.open) {
+      return '<div class="gd-bar"><b>초보자 가이드</b><span>' + done + '/3</span>' +
+        '<button data-act="guideopen">이어서 보기 ›</button>' +
+        '<button class="gd-x" data-act="guidehide" aria-label="가이드 숨기기">✕</button></div>';
+    }
+    for (i = 0; i < GUIDE_STEPS.length; i++) {
+      s = GUIDE_STEPS[i]; on = guideDone(s.k);
+      rows += '<div class="gd-step' + (on ? ' done' : '') + '">' +
+        '<span class="gd-no">' + (on ? '✓' : s.n) + '</span>' +
+        '<span class="gd-tx"><b>' + s.t + '</b><em>' + s.d + '</em></span>' +
+        (on ? '<span class="gd-ok">완료</span>' :
+          (s.kick ? '<button class="btn primary sm" data-act="kickoff">킥오프</button>' :
+            '<button class="btn sm" data-act="guidego" data-tab="' + s.tab + '">열기</button>')) +
+        '</div>';
+    }
+    return '<div class="card gd-card' + (done >= 3 ? ' all' : '') + '">' +
+      '<div class="card-head"><span class="dot"></span><b>처음 오셨나요? 3단계면 끝</b><span class="meta">' + done + '/3 완료</span>' +
+      '<button class="gd-x" data-act="guidefold" aria-label="가이드 접기">⌃</button></div>' +
+      rows +
+      '<div class="gd-foot"><span>' + (done >= 3 ? '모두 끝냈습니다. 이제 원하는 대로 즐기세요' : '순서대로 하면 첫 승까지 금방입니다') + '</span>' +
+      '<button class="gd-hide" data-act="guidehide">다시 보지 않기</button></div></div>';
+  }
+
   function sortTable() {
+    var pre = tablePreseason();
     S.table.sort(function (a, b) {
-      if (b.pts !== a.pts) { return b.pts - a.pts; }
-      var da = a.gf - a.ga, db = b.gf - b.ga;
-      if (db !== da) { return db - da; }
-      if (b.gf !== a.gf) { return b.gf - a.gf; }
+      if (!pre) {
+        if (b.pts !== a.pts) { return b.pts - a.pts; }
+        var da = a.gf - a.ga, db = b.gf - b.ga;
+        if (db !== da) { return db - da; }
+        if (b.gf !== a.gf) { return b.gf - a.gf; }
+      } else {
+        var sa = rowStrength(a), sb = rowStrength(b);
+        if (sb !== sa) { return sb - sa; }
+      }
       return a.name < b.name ? -1 : 1;
     });
   }
@@ -664,6 +741,7 @@
     }
 
     box.innerHTML =
+      guideHTML() +
       '<div class="hero">' +
       '<img class="hero-img" src="assets/hero-banner.jpg" alt="">' +
       '<div class="hero-badge"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/></svg>' + S.formation + ' · ' + DS.FORMATIONS[S.formation].tag + '</div>' +
@@ -758,7 +836,9 @@
         '<div class="vs-team"><canvas data-emblem="' + opp.emblem + '" data-kit="' + opp.kit.shirt + '|' + opp.kit.trim + '" width="34" height="40"></canvas><span class="nm">' + esc(opp.short) + '</span></div>' +
         '</div>' +
         '<div class="tiny muted" style="margin-bottom:6px">' + it.desc + ' · 보상 ' + fmt(it.reward) + (S.smatchStreak >= 3 ? ' (+연승 보너스)' : '') + '</div>' +
-        '<button class="btn ' + (i === 2 ? 'red' : '') + ' wide" data-act="smatch" data-k="' + it.key + '" ' + (S.smatchTickets <= 0 ? 'disabled' : '') + '>S매치 시작 · 이용권 ' + S.smatchTickets + '장</button>' +
+        /* v21b ① — 1판 소모량(1장)과 보유량을 분리해 표기 (3장 보유 = 3판 아님) */
+        '<button class="btn ' + (i === 2 ? 'red' : '') + ' wide" data-act="smatch" data-k="' + it.key + '" ' + (S.smatchTickets <= 0 ? 'disabled' : '') + ' title="이용권 1장을 쓰고 1판을 치릅니다">' +
+        'S매치 시작 · 1장 (보유 ' + S.smatchTickets + ')</button>' +
         '</div>';
     }
 
@@ -1134,11 +1214,14 @@
     var st = starters(), roleHTML = '';
     for (i = 0; i < st.length; i++) {
       var r = DS.roleOf(st[i].role);
+      /* v21b ② — 레벨이 모자라 롤을 열 수 없는 선수는 [진화]를 잠근다 */
+      var canEvo = canEvolve(st[i]), needLv = evoNeed(st[i]);
       roleHTML += '<div class="role-row">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
-        '<div class="ds">' + (r ? r.name + ' — ' + r.desc : '아직 롤 없음 · Lv.3부터 진화 가능') + '</div></div>' +
-        '<button class="btn sm ' + (r ? 'ghost' : 'primary') + '" data-act="evolve" data-id="' + st[i].id + '">' + (r ? '변경' : '진화') + '</button>' +
+        '<div class="ds">' + (r ? r.name + ' — ' + r.desc : (canEvo ? '아직 롤 없음 · 진화 가능' : '아직 롤 없음 · Lv.' + needLv + '부터 진화 가능')) + '</div></div>' +
+        '<button class="btn sm ' + (canEvo ? (r ? 'ghost' : 'primary') : 'ghost locked') + '" data-act="evolve" data-id="' + st[i].id + '"' + (canEvo ? '' : ' disabled aria-disabled="true"') + '>' +
+        (canEvo ? (r ? '변경' : '진화') : 'Lv.' + needLv) + '</button>' +
         '</div>';
     }
 
@@ -1633,7 +1716,8 @@
         '<label>이름<input id="pd-name" maxlength="8" value="' + esc(p.name) + '"></label>' +
         '<label style="flex:0 0 76px">등번호<input id="pd-num" type="number" min="1" max="99" value="' + p.number + '"></label>' +
         '<button class="btn primary" data-act="saveplayer" data-id="' + p.id + '">저장</button></div>' +
-        '<button class="btn dark wide" style="margin-top:8px" data-act="evolve" data-id="' + p.id + '">롤 진화 · ' + fmt(EVO_COST) + '</button>'
+        '<button class="btn dark wide" style="margin-top:8px" data-act="evolve" data-id="' + p.id + '"' + (canEvolve(p) ? '' : ' disabled aria-disabled="true"') + '>' +
+        (canEvolve(p) ? '롤 진화 · ' + fmt(EVO_COST) : '롤 진화 · Lv.' + evoNeed(p) + '부터') + '</button>'
         : '<div class="empty-note">스카우트 후보입니다. 영입하면 이름과 등번호를 바꿀 수 있어요.</div>');
 
     setSheet('PLAYER DETAIL', body);
@@ -1655,6 +1739,25 @@
       '<div class="tiny muted" style="margin-bottom:6px">경기 중 손패는 덱에서 3장이 뽑힙니다. 모멘텀을 모아 원하는 타이밍에 발동하세요.</div>' +
       cards +
       '<button class="btn primary wide" style="margin-top:8px" data-act="decksave">덱 저장</button>');
+  }
+
+  /* v21b ② — 지금 레벨에서 열 수 있는(현재 롤과 다른) 롤이 하나라도 있어야 진화 가능 */
+  function canEvolve(p) {
+    if (!p) { return false; }
+    var list = DS.rolesFor(p.pos), lv = p.level || 0, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].key === p.role) { continue; }
+      if (lv >= list[i].need) { return true; }
+    }
+    return false;
+  }
+  function evoNeed(p) {
+    var list = p ? DS.rolesFor(p.pos) : [], need = 3, i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i].key === p.role) { continue; }
+      need = Math.min(need, list[i].need);
+    }
+    return need;
   }
 
   function evolveModal(p) {
@@ -1709,11 +1812,13 @@
     var st = starters(), rows = '', i;
     for (i = 0; i < st.length; i++) {
       var r = DS.roleOf(st[i].role);
+      var canEvo2 = canEvolve(st[i]), needLv2 = evoNeed(st[i]);
       rows += '<div class="role-row">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
-        '<div class="ds">' + (r ? r.name : '롤 없음') + '</div></div>' +
-        '<button class="btn sm ' + (r ? 'ghost' : 'primary') + '" data-act="evolve" data-id="' + st[i].id + '">' + (r ? '변경' : '진화') + '</button></div>';
+        '<div class="ds">' + (r ? r.name : (canEvo2 ? '롤 없음 · 진화 가능' : '롤 없음 · Lv.' + needLv2 + ' 필요')) + '</div></div>' +
+        '<button class="btn sm ' + (canEvo2 ? (r ? 'ghost' : 'primary') : 'ghost locked') + '" data-act="evolve" data-id="' + st[i].id + '"' + (canEvo2 ? '' : ' disabled aria-disabled="true"') + '>' +
+        (canEvo2 ? (r ? '변경' : '진화') : 'Lv.' + needLv2) + '</button></div>';
     }
     setSheet('롤 진화 · 선발 11명',
       '<div class="tiny muted" style="margin-bottom:6px">선수를 선택해 현대 롤로 진화시키세요. Lv.3 / Lv.4부터 열립니다.</div>' + rows);
@@ -2112,6 +2217,8 @@
     if (lineup.length < 8) { toast('선발 선수가 부족합니다.'); return; }
     if (S.condition < 25) { toast('컨디션이 너무 낮습니다. 회복이 필요합니다.'); return; }
 
+    /* v21b ⑥ — 실제로 킥오프까지 간 경기만 가이드 2단계로 기록 */
+    if (kind === 'league') { guideMark('kickoff'); }
     save();
     setTab('match');
     renderMatchLive(oppTeam, kind);
@@ -2487,13 +2594,20 @@
       '<canvas id="m-pitch"></canvas>' +
       '<div class="sit" id="m-sit"><i></i><b>킥오프</b><span>경기 시작</span></div>' +
       '<div id="m-banner" class="goal-banner"></div>' +
-      '</div></div>' +
+      '</div>' +
+      /* v21b ③ — 피치 아래 실시간 선발 11인 체력·평점 바 (높은 화면에서만 펼침) */
+      '<div class="m-squad off" id="m-squad"><div class="ms-head"><b>선발 11인</b><span>체력 · 평점</span></div>' +
+      '<div class="ms-grid" id="m-squad-grid"></div></div>' +
+      '</div>' +
 
       '<aside class="m-side">' +
       '<div class="mom">' +
       '<div class="mom-top"><b>MOMENTUM</b><span class="uses" id="m-uses">개입 6/6</span>' +
       '<span class="val"><span id="m-mom-val">0</span><small>/100</small></span></div>' +
-      '<div class="mom-bar"><i id="m-mom-fill"></i></div>' +
+      /* v21b ⑤ — 손패 카드 발동 기준 눈금 (게이지 위 숫자 · 바 위 틱) */
+      '<div class="mom-scale" id="m-mom-scale"></div>' +
+      '<div class="mom-bar"><i id="m-mom-fill"></i><span class="mom-ticks" id="m-mom-ticks"></span></div>' +
+      '<div class="mom-hint" id="m-mom-hint">모멘텀을 모으면 카드가 열립니다</div>' +
       '<div class="mom-buffs" id="m-buffs"></div>' +
       '</div>' +
       '<div class="hand v7" id="m-hand"></div>' +
@@ -2524,12 +2638,14 @@
 
   function updateHud(st) {
     var now = Date.now();
-    if (now - hudStamp < 320) { return; }
+    if (now - hudStamp < 150) { return; }
     hudStamp = now;
     var val = document.getElementById('m-mom-val');
     var fill = document.getElementById('m-mom-fill');
     if (val) { val.textContent = st.momentum; }
     if (fill) { fill.style.width = st.momentum + '%'; }
+    updateMomentumGuide(st);
+    updateLiveSquad(st);
     var buffs = document.getElementById('m-buffs');
     if (buffs) {
       var names = {
@@ -2611,7 +2727,7 @@
           h += '<button class="tcard v7" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '">' +
             '<span class="tc-face">' + (c.face ? '<img src="' + c.face + '" alt="">' : '') + '</span>' +
             '<span class="tc-main"><span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
-            '<span class="cd"></span></span>' +
+            '<span class="tc-desc">' + c.desc + '</span><span class="cd"></span></span>' +
             '<span class="cost"><em>' + c.cost + '</em> M</span>' +
             '</button>';
         }
@@ -2629,6 +2745,80 @@
         cd.textContent = noUse ? '이번 경기 개입 완료' : (c.cooldown > 0 ? ('재장전 ' + c.cooldown + 's') : '');
       }
     }
+  }
+
+  /* v21b ⑤ — 손패 카드들의 발동 기준(코스트)을 게이지 위 눈금과 틱으로 보여주고,
+     지금 모멘텀에서 가장 싼 카드까지 얼마나 남았는지 한 줄로 안내한다. */
+  function updateMomentumGuide(st) {
+    var scale = document.getElementById('m-mom-scale');
+    var ticks = document.getElementById('m-mom-ticks');
+    var hint = document.getElementById('m-mom-hint');
+    if (!ticks && !scale && !hint) { return; }
+    var costs = [], i, c;
+    for (i = 0; i < st.hand.length; i++) {
+      c = st.hand[i].cost;
+      if (costs.indexOf(c) < 0) { costs.push(c); }
+    }
+    costs.sort(function (a, b) { return a - b; });
+    var sig = costs.join(',');
+    if (ticks && ticks.getAttribute('data-costs') !== sig) {
+      var th = '', t;
+      for (t = 0; t < costs.length; t++) {
+        th += '<b data-c="' + costs[t] + '" style="left:' + costs[t] + '%"></b>';
+      }
+      ticks.innerHTML = th;
+      ticks.setAttribute('data-costs', sig);
+    }
+    if (scale && scale.getAttribute('data-costs') !== sig) {
+      var sh = '', prev = -99, row = 0;
+      for (t = 0; t < costs.length; t++) {
+        if (costs[t] - prev < 9) { row = 1 - row; } else { row = 0; }
+        prev = costs[t];
+        sh += '<b class="r' + row + '" style="left:' + costs[t] + '%">' + costs[t] + '<i>M</i></b>';
+      }
+      scale.innerHTML = sh;
+      scale.setAttribute('data-costs', sig);
+    }
+    /* 지금 바로 누를 수 있는 카드 중 가장 싼 코스트 */
+    var next = null;
+    for (i = 0; i < st.hand.length; i++) {
+      if (st.hand[i].cooldown > 0) { continue; }
+      if (next === null || st.hand[i].cost < next) { next = st.hand[i].cost; }
+    }
+    var nodes = ticks ? ticks.querySelectorAll('b') : [], n;
+    for (n = 0; n < nodes.length; n++) {
+      var cv = +nodes[n].getAttribute('data-c');
+      nodes[n].className = (next !== null && cv === next && st.momentum < cv) ? 'next' : (st.momentum >= cv ? 'on' : '');
+    }
+    if (hint) {
+      var ht, cls = 'mom-hint';
+      if (st.usesLeft === 0) { ht = '이번 경기 개입 완료'; cls += ' done'; }
+      else if (next === null) { ht = '카드 재장전 중…'; }
+      else if (st.momentum >= next) { ht = '지금 발동 가능 · 최소 ' + next + 'M'; cls += ' ready'; }
+      else { ht = '다음 카드까지 -' + (next - st.momentum) + 'M · ' + next + 'M'; cls += ' next'; }
+      if (hint.getAttribute('data-t') !== ht) { hint.textContent = ht; hint.setAttribute('data-t', ht); }
+      hint.className = cls;
+    }
+  }
+
+  /* v21b ③ — 선발 11인 체력·평점 (넓은 화면에서 피치 아래를 채운다) */
+  function updateLiveSquad(st) {
+    var box = document.getElementById('m-squad-grid');
+    if (!box || !st.pitch) { return; }
+    var sig = st.pitch.map(function (p) { return p.name + p.stam + p.rating; }).join('|');
+    if (box.getAttribute('data-sig') === sig) { return; }
+    box.setAttribute('data-sig', sig);
+    var html = '', i, p, tone;
+    for (i = 0; i < st.pitch.length; i++) {
+      p = st.pitch[i];
+      tone = p.stam <= 30 ? ' hot' : (p.stam <= 50 ? ' warn' : '');
+      html += '<div class="ms-card' + tone + '">' +
+        '<span class="ms-face">' + (p.face ? '<img src="' + p.face + '" alt="">' : '') + '</span>' +
+        '<span class="ms-tx"><b>' + esc(p.name) + '</b><em>' + p.pos + ' · ' + p.stam + '%</em></span>' +
+        '<span class="ms-bar"><i style="width:' + Math.max(2, Math.min(100, p.stam)) + '%"></i></span>' +
+        '<b class="ms-rt">' + p.rating.toFixed(1) + '</b></div>';
+    }
+    box.innerHTML = html;
   }
 
   /* ═════════════════  교체 ═════════════════ */
@@ -2680,6 +2870,9 @@
     if (main) { main.scrollTop = 0; }
     if (tab !== 'match') { document.body.classList.remove('in-match'); }
     renderAll();
+    /* v21b ⑥ — 마이팀·클럽을 둘러보면 가이드 단계가 완료된다 */
+    if (tab === 'squad') { guideMark('team'); }
+    else if (tab === 'club') { guideMark('club'); }
   }
 
   function renderAll() {
@@ -2867,6 +3060,11 @@
       return;
     }
     if (act === 'tab') { closeModal(); setTab(t.getAttribute('data-tab')); return; }
+    /* v21b ⑥ — 초보자 가이드: 열기 / 접기 / 다시 보지 않기 */
+    if (act === 'guidego') { var gtab = t.getAttribute('data-tab'); if (gtab) { closeModal(); setTab(gtab); } return; }
+    if (act === 'guidefold') { guideState().open = false; save(); renderHome(); return; }
+    if (act === 'guideopen') { guideState().open = true; save(); renderHome(); return; }
+    if (act === 'guidehide') { var gs = guideState(); gs.hidden = true; gs.open = false; save(); renderHome(); return; }
 
     if (act === 'player') { id = t.getAttribute('data-id'); var pp = byId(id); if (pp) { playerModal(pp); } return; }
     if (act === 'backup') { id = t.getAttribute('data-id'); if (selId) { swapSlot(id, findBestSlot(id)); return; } var bp = byId(id); if (bp) { playerModal(bp); } return; }

@@ -1230,6 +1230,18 @@
       }
     }
     out.tired.sort(function (a, b) { return a.stam - b.stam; });
+    /* v21b ③ — 선발 11인 실시간 체력·평점 (높은 화면의 피치 아래 미니 바) */
+    out.pitch = [];
+    for (j = 0; j < players.length; j++) {
+      q = players[j];
+      if (q.side !== 'home' || q.off) { continue; }
+      var rq = ratingOf(q);
+      out.pitch.push({
+        name: short(q.name), pos: q.pos, stam: Math.round(q.stam),
+        rating: rq ? Math.round(rq.rating * 10) / 10 : 6.0,
+        face: DS.Art.headSrc(q.player)
+      });
+    }
     var i, def;
     for (i = 0; i < hand.length; i++) {
       def = DS.cardOf(hand[i].key);
@@ -1509,9 +1521,17 @@
     updateScoreboard();
     clearCommentary();
     resize();
+    if (global.document && document.fonts && document.fonts.ready && document.fonts.ready.then) {
+      document.fonts.ready.then(function () { if (M.running) { resize(); } });
+    }
     resetCamera();
     relaxBases();
     resetKickoff(Math.random() < 0.5 ? 'home' : 'away');
+    /* v21b — 첫 rAF가 첫 물리 스텝보다 먼저 그리면 보간 기준값(px/py)이 없어
+       공 좌표가 NaN이 되고 createRadialGradient가 예외를 던졌다. 시작 시점에 기준값을 심는다. */
+    var pi0;
+    for (pi0 = 0; pi0 < players.length; pi0++) { players[pi0].px = players[pi0].x; players[pi0].py = players[pi0].y; }
+    ball.px = ball.x; ball.py = ball.y; ball.pz = ball.z;
     M.running = true;
     M.phase = 'play';
     lastT = 0;
@@ -1721,9 +1741,41 @@
 
   /* ─────────────────────────  레이아웃  ───────────────────────── */
   M.resize = resize;
+  /* v21b ③ — 폰트·사이드바 높이가 늦게 확정되면 피치가 빈틈이나 오버플로를 남긴다.
+     경기장 컬럼의 실제 크기가 바뀔 때마다 한 번 더 맞춘다. */
+  var roCol = null, roTimer = 0;
+  function watchColumn() {
+    if (roCol || !global.ResizeObserver || !canvas) { return; }
+    var col = canvas.parentNode && canvas.parentNode.parentNode;
+    if (!col) { return; }
+    roCol = new global.ResizeObserver(function () {
+      if (roTimer) { return; }
+      roTimer = global.setTimeout(function () { roTimer = 0; resize(); }, 50);
+    });
+    roCol.observe(col);
+  }
   function resize() {
     if (!canvas) { return; }
-    var rect = canvas.parentNode.getBoundingClientRect();
+    watchColumn();
+    /* v21b ③ — 피치는 16:9를 유지하고, 높은 화면에서 남는 아래 공간은
+       '선발 11인 체력·평점' 바에 넘긴다 (예전에는 캔버스가 중간 높이에 멈춰
+       아래에 큰 빈 배경이 남았다). */
+    var wrap = canvas.parentNode;
+    var col = wrap.parentNode;
+    var colW = Math.max(320, Math.round(wrap.getBoundingClientRect().width));
+    var square = document.getElementById('m-squad');
+    var wrapH = 0;
+    if (col && col.className && String(col.className).indexOf('m-pitch-col') >= 0) {
+      var stacked = false;
+      try { stacked = global.getComputedStyle(col.parentNode).flexDirection === 'column'; } catch (e) { stacked = false; }
+      var colH = Math.max(180, Math.round(col.getBoundingClientRect().height));
+      var ratioH = Math.max(180, Math.round(colW * 9 / 16));
+      var useStrip = !stacked && !!square && (colH - ratioH >= 118);
+      if (square) { square.classList.toggle('off', !useStrip); }
+      wrapH = stacked ? ratioH : (useStrip ? ratioH : colH);
+      wrap.style.height = wrapH + 'px';
+    }
+    var rect = wrap.getBoundingClientRect();
     W = Math.max(320, Math.round(rect.width));
     H = Math.max(180, Math.round(rect.height));
     dpr = Math.min(2, global.devicePixelRatio || 1);
@@ -4687,7 +4739,7 @@
     var pi;
     for (pi = 0; pi < players.length; pi++) { players[pi].px = players[pi].x; players[pi].py = players[pi].y; }
     ball.px = ball.x; ball.py = ball.y; ball.pz = ball.z;
-    if (cutinHold > 0) { cutinHold -= dt; return; }
+    if (cutinHold > 0) { cutinHold -= dt; if (hudDirty) { hudDirty = false; pushHud(); } return; }
 
     var i;
     for (i = 0; i < hand.length; i++) { if (hand[i].readyAt > 0) { hand[i].readyAt -= dt; hudDirty = true; } }
@@ -5938,13 +5990,18 @@
       for (si = 0; si < players.length; si++) {
         sp = players[si];
         sp._x = sp.x; sp._y = sp.y;
-        sp.x = sp.px + (sp.x - sp.px) * lerpK;
-        sp.y = sp.py + (sp.y - sp.py) * lerpK;
+        var spx = isFinite(sp.px) ? sp.px : sp.x;
+        var spy = isFinite(sp.py) ? sp.py : sp.y;
+        sp.x = spx + (sp.x - spx) * lerpK;
+        sp.y = spy + (sp.y - spy) * lerpK;
       }
       ball._x = ball.x; ball._y = ball.y; ball._z = ball.z;
-      ball.x = ball.px + (ball.x - ball.px) * lerpK;
-      ball.y = ball.py + (ball.y - ball.py) * lerpK;
-      ball.z = ball.pz + (ball.z - ball.pz) * lerpK;
+      var bpx = isFinite(ball.px) ? ball.px : ball.x;
+      var bpy = isFinite(ball.py) ? ball.py : ball.y;
+      var bpz = isFinite(ball.pz) ? ball.pz : ball.z;
+      ball.x = bpx + (ball.x - bpx) * lerpK;
+      ball.y = bpy + (ball.y - bpy) * lerpK;
+      ball.z = bpz + (ball.z - bpz) * lerpK;
     }
 
     /* 카메라 흔들림 — 슛·골·선방 순간 경기장이 짧게 울린다 */
