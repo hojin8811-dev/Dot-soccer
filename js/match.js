@@ -2062,7 +2062,8 @@
       if (play.sitHold <= 0) {
         var el = document.getElementById('m-sit');
         if (el) { el.className = 'sit off'; }
-        play.sitKey = '';
+        /* sitKey 는 그대로 둔다 — 같은 상황이 계속되면 다시 튀어나오지 않고,
+           상황이 바뀌었을 때만 새 문구로 다시 열린다. */
       }
     }
   }
