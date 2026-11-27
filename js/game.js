@@ -3989,6 +3989,8 @@
     formRank: 2,        /* 팀 하위 2명 — 팀 평균보다 낮으면 부진으로 함께 본다 */
     aptGap: 2,          /* 슬롯 적성이 자기 최고 적성보다 2 이상 낮으면 전술 부적응 */
     stam: 62,           /* 체력 62% 이하 → 고갈 위험 (하프타임 +11 회복 뒤 값) */
+    dropForm: 2,        /* 부진 교체는 OVR -2까지 (더 약한 선수로 바꿔 팀을 약화시키지 않는다) */
+    dropUrgent: 5,      /* 체력·경고처럼 어쩔 수 없는 교체는 OVR -5까지 */
     maxRows: 3
   };
   var advDone = [];     /* 이번 하프타임에 원클릭으로 마친 교체 */
@@ -4001,7 +4003,7 @@
 
   /* 추천 1건에 붙일 '왜' — 부진·체력·경고를 한 사람에 여러 개 붙일 수 있다 */
   function advTagsOf(p, lowCut, avg) {
-    var tags = [], score = 0;
+    var tags = [], score = 0, flags = { form: false, slot: false, stam: false, card: false };
     var formLow = (p.rating <= ADV.formAbs) ||
       (p.rating <= lowCut + 0.001 && p.rating < avg - 0.05);
     var slotBad = ((p.aptBest || 0) - (p.aptSlot || 0)) >= ADV.aptGap;
@@ -4010,16 +4012,21 @@
     else if (slotBad) { tags.push('📉 전술 부적응'); }
     if (formLow) { score += (6.4 - p.rating) * 12; }
     if (slotBad) { score += 3.5; }
-    if (p.stam <= ADV.stam) { tags.push('😮‍💨 체력 고갈 위험'); score += (ADV.stam + 4 - p.stam) * 0.55; }
-    if (p.yellows >= 1) { tags.push('🟨 경고 누적 · 퇴장 주의'); score += 6.5; }
-    return { tags: tags, score: score };
+    if (p.stam <= ADV.stam) { tags.push('😮‍💨 체력 고갈 위험'); score += (ADV.stam + 4 - p.stam) * 0.55; flags.stam = true; }
+    if (p.yellows >= 1) { tags.push('🟨 경고 누적 · 퇴장 주의'); score += 6.5; flags.card = true; }
+    flags.form = formLow; flags.slot = slotBad;
+    return { tags: tags, score: score, flags: flags };
   }
 
-  function advBestBench(outP, st, taken) {
+  /* 벤치 후보 1:1 매칭 — 미출전 · 같은/비슷한 자리 · OVR · 적성 순.
+     maxDrop: 선발보다 이만큼 약한 후보까지만 추천한다(체력·경고로 어쩔 수 없을 땐 넓힌다).
+     맞는 자리가 없으면 null — 골키퍼 자리에 필드플레이어를 넣지는 않는다. */
+  function advBestBench(outP, st, taken, maxDrop) {
     var best = null, i, b, fit, val;
     for (i = 0; i < st.bench.length; i++) {
       b = st.bench[i];
       if (b.used || taken[b.id]) { continue; }
+      if (outP.ovr - b.ovr > maxDrop) { continue; }   /* 너무 약한 후보로 바꿔 팀을 약화시키지 않는다 */
       fit = advFit(b.pos, outP.pos);
       if (!fit.score) { continue; }              /* 골키퍼↔필드플레이어처럼 자리가 안 맞으면 추천하지 않는다 */
       val = fit.score + b.ovr * 0.9 + ((b.apt && b.apt[outP.pos]) || 1) * 1.2;
@@ -4043,7 +4050,7 @@
       p = on[i];
       t = advTagsOf(p, lowCut, avg);
       if (!t.tags.length) { continue; }
-      cands.push({ p: p, tags: t.tags, score: t.score });
+      cands.push({ p: p, tags: t.tags, score: t.score, flags: t.flags });
     }
     cands.sort(function (a, b) {
       if (b.score !== a.score) { return b.score - a.score; }
@@ -4051,7 +4058,8 @@
       return a.p.stam - b.p.stam;
     });
     for (i = 0; i < cands.length && rows.length < ADV.maxRows; i++) {
-      var pick = advBestBench(cands[i].p, st, taken);
+      var drop = (cands[i].flags.stam || cands[i].flags.card) ? ADV.dropUrgent : ADV.dropForm;
+      var pick = advBestBench(cands[i].p, st, taken, drop);
       if (!pick) { continue; }
       taken[pick.b.id] = 1;
       rows.push({ out: cands[i].p, bench: pick.b, fit: pick.fit, tags: cands[i].tags, score: cands[i].score });
@@ -4128,8 +4136,8 @@
       for (i = 0; i < rows.length; i++) { html += advRowHTML(rows[i], st); }
       html += '</div>';
     } else if (plan.blocked) {
-      html += '<div class="adv-none"><b>추천할 선발은 있지만 벤치에 맞는 후보가 없습니다</b>' +
-        '<span>직접 교체에서 다른 포지션 선수를 고르거나, 그대로 후반을 시작하세요.</span></div>';
+      html += '<div class="adv-none"><b>추천할 선발은 있지만 지금 벤치에 넣을 만한 후보가 없습니다</b>' +
+        '<span>그대로 후반을 시작하거나, 직접 교체에서 다른 선수를 고르세요.</span></div>';
     } else if (!advDone.length) {
       html += '<div class="adv-none"><b>전반전 전원 양호 · 교체 추천 없음</b>' +
         (weakest ? '<span>참고 · ' + esc(weakest.name) + ' (평점 ' + weakest.rating.toFixed(1) + ' · 체력 ' + weakest.stam + '%)</span>' : '') +
