@@ -3813,6 +3813,9 @@
       '<div class="mt-team away"><canvas data-emblem="' + oppTeam.emblem + '" data-kit="' + oppTeam.kit.shirt + '|' + oppTeam.kit.trim + '" width="20" height="24"></canvas>' +
       '<span class="mt-name">' + esc(oppTeam.short) + '</span></div>' +
       '<div class="mt-tools">' +
+      /* v30 — 중계뷰 / 전체뷰 토글 */
+      '<button class="tbtn view' + ((DS.Match && DS.Match.viewState && DS.Match.viewState().mode === 'full') ? ' on' : '') + '" data-act="viewmode" id="m-view" title="중계뷰 / 전체뷰">' +
+      ((DS.Match && DS.Match.viewState && DS.Match.viewState().mode === 'full') ? '🗺 전체' : '📺 중계') + '</button>' +
       '<button class="tbtn ico" data-act="mute" id="m-mute" title="음소거">' +
       ((DS.Match && DS.Match.isMuted && DS.Match.isMuted()) ? '🔇' : '🔊') + '</button>' +
       '<button class="tbtn" data-act="auto" id="m-auto" title="자동 개입">자동</button>' +
@@ -4979,7 +4982,8 @@
       return;
     }
     if (act === 'rotgo') {
-      document.body.classList.add('rot-off');
+      /* v30 — 완전 가로 전용: 세로에서는 플레이 화면을 열지 않는다.
+         가로 잠금을 시도하고, 회전되면 checkRotate()가 안내를 걷힌다. */
       try {
         var de = document.documentElement;
         var lock = function () {
@@ -4998,9 +5002,16 @@
       toast('가로 화면으로 전환합니다.');
       return;
     }
-    if (act === 'rotstay') {
-      document.body.classList.add('rot-off');
-      toast('세로 화면으로 계속합니다. 가로로 돌리면 더 넓게 보입니다.');
+    if (act === 'viewmode') {
+      if (DS.Match && DS.Match.toggleView) {
+        var vm = DS.Match.toggleView();
+        var vb = document.getElementById('m-view');
+        if (vb) {
+          vb.innerHTML = vm === 'full' ? '🗺 전체' : '📺 중계';
+          vb.classList.toggle('on', vm === 'full');
+        }
+        toast(vm === 'full' ? '전체뷰 — 피치 전체·전술 배치를 한눈에' : '중계뷰 — 공을 따라가는 카메라');
+      }
       return;
     }
     if (act === 'subs') { openSubs(false); return; }
@@ -5135,13 +5146,16 @@
     });
   }
 
-  /* ═════════════════  가로 회전 안내 ═════════════════ */
+  /* ═════════════════  가로 회전 안내 ═════════════════
+     v30 — 완전 가로 전용 게임. 세로(폭 900px 이하)에서는 플레이 화면을 그리지 않고
+     전체 화면 회전 안내만 띄운다. 가로로 돌리면 즉시 걷힌다. */
   function checkRotate() {
     var w = global.innerWidth || 0, h = global.innerHeight || 0;
-    var portrait = h > w && w > 0 && w < 900;
+    var portrait = h > w && w > 0 && w <= 900;
     if (document.body && document.body.classList) {
       document.body.classList.toggle('rot', portrait);
     }
+    return portrait;
   }
 
   /* ═════════════════  부트 ═════════════════ */

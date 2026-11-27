@@ -53,9 +53,18 @@
   var BALL_G = 150;          /* 공 중력(월드 단위/s^2) */
   var pitchLayer = null;
 
-  /* ═════════ v17 — TV 생중계 연출 상태 ═════════ */
-  var CAM_Z0 = 1.035;                                       /* 기본 프레임 — 살짝 당겨 패닝 여유를 만든다 */
+  /* ═════════ v17 — TV 생중계 연출 상태 ═════════
+     v30 — 기본 프레임을 1.035 → 1.15로 당기고(중계뷰), 선수 원은 13% 축소해
+     화면상 얼굴 크기는 v29와 같게 두면서 선수 간 간격·피치 공간감을 넓혔다.
+     전체뷰(토글)는 줌 1.0으로 전술 전체 배치를 한눈에 본다. */
+  var CAM_Z0 = 1.15;                                        /* 중계뷰 기본 프레임 */
+  var CAM_Z_FULL = 1.0;                                     /* 전체뷰 — 피치 전체 */
+  var CAM_Z_CHANCE = 1.20;                                  /* 페널티 박스 25m 이내·슈팅 찬스 */
   var cam = { x: W / 2, y: H / 2, z: CAM_Z0 };              /* 방송 카메라 (줌·패닝) */
+  var camMode = 'broadcast';                                /* v30 — 'broadcast' | 'full' */
+  var slowmo = { t: 0, t0: 0, k: 1 };                       /* v30 — 골 순간 짧은 슬로우 모션 */
+  var goalCutinPend = 0, goalCutinWho = null;               /* v30 — 골 임팩트 뒤 GOAL 컷인 지연 */
+  var fadeFx = { t: 0, t0: 0.5 };                           /* v30 — 세리머니 → 킥오프 암전 전환 */
   var goalStage = null, goalT = 0;                          /* 'celebrate' 세리머니 동안만 사용 */
   var cel = null;                                           /* 세레모니 (득점자·코너·동료) */
   var netFx = { t: 0, t0: 1.15, side: 'home' };             /* 골망 출렁임 */
@@ -331,6 +340,11 @@
   /* v10 — 몸통 제거, 원형 초상화 토큰 + 파랑/빨강 팀 링
      v14 — 원을 한 단계 더 축소(0.55 → 0.43): 잔디 공간·패스 레인이 넓게 보인다 */
   var TOKEN_R = 0.43;             /* 토큰 원 반지름 / SPR_H (지름 ≈ 0.86 × SPR_H) */
+  /* v30 — 중계뷰에서 토큰 원을 13% 축소(0.87). 줌 1.15와 곱해져 화면상 얼굴 크기는
+     v29와 같고, 선수 간 간격만 넓어진다. 전체뷰는 v29 크기(1.0). */
+  var TOKEN_SCALE_BROADCAST = 0.87;
+  var TOKEN_SCALE_FULL = 1.0;
+  function tokenScale() { return camMode === 'full' ? TOKEN_SCALE_FULL : TOKEN_SCALE_BROADCAST; }
   var heads = {};                 /* pic 번호 → { img, ready } — 피치 원형 토큰 초상화 */
   var headLeft = 0;               /* 아직 안 끝난 두상 로드 수 — 입장 게이트 */
   var ripples = [];               /* 액션 타격감 — 바깥으로 퍼지는 원형 파동 */
@@ -444,46 +458,74 @@
     return scr(50, side === 'home' ? 3.5 : WORLD_H - 3.5);
   }
   function camClampToView() {
-    if (!(cam.z > 1.0005)) { cam.z = 1.0005; }
+    if (!(cam.z >= CAM_Z_FULL)) { cam.z = CAM_Z_FULL; }
     var hw = W / (2 * cam.z), hh = H / (2 * cam.z);
     cam.x = clamp(cam.x, hw, W - hw);
     cam.y = clamp(cam.y, hh, H - hh);
   }
+  /* v30 — 공 추적 카메라. 화면 좌표를 Lerp(프레임당 0.08 ≈ exp(-5.0·dt))로 부드럽게 따라가고,
+     찬스(박스 25m 이내·슈팅·세트피스·골)에만 1.20~1.26배로 미세 줌인한다.
+     클램프로 화면 밖 빈 공간(검은 여백)은 절대 드러나지 않는다. */
+  function ballChanceZoom() {
+    var dGoal = Math.min(ball.y, WORLD_H - ball.y);
+    if (ball.kind === 'shot' && ball.shot) { return true; }
+    if (play.phase === 'goal' || play.phase === 'setpiece') { return true; }
+    if (dGoal < 25) { return true; }
+    if (play.stage === 'final' || play.counterT > 0) { return true; }
+    return false;
+  }
   function updateCamera(dt) {
     var b = scr(ball.x, ball.y);
+    /* 전체뷰 — 피치 전체를 고정 프레임으로 (전술 배치 확인용) */
+    if (camMode === 'full') {
+      var kf = 1 - Math.exp(-Math.max(0, dt) * 6.0);
+      cam.z += (CAM_Z_FULL - cam.z) * kf;
+      cam.x += (W / 2 - cam.x) * kf;
+      cam.y += (H / 2 - cam.y) * kf;
+      camClampToView();
+      return;
+    }
     var fx = b.x, fy = b.y, tz = CAM_Z0, g, sh, sp;
+    /* 공 진행 방향으로 살짝 리드 — 롱패스·전환이 화면 밖으로 빨려 나가지 않게 */
+    fx += clamp((ball.vx || 0) * 1.6, -W * 0.055, W * 0.055);
+    fy += clamp((ball.vy || 0) * 0.5, -H * 0.03, H * 0.03);
+    /* 페널티 박스 25m 이내 · 슈팅 찬스 — 골문 쪽으로 살짝 붙으며 미세 줌인 */
+    if (ballChanceZoom() && play.phase !== 'goal' && play.phase !== 'setpiece') {
+      tz = CAM_Z_CHANCE;
+      g = goalMouthPt(ball.y < WORLD_H / 2 ? 'home' : 'away');
+      fx = g.x * 0.26 + fx * 0.74;
+      fy = g.y * 0.16 + fy * 0.84;
+    }
     if (play.phase === 'goal' && cel && cel.scorer) {
       sp = scr(cel.scorer.x, cel.scorer.y);
-      tz = 1.24; fx = sp.x; fy = sp.y;
+      tz = 1.26; fx = sp.x; fy = sp.y;
     } else if (play.phase === 'setpiece' && play.setpiece) {
       g = goalMouthPt(play.setpiece.side);
       if (play.setpiece.type === 'pk' || play.setpiece.type === 'corner') {
-        tz = 1.22; fx = g.x * 0.58 + b.x * 0.42; fy = g.y * 0.46 + b.y * 0.54;
+        tz = 1.24; fx = g.x * 0.58 + b.x * 0.42; fy = g.y * 0.46 + b.y * 0.54;
       } else if (play.setpiece.type === 'fk') {
-        tz = 1.14; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.32 + b.y * 0.68;
-      } else { tz = 1.09; }
+        tz = 1.18; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.32 + b.y * 0.68;
+      } else { tz = 1.16; }
     } else if (ball.kind === 'shot' && ball.shot) {
       sh = ball.shot;
       g = scr(sh.tx, sh.gy);
-      tz = 1.20; fx = g.x * 0.60 + b.x * 0.40; fy = g.y * 0.52 + b.y * 0.48;
+      tz = 1.22; fx = g.x * 0.60 + b.x * 0.40; fy = g.y * 0.52 + b.y * 0.48;
     } else if (play.stage === 'final') {
       g = goalMouthPt(ball.carrier ? ball.carrier.side : play.atkSide);
-      tz = 1.17; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.36 + b.y * 0.64;
-    } else if (play.counterT > 0) {
-      tz = 1.10;
-    } else if (play.stage === 'wide') {
-      tz = 1.085;
+      tz = 1.19; fx = g.x * 0.40 + b.x * 0.60; fy = g.y * 0.36 + b.y * 0.64;
     }
     var hw = W / (2 * tz), hh = H / (2 * tz);
     fx = clamp(fx, hw, W - hw); fy = clamp(fy, hh, H - hh);
-    var k = 1 - Math.exp(-Math.max(0, dt) * 3.6);
-    cam.z += (tz - cam.z) * k;
+    var k = 1 - Math.exp(-Math.max(0, dt) * 5.0);   /* ≈ 0.08 / 프레임 */
+    var kz = 1 - Math.exp(-Math.max(0, dt) * 3.2);  /* 줌은 더 느리게 */
+    cam.z += (tz - cam.z) * kz;
     cam.x += (fx - cam.x) * k;
     cam.y += (fy - cam.y) * k;
     camClampToView();
   }
   function resetCamera() {
-    cam.z = CAM_Z0; cam.x = W / 2; cam.y = H / 2;
+    cam.z = camMode === 'full' ? CAM_Z_FULL : CAM_Z0;
+    cam.x = W / 2; cam.y = H / 2;
     camClampToView();
   }
 
@@ -492,6 +534,8 @@
   function finishCelebration() {
     goalStage = null; cel = null;
     bannerT = 0;
+    /* v30 — 세리머니 → 킥오프 사이에 짧은 암전 전환 (갑자기 끊기지 않게) */
+    fadeFx = { t: 0.46, t0: 0.46 };
     var el = document.getElementById('m-banner');
     if (el) { el.classList.remove('on'); }
     resetKickoff(lastScorerSide === 'home' ? 'away' : 'home');
@@ -1571,6 +1615,10 @@
     };
     /* v17 연출 상태 초기화 */
     goalStage = null; goalT = 0; cel = null;
+    /* v30 — 슬로모션·골 임팩트·암전 전환 초기화, 카메라는 현재 보기 모드로 */
+    slowmo = { t: 0, t0: 0, k: 1 };
+    goalCutinPend = 0; goalCutinWho = null;
+    fadeFx = { t: 0, t0: 0.5 };
     netFx = { t: 0, t0: 1.15, side: 'home' };
     crowd = { energy: 0, acc: 0, flashes: [], wave: 0 };
     lastGoalXg = 0; lastGoalAssist = '';
@@ -1627,6 +1675,43 @@
   };
 
   M.setSpeed = function (n) { M.speed = clamp(n, 1, 3); };
+  /* v30 — 중계뷰 / 전체뷰 토글. 전체뷰는 줌 1.0으로 피치 전체와 전술 배치를 한눈에. */
+  M.setView = function (mode) {
+    camMode = mode === 'full' ? 'full' : 'broadcast';
+    if (camMode === 'full') { cam.z = CAM_Z_FULL; cam.x = W / 2; cam.y = H / 2; }
+    else if (!(cam.z > CAM_Z_FULL + 0.0005)) { cam.z = CAM_Z0; }
+    camClampToView();
+    if (cfg && cfg.onView) { cfg.onView(M.viewState()); }
+    return camMode;
+  };
+  M.toggleView = function () { return M.setView(camMode === 'full' ? 'broadcast' : 'full'); };
+  M.viewState = function () {
+    return {
+      mode: camMode, zoom: Math.round(cam.z * 1000) / 1000, zoomBase: CAM_Z0, zoomFull: CAM_Z_FULL,
+      camX: Math.round(cam.x * 10) / 10, camY: Math.round(cam.y * 10) / 10,
+      tokenScale: tokenScale(), viewW: W / cam.z, viewH: H / cam.z
+    };
+  };
+  /* v30 QA — 골 임팩트·슬로모션·침투 화살표 계측 */
+  M.v30 = function () {
+    var i, p, runs = [];
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.off || isGK(p) || ball.carrier === p) { continue; }
+      if (p.runT > 0 || (p.throughRun && p.throughRun.t > 0)) {
+        var tyv = p.throughRun ? p.throughRun.y : (p.runTo ? p.runTo.y : p.ty);
+        runs.push({ name: p.name, side: p.side, runT: Math.round(p.runT * 100) / 100, awayFromBall: p !== ball.carrier,
+          fwd: Math.round(((tyv - p.y) * goalDir(p.side)) * 10) / 10, arrow: isFinite(tyv) && (tyv - p.y) * goalDir(p.side) >= 2.2 });
+      }
+    }
+    return {
+      view: M.viewState(),
+      slowmo: { t: Math.round(slowmo.t * 1000) / 1000, k: slowmo.k, active: slowmo.t > 0 },
+      goalImpact: { cutinPend: Math.round(goalCutinPend * 1000) / 1000, shake: Math.round(shake.t * 100)/100, fade: Math.round(fadeFx.t * 100)/100 },
+      ball: { z: Math.round(ball.z * 100) / 100, vz: Math.round(ball.vz * 10) / 10, airborne: ball.z > 0.05, netAt: ball.netAt || null },
+      runs: runs
+    };
+  };
   var LEGACY_MENT = { defense: 'defensive', defensive: 'defensive', balanced: 'balanced', attack: 'attacking', attacking: 'attacking', allout: 'allout' };
   M.setTactics = function (t) {
     tactic = t;
@@ -1727,6 +1812,10 @@
   M.stop = function () {
     M.running = false;
     cancelAnimationFrame(rafId);
+    /* v30 — 골 임팩트·슬로모션·암전 상태를 반드시 닫는다 (다음 경기로 새면 안 됨) */
+    goalCutinPend = 0; goalCutinWho = null;
+    slowmo = { t: 0, t0: 0, k: 1 };
+    fadeFx = { t: 0, t0: 0.5 };
     SND.ambientOff();
     SND.matchOn(false);
     try { if (DS.Bgm) { DS.Bgm.setHalf(false); DS.Bgm.play('lobby', 0.35); } } catch (e) { /* 무시 */ }
@@ -1934,7 +2023,8 @@
     /* 가로 피치 — 스타디움 이미지가 캔버스를 꽉 채운다 */
     field = { x: 0, y: 0, w: W, h: H };
     SPR_H = Math.round(clamp(H * 0.084, 20, 42));   /* v8: v7(0.168)의 정확히 절반 크기 */
-    if (!(cam.z > 1.0005)) { cam.z = CAM_Z0; }
+    if (camMode === 'full') { cam.z = CAM_Z_FULL; }
+    else if (!(cam.z >= CAM_Z_FULL + 0.0005)) { cam.z = CAM_Z0; }
     camClampToView();
     loadPitchImage();
     buildPitchLayer();
@@ -4251,7 +4341,9 @@
     for (i = 0; i < 26; i++) { spawnFlash(); }
     SND.cheer(1, 2.6);
     SND.kick(0.85);
-    if (isHome) { goalCutin(scorer); }
+    if (isHome) {
+      /* v30 — 컷인은 loop()가 goalCutinPend 만료 시 띄운다 (골망·슬로모션을 먼저 보여 준다) */
+    }
     say((isHome ? '⚽ GOAL!! ' : '😱 실점... ') + U.josa(short(scorer.name), '이/가') + ' 골망을 흔듭니다! ' + pick([
       '관중석이 들썩입니다!', '완벽한 마무리였습니다!', '골키퍼가 손을 쓸 수 없었습니다!', '중계석도 목이 쉬겠습니다!'
     ]), 'goal');
@@ -4268,7 +4360,17 @@
     ball.carrier = null;
     ball.kind = 'idle';
     ball.vx = 0; ball.vy = 0;
-    ball.x = 50; ball.y = WORLD_H / 2;
+    ball.vz = 0;
+    /* v30 — 공을 센터서클로 순간이동시키지 않는다. 골라인에 그대로 남겨
+       골망이 출렁이는 동안 '어디로 들어갔는지'가 눈에 남는다 (킥오프에서 중앙으로 리셋). */
+    ball.z = 0.6;
+    ball.netAt = { x: ball.x, y: ball.y };
+    /* v30 — 타격감: 0.15초 짧고 강한 화면 흔들림 + 짧은 슬로우 모션.
+       GOAL 컷인은 이 임팩트가 끝난 뒤(0.42초)에 띄워 골장면 → 컷인 순서가 자연스럽다. */
+    kickCam(4.2, 0.15);
+    slowmo = { t: 0.42, t0: 0.42, k: 0.34 };
+    goalCutinPend = 0.42;
+    goalCutinWho = scorer;
     /* ── v17 세레모니 준비: 득점자가 코너로 달려가고 동료 2~3명이 따라본다 ── */
     var cgy = attackGoalY(side);
     var ccx = scorer.x < 50 ? 6.5 : WORLD_W - 6.5;
@@ -5226,6 +5328,16 @@
       }
     }
     if (!M.paused) {
+      /* v30 — 골 임팩트(골망 출렁·슬로모션) 뒤에 GOAL 컷인을 띄운다. 실제 시간으로 깎는다. */
+      if (goalCutinPend > 0) {
+        goalCutinPend -= realDt;
+        if (goalCutinPend <= 0) {
+          goalCutinPend = 0;
+          if (goalCutinWho) { goalCutin(goalCutinWho); goalCutinWho = null; }
+        }
+      }
+      /* v30 — 슬로우 모션은 실시간으로 깍는다(배속과 무관하게 0.42초) */
+      if (slowmo.t > 0) { slowmo.t -= realDt; if (slowmo.t < 0) { slowmo.t = 0; } }
       if (cutinHold > 0) {
         /* v26c ② — 기술/골 컷인 정지. 배속(×1/×2/×3)과 무관하게 실제 시간으로만 깎고,
            이 동안 step()은 한 번도 돌지 않아 경기 시계·선수 이동·손패 쿨다운이 모두 멈춘다.
@@ -5235,7 +5347,7 @@
         acc = 0;
         renderAlpha = 1;
       } else {
-        var dt = realDt * M.speed;
+        var dt = realDt * M.speed * (slowmo.t > 0 ? slowmo.k : 1);
         acc += dt;
         var stepDt = 1 / 60, guard = 0;
         while (acc >= stepDt && guard < 14) { step(stepDt); acc -= stepDt; guard++; }
@@ -5255,6 +5367,8 @@
     if (M.phase === 'ended') { return; }
     simFrame++;
     v21t.steps++;
+    /* v30 — 세리머니 → 킥오프 암전 전환 타이머 (모든 단계에서 실제 시간으로 진행) */
+    if (fadeFx.t > 0) { fadeFx.t -= dt; if (fadeFx.t < 0) { fadeFx.t = 0; } }
     /* v21 ③ — 이번 스텝 전 좌표를 남겨 렌더에서 보간한다 */
     var pi;
     for (pi = 0; pi < players.length; pi++) { players[pi].px = players[pi].x; players[pi].py = players[pi].y; }
@@ -6202,6 +6316,54 @@
     }
   }
 
+  /* ═════════ v30 — 오프더볼 침투 가속 연출 ═════════
+     볼 소유자 시야 앞·수비 뒷공간으로 달려 들어가는 선수의 발밑에
+     진행 방향 앞쪽으로 흐르는 화살표(첩자 2개)를 1~2초 가볍게 그린다. */
+  function drawRunArrows() {
+    var i, p, g, dir, len, a, k, head, sx, j;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (p.off || isGK(p) || ball.carrier === p) { continue; }
+      var run = p.throughRun;
+      var t = p.runT > 0 ? p.runT : (run ? run.t : 0);
+      if (!(t > 0)) { continue; }
+      /* 전진 침투만 — 공격 방향 앞쪽으로 목표가 잡혀 있어야 한다 */
+      var ty = run ? run.y : (p.runTo ? p.runTo.y : p.ty);
+      dir = goalDir(p.side);
+      if (!isFinite(ty) || (ty - p.y) * dir < 2.2) { continue; }
+      g = scr(p.x, p.y);
+      var rr = Math.max(5.6, SPR_H * g.s * TOKEN_R) * tokenScale();
+      len = clamp(SPR_H * g.s * 0.62, 7, 18);
+      k = clamp(t / 0.55, 0, 1);                       /* 끝날 때 부드럽게 사라짐 */
+      a = (0.55 + 0.28 * Math.sin(simTime * 7.2 + i)) * k;
+      if (a <= 0.04) { continue; }
+      sx = dir > 0 ? -1 : 1;   /* 화면 x는 공격축 y와 반대 — 홈은 오른쪽으로 공격 */
+      var ac = p.side === 'home' ? '214,255,168' : '255,214,168';
+      ctx.save();
+      ctx.translate(g.x, g.y);
+      ctx.scale(1, 0.64);                             /* 지면에 눌린 화살표 */
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(' + ac + ',0.6)';
+      ctx.shadowBlur = 5;
+      for (j = 0; j < 2; j++) {
+        var ph = ((simTime * 1.6 + j * 0.5) % 1);       /* 앞으로 흐르는 위상 */
+        /* 토큰 밖에서 시작해 앞으로 흘러가야 보인다 (원 안에 가리지 않게) */
+        var ox = sx * (rr * 0.95 + len * (0.15 + ph * 0.85));
+        var al = a * (1 - ph * 0.45) * (j === 0 ? 1 : 0.62);
+        if (al <= 0.02) { continue; }
+        ctx.strokeStyle = 'rgba(' + ac + ',' + al.toFixed(3) + ')';
+        ctx.lineWidth = Math.max(2.0, len * 0.24);
+        ctx.beginPath();
+        ctx.moveTo(ox - sx * len * 0.42, -len * 0.40);
+        ctx.lineTo(ox, 0);
+        ctx.lineTo(ox - sx * len * 0.42, len * 0.40);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   /* v25 ③ — 킥오프 센터 서클 마커: 세리머니 동안 센터 스폿이 살아 있음을 보여 준다 */
   function drawKickoffMark() {
     if (!kick) { return; }
@@ -6770,14 +6932,16 @@
     var hot = ball.kind === 'shot';
     var airborne = ball.z > 0.05;
     var gy = (groundY == null ? y + r * 1.02 : groundY);
-    /* 바닥 그림자 — 공중에 뜨면 지면에 따로 남는다 */
-    ctx.save();
-    ctx.globalAlpha = airborne ? 0.24 : 0.42;
-    ctx.fillStyle = '#02110c';
-    ctx.beginPath();
-    ctx.ellipse(x, gy + (airborne ? 0 : r * 0.02), r * 1.08, r * 0.46, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    /* 바닥 그림자 — 공중에 뜨면 draw()가 고도 비례 그림자를 따로 그린다(중복 방지) */
+    if (!airborne || groundY == null) {
+      ctx.save();
+      ctx.globalAlpha = 0.42;
+      ctx.fillStyle = '#02110c';
+      ctx.beginPath();
+      ctx.ellipse(x, gy + r * 0.02, r * 1.08, r * 0.46, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     /* 네온 발광 링 */
     var glowR = r * (hot ? 3.2 : 2.4);
     var gr = ctx.createRadialGradient(x, y, r * 0.45, x, y, glowR);
@@ -7059,7 +7223,9 @@
   function drawPlayer(p) {
     var g = scr(p.x, p.y);
     var pose = poseOf(p);
-    var r = Math.max(5.6, SPR_H * g.s * TOKEN_R);   /* 토큰 반지름 — 원근 스케일 적용 (v14 축소) */
+    var tsc = tokenScale();
+    var rBase = Math.max(5.6, SPR_H * g.s * TOKEN_R);   /* v14 기준 반지름 (축소 전) */
+    var r = rBase * tsc;                                /* v30 중계뷰 0.87 — 간격·공간감 */
     var tf = TEAM_FX[p.side];
     var isCarrier = ball.carrier === p;
     var gk = isGK(p);
@@ -7145,7 +7311,7 @@
 
     var cx = g.x + slide;
     var cy = g.y - r * 0.96 + hop;             /* 원 아래가 잔디에 닿는다 */
-    var ringW = Math.max(1.7, r * 0.22);       /* 팀 링 두께 — v14: 토큰과 함께 슬림하게 */
+    var ringW = Math.max(1.7, rBase * 0.22);   /* v30 — 원을 13% 줄여도 팀 링 두께는 v29 그대로 (시인성 유지) */
 
     /* ── 지면 그림자 (떠 있는 높이만큼 짙고 넓게) ── */
     var air = clamp(Math.abs(hop) / (r * 2.2), 0, 1);
@@ -7682,6 +7848,7 @@
     drawTrapLine();
     drawSupportWeb();
     drawDecals();
+    drawRunArrows();                /* v30 — 오프더볼 침투 방향 화살표 (발밑) */
     drawParts(false);
     drawRipples();
 
@@ -7713,18 +7880,39 @@
       drawBubble(p, g.x, g.y, SPR_H * g.s, up);
     }
 
-    /* 볼 — 높이(z)에 따라 지면 그림자와 분리된다 */
+    /* 볼 — 높이(z)에 따라 지면 그림자와 분리된다. v30 — 그림자가 고도에 비례해
+       작아지고 옅어져 포물선 높이를 읽을 수 있고, 세기는 부드러운 그라데이센트로 깨끗하게. */
     var bp = scr(ball.x, ball.y);
     var zpx = depthPx(ball.z);
     var r = Math.max(4.4, W / 108) * (1 + Math.min(0.3, zpx * 0.004));
-    if (zpx > 0.6) {
+    if (ball.z > 0.05 || zpx > 0.6) {
+      var shK = clamp(1 - zpx * 0.007, 0.50, 1);          /* 높을수록 작게 */
+      var shA = clamp(0.42 - zpx * 0.0022, 0.12, 0.42);   /* 높을수록 옅게 */
+      var srx = Math.max(2.2, r * 1.18 * shK), sry = Math.max(1.1, r * 0.52 * shK);
       ctx.save();
-      ctx.globalAlpha = clamp(0.36 - zpx * 0.006, 0.06, 0.36);
-      ctx.fillStyle = '#04140f';
+      var shg = ctx.createRadialGradient(bp.x, bp.y, 0, bp.x, bp.y, srx);
+      shg.addColorStop(0, 'rgba(4,20,15,' + shA + ')');
+      shg.addColorStop(0.62, 'rgba(4,20,15,' + (shA * 0.62) + ')');
+      shg.addColorStop(1, 'rgba(4,20,15,0)');
+      ctx.fillStyle = shg;
       ctx.beginPath();
-      ctx.ellipse(bp.x, bp.y, Math.max(2.4, 5 - zpx * 0.05), Math.max(1.2, 2.2 - zpx * 0.02), 0, 0, Math.PI * 2);
+      ctx.ellipse(bp.x, bp.y, srx, sry, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+      /* 높은 로빙볼은 그림자 → 공을 잇는 점선으로 높이를 한눈에 읽게 한다 */
+      if (zpx > 14) {
+        ctx.save();
+        ctx.globalAlpha = clamp(0.10 + zpx * 0.0018, 0.10, 0.26);
+        ctx.strokeStyle = 'rgba(232,255,240,0.9)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(bp.x, bp.y - 2);
+        ctx.lineTo(bp.x, bp.y - zpx * 0.92);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
     }
     if (ball.kind === 'shot') {
       var byy = bp.y - zpx - r;
@@ -7737,6 +7925,15 @@
     drawMatchBall(bp.x, bp.y - zpx - r * 0.35, r, bp.y);
     drawNetRipple();
     ctx.restore();
+
+    /* v30 — 세리머니 → 킥오프 사이 짧은 암전 전환 (피치 위에서만, HUD는 살아 있음) */
+    if (fadeFx.t > 0) {
+      var fk2 = 1 - clamp(fadeFx.t / fadeFx.t0, 0, 1);
+      ctx.save();
+      ctx.fillStyle = 'rgba(3,16,13,' + (Math.sin(fk2 * Math.PI) * 0.55).toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
 
     /* v17 — 관중석 반짝임·깃발 (화면 고정 레이어) */
     drawCrowdFx();
@@ -7852,7 +8049,7 @@
         x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100,
         tx: Math.round(p.tx * 100) / 100, ty: Math.round(p.ty * 100) / 100,
         sx: Math.round(g.x * 10) / 10, sy: Math.round(g.y * 10) / 10,
-        r: Math.round(Math.max(5.6, SPR_H * g.s * TOKEN_R) * 10) / 10,
+        r: Math.round(Math.max(5.6, SPR_H * g.s * TOKEN_R) * tokenScale() * 10) / 10,
         kind: p.kind, moving: !!p.moving,
         bubble: p.bubble ? p.bubble.text : null,
         slot: p.boxSlot ? p.boxSlot.name : null,
@@ -7863,7 +8060,7 @@
       t: Math.round(simTime * 1000) / 1000, clock: Math.round(M.clock * 10) / 10,
       phase: play.phase, stage: play.stage, atk: play.atkSide,
       ball: { x: Math.round(ball.x * 10) / 10, y: Math.round(ball.y * 10) / 10, carrier: ball.carrier ? ball.carrier.name : null, kind: ball.kind },
-      view: { w: W, h: H, sprH: SPR_H, tokenR: TOKEN_R, sepK: SEP_K, field: field },
+      view: { w: W, h: H, sprH: SPR_H, tokenR: TOKEN_R, tokenScale: tokenScale(), camMode: camMode, camZ: Math.round(cam.z * 1000) / 1000, sepK: SEP_K, field: field },
       sepMove: Math.round(sepMove * 1000) / 1000,
       recoverT: Math.round(play.recoverT * 100) / 100, recoverSide: play.recoverSide,
       p: out
@@ -8034,7 +8231,7 @@
         head: (function () { var hrec = heads[(p.player && p.player.pic) || 1]; return hrec && hrec.ready ? 'loaded' : 'pending'; })(),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
         pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
-        stam: Math.round(p.stam), tokenR: Math.round(SPR_H * scr(p.x, p.y).s * TOKEN_R * 10) / 10,
+        stam: Math.round(p.stam), tokenR: Math.round(SPR_H * scr(p.x, p.y).s * TOKEN_R * tokenScale() * 10) / 10,
         ring: p.side === 'home' ? TEAM_FX.home.ring : TEAM_FX.away.ring, gk: isGK(p),
         carrier: ball.carrier === p, ringColor: (p.side === 'home' ? 'blue' : 'red'),
         bodySprite: false,
@@ -8314,6 +8511,14 @@
       return true;
     }
     return false;
+  };
+
+  /* v30 QA — 공중볼 그림자·높이 점선을 결정적으로 확인하는 훅 (검증 하네스 전용) */
+  M.debugBallAir = function (z) {
+    if (!M.running) { return false; }
+    ball.z = clamp(z == null ? 26 : z, 0, 80);
+    ball.vz = 0;
+    return { z: ball.z, px: depthPx(ball.z) };
   };
 
   DS.Match = M;
