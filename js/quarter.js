@@ -17,8 +17,8 @@
 
   var W = 844, H = 390;
   var cam = {
-    yaw: Math.PI + 0.26,       /* 길이축을 대각선으로 보는 좌우 각도 */
-    pitch: 0.47,               /* 내려다보는 각도(rad, ≈27°) */
+    yaw: Math.PI,              /* v35 — 완전 수평 TV 중계 (좌우 기울기 0) */
+    pitch: 0.46,               /* 내려다보는 각도(rad, ≈26°) */
     dist: 120,
     tx: 0, ty: 3, tz: 0,
     mode: 'broadcast'
@@ -125,8 +125,8 @@
   Q.ppm = function () { return PPM; };
 
   /* ─────────────────────────  팔레트  ───────────────────────── */
-  var LINE = 'rgba(248,255,251,0.92)';
-  var CROWD_COLS = ['#e8e2d0', '#cdd7e8', '#f0c98a', '#c7e7c0', '#e0b8c8', '#b9c6e8', '#f2e6b6', '#d9cdb4'];
+  var LINE = 'rgba(252,255,250,0.96)';
+  var CROWD_COLS = ['#f4efe2', '#8fb4ea', '#f6c46a', '#7fd68d', '#e88fa4', '#6f8fd8', '#ffe08a', '#c8b7a4', '#e05a5a', '#5ac8e0'];
 
   function q(ctx, pts, fill) {
     ctx.beginPath();
@@ -173,30 +173,34 @@
 
   /* ─────────────────────────  관중석  ───────────────────────── */
   var crowdCache = null;
+  /* 관중 — 계단마다 한 줄로 앉힌다(줄이 흐트러지면 공중에 뜬 색종이처럼 보인다).
+     몸통 = 색 사각형, 머리 = 살색 사각형. 픽셀 도트 감성 그대로. */
   function buildCrowd() {
-    var rows = [], i, tier;
-    function band(x0, x1, count, tiers) {
-      for (i = 0; i < count; i++) {
-        var t = (i + 0.5) / count;
-        tier = (Math.random() * tiers) | 0;
-        var xa = x0 + (x1 - x0) * (tier / Math.max(1, tiers - 1));
-        rows.push({
-          x: xa, y: -16 + 132 * t,
-          z: 0.9 + tier * 1.55,
-          h: 1.0 + Math.random() * 0.35,
-          c: CROWD_COLS[(Math.random() * CROWD_COLS.length) | 0],
-          ph: Math.random() * 6.28
-        });
+    var rows = [], i, tier, n;
+    function band(x0, x1, tiers, count) {
+      for (tier = 0; tier < tiers; tier++) {
+        var xa = x0 + (x1 - x0) * (tiers === 1 ? 0 : tier / (tiers - 1));
+        for (i = 0; i < count; i++) {
+          var t = (i + 0.5) / count;
+          rows.push({
+            x: xa + (Math.random() - 0.5) * 0.5,
+            y: -14 + 128 * t,
+            z: 0.5 + tier * 1.05 + Math.random() * 0.3,
+            h: 1.0 + Math.random() * 0.28,
+            c: CROWD_COLS[(i * 5 + tier * 3 + ((Math.random() * 3) | 0)) % CROWD_COLS.length],
+            ph: Math.random() * 6.28
+          });
+        }
       }
     }
-    /* 먼 터치라인 뒤 (화면 위쪽), 가까운 터치라인 뒤 (화면 아래쪽) */
-    band(-24.5, -3.1, 230, 8);
-    band(102.5, 124.5, 200, 8);
-    /* 골 뒤 (좌/우) */
-    for (i = 0; i < 60; i++) {
+    /* 먼 터치라인 뒤(화면 위) · 가까운 터치라인 뒤(화면 아래) */
+    band(-24.6, -3.6, 10, 58);
+    band(102.6, 123.6, 10, 56);
+    /* 골 뒤 */
+    for (i = 0; i < 40; i++) {
       var tz = (Math.random() * 4) | 0;
-      rows.push({ x: -2.5 - tz * 2.3, y: -13 + (i * 4.1) % 130, z: 0.9 + tz * 1.3, h: 1.0 + Math.random() * 0.35, c: CROWD_COLS[(Math.random() * CROWD_COLS.length) | 0], ph: Math.random() * 6.28 });
-      rows.push({ x: 102.5 + tz * 2.3, y: -13 + (i * 4.7) % 130, z: 0.9 + tz * 1.3, h: 1.0 + Math.random() * 0.35, c: CROWD_COLS[(Math.random() * CROWD_COLS.length) | 0], ph: Math.random() * 6.28 });
+      rows.push({ x: -3.0 - tz * 2.4, y: -12 + (i * 4.3) % 126, z: 0.5 + tz * 1.05, h: 1.0 + Math.random() * 0.28, c: CROWD_COLS[(i * 3) % CROWD_COLS.length], ph: Math.random() * 6.28 });
+      rows.push({ x: 102.4 + tz * 2.4, y: -12 + (i * 4.9) % 126, z: 0.5 + tz * 1.05, h: 1.0 + Math.random() * 0.28, c: CROWD_COLS[(i * 7) % CROWD_COLS.length], ph: Math.random() * 6.28 });
     }
     crowdCache = rows;
   }
@@ -211,9 +215,9 @@
         x0 = list[i][0]; x1 = list[i][1];
         z0 = 0.55 + i * 1.55; z1 = z0 + 1.55;
         /* 계단면(수직) */
-        wpoly(ctx, [[x0, -18, z1], [x0, 138, z1], [x1, 138, z1], [x1, -18, z1]], '#1c4536');
+        wpoly(ctx, [[x0, -18, z1], [x0, 138, z1], [x1, 138, z1], [x1, -18, z1]], i % 2 ? '#2b5f47' : '#316b50');
         /* 단 입면 */
-        wpoly(ctx, [[x0, -18, z0], [x0, 138, z0], [x0, 138, z1], [x0, -18, z1]], i % 2 ? '#17392d' : '#1a4033');
+        wpoly(ctx, [[x0, -18, z0], [x0, 138, z0], [x0, 138, z1], [x0, -18, z1]], i % 2 ? '#1b4433' : '#1e4c39');
       }
     }
     /* 먼 쪽은 뒤에서 앞으로, 가까운 쪽은 앞에서 뒤로 그려 겹침을 맞춘다 */
@@ -223,23 +227,22 @@
 
   function drawStands(ctx, t) {
     if (!crowdCache) { buildCrowd(); }
-    var i, c, p, s, hpx, rpx, bob;
+    var i, c, p, s, hpx, rpx, bob, bw, bh, hd;
     for (i = 0; i < crowdCache.length; i++) {
       c = crowdCache[i];
       p = Q.project(c.x, c.y, c.z || 0);
-      if (p.x < -24 || p.x > W + 24 || p.y < -16 || p.y > H + 16) { continue; }
+      if (p.x < -20 || p.x > W + 20 || p.y < -14 || p.y > H + 14) { continue; }
       s = p.s;
-      hpx = Math.max(3.2, c.h * PPM * s * 1.15);
-      rpx = Math.max(1.2, hpx * 0.30);
-      bob = Math.sin((t || 0) * 2.1 + c.ph) * hpx * 0.10;
+      hpx = Math.max(2.2, c.h * PPM * s * 0.46);
+      rpx = Math.max(1.0, hpx * 0.34);
+      bob = Math.sin((t || 0) * 2.1 + c.ph) * hpx * 0.08;
+      bw = Math.max(2, Math.round(rpx * 2.0));
+      bh = Math.max(2, Math.round(hpx * 0.66));
+      hd = Math.max(1.4, Math.round(rpx * 1.5));
       ctx.fillStyle = c.c;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y - hpx * 0.40 + bob, rpx * 0.95, hpx * 0.42, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(244,220,192,0.96)';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - hpx * 0.86 + bob, rpx * 0.80, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(Math.round(p.x - bw / 2), Math.round(p.y - bh + bob), bw, bh);
+      ctx.fillStyle = c.s || '#f4dcc0';
+      ctx.fillRect(Math.round(p.x - hd / 2), Math.round(p.y - bh - hd + bob), hd, hd);
     }
   }
 
@@ -328,8 +331,9 @@
     var i;
     /* 스타디움 배경 */
     var bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#04120f');
-    bg.addColorStop(0.42, '#0a211c');
+    bg.addColorStop(0, '#0a2233');
+    bg.addColorStop(0.30, '#0e3138');
+    bg.addColorStop(0.62, '#0b2a22');
     bg.addColorStop(1, '#04100d');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
@@ -344,8 +348,8 @@
     wpoly(ctx, [[-44, 148, 15], [160, 148, 15], [160, 148, 0], [-44, 148, 0]], '#0a1f19');
 
     /* 피치 바깥 잔디 (러닝 트랙 · 잔디 여유) */
-    wpoly(ctx, [[-20, -24], [120, -24], [120, 134], [-20, 134]], '#2b7437');
-    wpoly(ctx, [[-6, -10], [106, -10], [106, 130], [-6, 130]], '#2f7d3b');
+    wpoly(ctx, [[-20, -24], [120, -24], [120, 134], [-20, 134]], '#3f9b46');
+    wpoly(ctx, [[-6, -10], [106, -10], [106, 130], [-6, 130]], '#46a94c');
 
     /* 관중석 — 피치 바깥에 세워진 계단식 스탠드 */
     standTiers(ctx);
@@ -355,7 +359,7 @@
     var bands = 14;
     for (i = 0; i < bands; i++) {
       var y0 = 120 * i / bands, y1 = 120 * (i + 1) / bands;
-      var col = i % 2 === 0 ? '#55ab59' : '#479e4c';
+      var col = i % 2 === 0 ? '#5fd162' : '#47b24d';
       wpoly(ctx, [[0, y0], [100, y0], [100, y1], [0, y1]], col);
     }
     /* 잔디 결 */
@@ -410,11 +414,14 @@
       });
     });
 
+    /* 흰 안전 펜스 — 관중석 앞 낮은 벽 */
+    wpoly(ctx, [[-3.6, -3.4, 0], [103.6, -3.4, 0], [103.6, -3.4, 1.35], [-3.6, -3.4, 1.35]], '#eef3ee');
+    wpoly(ctx, [[-3.6, 123.4, 0], [103.6, 123.4, 0], [103.6, 123.4, 1.35], [-3.6, 123.4, 1.35]], '#eef3ee');
     /* 광고판 — 먼 터치라인 뒤 · 가까운 터치라인 뒤 · 골 뒤 */
-    drawBoard(ctx, -1.6, -6, -1.6, 126, 1.2, '#1b5a93', '#0e3357', 'FOOTBALL DREAM  ·  KKOMA ELEVEN  ·  FOOTBALL DREAM  ·  KKOMA ELEVEN');
-    drawBoard(ctx, 101.6, -6, 101.6, 126, 1.2, '#1c5c3a', '#0f3722', '');
-    drawBoard(ctx, -2, -1.6, 102, -1.6, 1.2, '#5b1230', '#3c0c20', '');
-    drawBoard(ctx, -2, 121.6, 102, 121.6, 1.2, '#5b1230', '#3c0c20', '');
+    drawBoard(ctx, -1.6, -6, -1.6, 126, 1.7, '#2f7fd0', '#12467e', 'FOOTBALL DREAM  ·  KKOMA ELEVEN  ·  FOOTBALL DREAM  ·  KKOMA ELEVEN');
+    drawBoard(ctx, 101.6, -6, 101.6, 126, 1.7, '#2f9a5c', '#125c33', '');
+    drawBoard(ctx, -2, -1.6, 102, -1.6, 1.7, '#c9243a', '#7d1020', 'KKOMA ELEVEN FC');
+    drawBoard(ctx, -2, 121.6, 102, 121.6, 1.7, '#c9243a', '#7d1020', '');
 
     /* 골대 */
     drawGoal(ctx, 'opp', opt.netFx);

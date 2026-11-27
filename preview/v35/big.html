@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>v35 — 확대 검사</title>
+<style>
+  body { margin: 0; background: #16241c; }
+  .row { display: flex; gap: 10px; padding: 8px 12px; align-items: flex-end; }
+  canvas { background: #3d9145; image-rendering: pixelated; border: 1px solid #0a2; }
+</style>
+</head>
+<body>
+<div class="row" id="a"></div>
+<div class="row" id="b"></div>
+<script src="../../js/data.js"></script>
+<script src="../../js/pixel_player.js"></script>
+<script>
+var P = DS.PIXEL;
+var base = { kit: 'home', hair: 'spiky', hairColor: '#23262e', skin: 1, acc: 'none' };
+function big(host, look, dir, pose, f, sc) {
+  var cv = P.render(look, dir, pose, f, 0.4);
+  var c = document.createElement('canvas');
+  c.width = cv.width * sc; c.height = cv.height * sc;
+  var x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  x.drawImage(cv, 0, 0, c.width, c.height);
+  host.appendChild(c);
+}
+var A = document.getElementById('a'), B = document.getElementById('b');
+big(A, base, 'down', 'idle', 0, 11);
+big(A, base, 'side', 'idle', 0, 11);
+big(A, Object.assign({}, base, { hair: 'swoop', hairColor: '#e3c169', skin: 0, acc: 'glasses' }), 'down', 'idle', 0, 11);
+big(A, Object.assign({}, base, { hair: 'ponytail', hairColor: '#d9b06a', skin: 2 }), 'down', 'idle', 0, 11);
+big(B, base, 'side', 'run', 0, 11);
+big(B, base, 'side', 'run', 1, 11);
+big(B, base, 'down', 'run', 1, 11);
+big(B, base, 'side', 'kick', 1, 11);
+</script>
+</body>
+</html>
