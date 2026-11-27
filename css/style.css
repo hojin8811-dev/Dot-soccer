@@ -801,6 +801,11 @@ main {
 .rs-team { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .rs-team canvas { width: 30px; height: 34px; }
 .rs-team b { font-size: 9.5px; font-weight: 800; text-align: center; }
+/* v25b — 결과서 상단 팀 이름·점수도 경기 화면과 같은 파랑/빨강 */
+.rs > .rs-team:first-of-type b { color: var(--team-home-ink); }
+.rs > .rs-team:last-of-type b { color: var(--team-away-ink); }
+.rs > .rs-score b:first-of-type { color: var(--team-home-ink); }
+.rs > .rs-score b:last-of-type { color: var(--team-away-ink); }
 .rs-team span { font-size: 6.5px; font-weight: 900; color: rgba(233,244,221,.4); letter-spacing: .5px; white-space: nowrap; }
 .rs-score b { font-size: 28px; font-weight: 900; letter-spacing: -1.6px; }
 .rs-score i { font-style: normal; color: rgba(233,244,221,.4); font-size: 14px; margin: 0 3px; }
@@ -1102,14 +1107,18 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
   background: linear-gradient(180deg, rgba(13, 44, 37, .99), rgba(6, 24, 20, .99));
   border-bottom: 1px solid rgba(200, 241, 105, .16);
 }
+/* v25b — 팀 색은 언제나 파랑(홈) vs 빨강(원정) — 피치 링·점유율 바·xG맵과 같은 색 */
+:root { --team-home: #2f8dff; --team-away: #ff4b4b; --team-home-ink: #9dcaff; --team-away-ink: #ffa6a6; }
 .mt-team { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .mt-team.away { flex-direction: row-reverse; }
 .mt-team canvas { width: 20px; height: 24px; flex: 0 0 auto; }
-.mt-name { font-size: 11.5px; font-weight: 800; color: #e9f4dd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-.mt-team.away .mt-name { color: #ffd9cf; }
+.mt-name { font-size: 11.5px; font-weight: 800; color: var(--team-home-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.mt-team.away .mt-name { color: var(--team-away-ink); }
 .mt-mid { display: flex; align-items: center; gap: 6px; }
 .mt-score { display: flex; align-items: baseline; gap: 3px; }
 .mt-score b { font-size: 20px; font-weight: 900; color: #f6fdef; letter-spacing: -1px; line-height: 1; }
+.mt-score b#m-gf { color: var(--team-home-ink); }
+.mt-score b#m-ga { color: var(--team-away-ink); }
 .mt-score i { font-style: normal; color: rgba(233, 244, 221, .45); font-size: 12px; }
 .mt-clock { font-size: 9.5px; font-weight: 900; color: var(--lime); background: rgba(200, 241, 105, .13); border-radius: 7px; padding: 2px 6px; letter-spacing: .3px; }
 .mt-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
@@ -1180,9 +1189,10 @@ body.in-match main { margin-left: 0; padding: 0; overflow: hidden; }
 .m-live .lv-row { display: flex; align-items: center; gap: 5px; height: 13px; }
 .m-live .lv-lbl { flex: 0 0 auto; font-size: 7.5px; font-weight: 900; letter-spacing: .3px; color: rgba(233, 244, 221, .55); }
 .m-live .lv-bar { flex: 1 1 auto; height: 6px; border-radius: 4px; overflow: hidden; position: relative;
-  background: linear-gradient(90deg, rgba(255, 96, 72, .55) 0%, rgba(255, 96, 72, .55) 100%); }
+  background: linear-gradient(90deg, rgba(255, 75, 75, .62) 0%, rgba(255, 75, 75, .62) 100%); }
 .m-live .lv-bar > i { display: block; height: 100%; width: 50%; border-radius: 4px;
-  background: linear-gradient(90deg, #2e7bff, #63d8ff); transition: width .3s linear; box-shadow: 0 0 6px rgba(80, 200, 255, .55); }
+  background: linear-gradient(90deg, #2f8dff, #6cc0ff); transition: width .3s linear; box-shadow: 0 0 6px rgba(47, 141, 255, .55); }
+.m-live #m-poss-v { color: var(--team-home-ink); }
 .m-live .lv-row b { flex: 0 0 auto; font-size: 9px; font-weight: 900; color: #eaf6dd; }
 .m-live .lv-shots { margin-left: auto; letter-spacing: .3px; }
 .m-live .lv-shots em { font-style: normal; color: rgba(233, 244, 221, .35); font-size: 8px; margin: 0 1px; }

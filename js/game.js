@@ -2347,11 +2347,10 @@
     c.lineWidth = 2;
     c.beginPath(); c.moveTo(pad, Y(43)); c.lineTo(pad, Y(57));
     c.moveTo(pad + pw, Y(43)); c.lineTo(pad + pw, Y(57)); c.stroke();
-    var TEAM = {
-      home: (r.homeKit && r.homeKit.shirt) || '#63b3ff',
-      away: (r.awayKit && r.awayKit.shirt) || '#ff6b5c'
-    };
-    if (TEAM.home === TEAM.away) { TEAM = { home: '#63b3ff', away: '#ff6b5c' }; }
+    /* v25b — 유니폼 색이 아니라 경기 화면과 같은 고정 팔레트(파랑 vs 빨강).
+       초록·검정 유니폼 구단을 만나도 xG맵 점이 잔디와 겹치지 않는다. */
+    var TC = (DS.Match && DS.Match.teamColors) || { home: '#2f8dff', away: '#ff4b4b' };
+    var TEAM = { home: TC.home, away: TC.away };
 
     if (mode === 'xg') {
       var shots = (r.tele.shots || []);
@@ -2381,12 +2380,21 @@
           c.beginPath(); c.arc(cx, cy, 1.4, 0, Math.PI * 2); c.fillStyle = '#ffe98a'; c.fill();
         }
       }
-      var txt = (r.homeShort || 'HOME') + ' ' + (r.tele.shots || []).filter(function (s) { return s.side === 'home'; }).length +
-        ' · ' + (r.awayShort || 'AWAY') + ' ' + (r.tele.shots || []).filter(function (s) { return s.side === 'away'; }).length + '슛 (원 = xG)';
-      c.fillStyle = 'rgba(233,244,221,.62)';
-      c.font = '600 7px system-ui, sans-serif';
+      /* v25b — 범례도 팀 색과 같은 파랑·빨강으로 (스코어보드·점유율 바와 통일) */
+      var nH = (r.tele.shots || []).filter(function (s) { return s.side === 'home'; }).length;
+      var nA = (r.tele.shots || []).filter(function (s) { return s.side === 'away'; }).length;
+      c.font = '700 7px system-ui, sans-serif';
       c.textAlign = 'left';
-      c.fillText(txt, pad + 1, h - 3);
+      var tx = pad + 1, ty = h - 3;
+      function seg(label, color) {
+        c.fillStyle = color;
+        c.fillText(label, tx, ty);
+        tx += c.measureText(label).width + 1;
+      }
+      seg((r.homeShort || 'HOME') + ' ' + nH, TEAM.home);
+      seg(' · ', 'rgba(233,244,221,.45)');
+      seg((r.awayShort || 'AWAY') + ' ' + nA, TEAM.away);
+      seg('슛 (원 = xG)', 'rgba(233,244,221,.55)');
       return;
     }
 

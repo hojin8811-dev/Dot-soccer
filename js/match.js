@@ -5466,17 +5466,22 @@
   /* ───────────────  그리기 (가로 피치 · 원형 초상화 토큰)  ───────────────
      v10: 피치 위 22명의 몸통을 지우고, 고유 얼굴을 담은 원형 토큰으로 그린다.
      원 바깥 두까운 링이 팀을 나누다 — 홈 = 생생한 파랑, 원정 = 생생한 빨강. */
+  /* v25b — 팀 색은 유니폼이 아니라 고정 팔레트다.
+     홈(우리 팀) = 선명한 파랑 #2f8dff · 원정 = 선명한 빨강 #ff4b4b.
+     v25에서는 유니폼 색으로 링을 칠했는데, 초록·검정·흰색 유니폼 구단을 만나면
+     링이 잔디에 묻혀 누가 우리 선수인지 한눈에 안 보였다. 어떤 구단과 붙어도
+     늘 같은 두 색으로 갈라 보이게 하고, 스코어보드·점유율 바·결과서 xG맵도
+     이 두 색을 그대로 쓴다(DS.Match.teamColors). */
+  var HOME_COL = '#2f8dff', AWAY_COL = '#ff4b4b';
   var TEAM_FX_DEF = {
-    home: { ring: '#3b82f6', ring2: '#38bdf8', glow: 'rgba(56,189,248,0.95)', base: 'rgba(8,32,58,0.94)', base2: 'rgba(12,52,92,0.94)', text: '#d9f2ff' },
-    away: { ring: '#ef4444', ring2: '#f87171', glow: 'rgba(248,113,113,0.95)', base: 'rgba(52,10,14,0.94)', base2: 'rgba(92,18,24,0.94)', text: '#ffe2dc' }
+    home: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' },
+    away: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' }
   };
   var TEAM_FX = {
-    home: { ring: '#3b82f6', ring2: '#38bdf8', glow: 'rgba(56,189,248,0.95)', base: 'rgba(8,32,58,0.94)', base2: 'rgba(12,52,92,0.94)', text: '#d9f2ff' },
-    away: { ring: '#ef4444', ring2: '#f87171', glow: 'rgba(248,113,113,0.95)', base: 'rgba(52,10,14,0.94)', base2: 'rgba(92,18,24,0.94)', text: '#ffe2dc' }
+    home: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' },
+    away: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' }
   };
 
-  /* v25 — 스코어보드·엠블럼과 같은 유니폼 색으로 피치 링을 맞춘다.
-     두 팀 색이 너무 비슷해 구분이 안 되면 기존 파랑/빨강으로 돌아간다. */
   function hexRgb(h) {
     var t = String(h || '').replace('#', '');
     if (t.length === 3) { t = t.charAt(0) + t.charAt(0) + t.charAt(1) + t.charAt(1) + t.charAt(2) + t.charAt(2); }
@@ -5488,45 +5493,28 @@
   function mixRgb(a, b, t) {
     return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
   }
-  function lumOf(rgb) { return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; }
-  function hueOf(rgb) {
-    var r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
-    if (d < 1e-6) { return 0; }
-    if (mx === r) { h = ((g - b) / d) % 6; }
-    else if (mx === g) { h = (b - r) / d + 2; }
-    else { h = (r - g) / d + 4; }
-    h *= 60; if (h < 0) { h += 360; }
-    return h;
-  }
-  function hueGap(a, b) { var d = Math.abs(hueOf(a) - hueOf(b)); return d > 180 ? 360 - d : d; }
   function applyTeamColors() {
-    var hk = (cfg && cfg.homeKit) || {}, ak = (cfg && cfg.awayKit) || {};
-    var h = hexRgb(hk.shirt || hk.a || ''), a = hexRgb(ak.shirt || ak.a || '');
     var white = [255, 255, 255], dark = [4, 20, 15];
-    /* 두 유니폼이 사실상 같은 색이면(밝기·색상 모두 근접) 원정만 대비색으로 바꾼다.
-       그 외에는 각 팀 유니폼 색을 그대로 써서 스코어보드·엠블럼과 링 색을 일치시킨다. */
-    var clash = !!(h && a) && Math.abs(lumOf(h) - lumOf(a)) < 0.13 && hueGap(h, a) < 55;
-    function paint(side, rgb) {
-      var f = TEAM_FX[side];
+    function paint(side, hex, def) {
+      var f = TEAM_FX[side], rgb = hexRgb(hex);
       if (!rgb) {
-        var d0 = TEAM_FX_DEF[side];
-        f.ring = d0.ring; f.ring2 = d0.ring2; f.glow = d0.glow;
-        f.base = d0.base; f.base2 = d0.base2; f.text = d0.text;
+        f.ring = def.ring; f.ring2 = def.ring2; f.glow = def.glow;
+        f.base = def.base; f.base2 = def.base2; f.text = def.text;
         return;
       }
       f.ring = 'rgb(' + rgbStr(rgb) + ')';
-      f.ring2 = 'rgb(' + rgbStr(mixRgb(rgb, white, 0.45)) + ')';
+      f.ring2 = 'rgb(' + rgbStr(mixRgb(rgb, white, 0.42)) + ')';
       f.glow = 'rgba(' + rgbStr(rgb) + ',0.95)';
       f.base = 'rgba(' + rgbStr(mixRgb(rgb, dark, 0.74)) + ',0.94)';
       f.base2 = 'rgba(' + rgbStr(mixRgb(rgb, dark, 0.56)) + ',0.94)';
       f.text = 'rgb(' + rgbStr(mixRgb(rgb, white, 0.80)) + ')';
     }
-    var awayRgb = a;
-    if (clash) { awayRgb = hexRgb(lumOf(h) > 0.45 ? '#2f6fb8' : '#e0503a'); }
-    paint('home', h);
-    paint('away', awayRgb);
+    paint('home', HOME_COL, TEAM_FX_DEF.home);
+    paint('away', AWAY_COL, TEAM_FX_DEF.away);
   }
+  applyTeamColors();
+  /* v25b — 피치 밖 UI(스코어보드·점유율 바·결과서 xG맵)도 같은 두 색을 쓴다 */
+  M.teamColors = { home: HOME_COL, away: AWAY_COL };
 
   function roundRect(x, y, w, h, r) {
     ctx.beginPath(); ctx.moveTo(x + r, y);
@@ -6784,6 +6772,11 @@
     ctx.shadowBlur = isCarrier ? r * 0.55 : (p.skillT > 0 || p.glow > 0 ? r * 0.44 : r * 0.22);
     ctx.stroke();
     ctx.restore();
+    /* v25b — 링 안쪽 밝은 실선: 파랑·빨강 링이 잔디 초록에 묻히지 않게 대비 한 겹 */
+    ctx.beginPath(); ctx.arc(0, 0, r + ringW * 0.72, 0, PI2);
+    ctx.lineWidth = Math.max(0.7, ringW * 0.18);
+    ctx.strokeStyle = 'rgba(255,255,255,0.60)';
+    ctx.stroke();
     /* 바깥 경계선 — 밝은 잔디·관중 위에서도 원이 또렷하게 */
     ctx.beginPath(); ctx.arc(0, 0, r + ringW - 0.15, 0, PI2);
     ctx.lineWidth = Math.max(0.8, ringW * 0.26);
@@ -6959,14 +6952,14 @@
     var home = flash.side === 'home';
     ctx.save();
     ctx.globalAlpha = clamp(a, 0, 1);
-    ctx.shadowColor = home ? 'rgba(56,189,248,0.75)' : 'rgba(248,113,113,0.75)';
+    ctx.shadowColor = home ? 'rgba(47,141,255,0.75)' : 'rgba(255,75,75,0.75)';
     ctx.shadowBlur = 18;
     ctx.fillStyle = 'rgba(5,18,14,0.94)';
     roundRect(x, y, w, h, 10);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.lineWidth = 1.6;
-    ctx.strokeStyle = home ? '#38bdf8' : '#f87171';
+    ctx.strokeStyle = home ? '#2f8dff' : '#ff4b4b';
     roundRect(x, y, w, h, 10);
     ctx.stroke();
     /* 왼쪽 골드 바 */
