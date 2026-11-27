@@ -18,7 +18,7 @@
   .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
   .score{display:flex;align-items:center;gap:8px;background:rgba(6,18,14,.72);border:1px solid rgba(255,255,255,.12);
     border-radius:12px;padding:5px 9px;backdrop-filter:blur(7px);box-shadow:0 4px 14px rgba(0,0,0,.35)}
-  .team{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;letter-spacing:-.3px}
+  .team{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
   .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
   .dot.h{background:var(--red)} .dot.a{background:var(--blue)}
   .num{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;padding:0 4px}
@@ -48,6 +48,11 @@
 .tag{position:fixed;left:12px;bottom:calc(58px + env(safe-area-inset-bottom));font-size:9.5px;color:#7f968f;letter-spacing:.4px}
   .loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050c0a;color:var(--dim);font-size:12px;z-index:20;transition:opacity .4s}
   .loading.off{opacity:0;pointer-events:none}
+  @media (max-width:560px){
+    .team{font-size:9.5px;gap:4px} .num{font-size:17px}
+    .badge{font-size:9px;padding:3px 6px}
+    .badge.wide{display:none}
+  }
   @media (orientation:portrait){ .views button{padding:7px 10px} .flash{font-size:34px} }
 </style>
 </head>
@@ -64,7 +69,7 @@
     </div>
     <div class="right">
       <div class="badge"><b id="fps">--</b> fps</div>
-      <div class="badge">3D 치비 <b>22</b>명 · WebGL</div>
+      <div class="badge wide">3D 치비 <b>22</b>명 · WebGL</div>
     </div>
   </div>
 
@@ -88,8 +93,8 @@
   window.addEventListener('error', function (e) { window.__v34Errors.push(String(e.message || e.error || e) + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + '\n' + ((e.error && e.error.stack) || '')); });
   window.addEventListener('unhandledrejection', function (e) { window.__v34Errors.push('promise:' + e.reason); });
 </script>
-<script src="../js/vendor/three.min.js?v=34&b=9"></script>
-<script src="../js/render3d.js?v=34&b=9"></script>
+<script src="../js/vendor/three.min.js?v=34&b=10"></script>
+<script src="../js/render3d.js?v=34&b=10"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -147,8 +152,10 @@
 
   /* 세로 화면이면 가로 전환 안내 */
   function checkOrient() {
-    var st = document.getElementById('stage');
-    $('hint').classList.toggle('on', st.clientHeight > st.clientWidth);
+    var st = document.getElementById('stage'), hint = $('hint');
+    hint.style.left = (st.offsetLeft + st.clientWidth / 2) + 'px';
+    hint.style.top = (st.offsetTop + st.clientHeight / 2) + 'px';
+    hint.classList.toggle('on', st.clientHeight > st.clientWidth);
   }
   setInterval(checkOrient, 700); checkOrient();
 
