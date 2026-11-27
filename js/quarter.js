@@ -104,20 +104,19 @@
       dist: Math.round(cam.dist * 10) / 10, mode: cam.mode, ppm: Math.round(PPM * 100) / 100, fo: Math.round(FO) };
   };
 
-  /* 투영 */
-  var _p = { x: 0, y: 0, s: 1, d: 0, v: 0 };
+  /* 투영 — 호출마다 새 객체를 돌려준다(두 점을 동시에 들고 그리는 코드가 많다) */
   Q.project = function (wx, wy, wz) {
     if (dirty) { rebuildBasis(); }
     var P = to3(wx, wy, wz), v = sub(P, eye);
     var cz = dot(v, fwd);
     if (cz < 6) { cz = 6; }
-    var s = DREF / cz;
-    _p.x = W / 2 + FO * dot(v, right) / cz;
-    _p.y = H / 2 - FO * dot(v, up) / cz;
-    _p.s = s;
-    _p.d = cz;
-    _p.v = (wy || 0) / 120;
-    return _p;
+    return {
+      x: W / 2 + FO * dot(v, right) / cz,
+      y: H / 2 - FO * dot(v, up) / cz,
+      s: DREF / cz,
+      d: cz,
+      v: (wy || 0) / 120
+    };
   };
   Q.projectRaw = function (wx, wy, wz) { return Q.project(wx, wy, wz); };
   Q.zpx = function (z, s) { return (z * ZU) * (s || 1) * PPM * Math.cos(cam.pitch) * 0.96; };
@@ -251,8 +250,8 @@
     var g = ctx.createLinearGradient(a2.x, a2.y, a.x, a.y);
     g.addColorStop(0, colA); g.addColorStop(1, colB);
     q(ctx, [a2, b2, b, a], g);
-    ctx.strokeStyle = 'rgba(0,0,0,0.30)';
-    ctx.lineWidth = Math.max(0.6, mid.s * 0.5);
+    ctx.strokeStyle = 'rgba(2,14,10,0.18)';
+    ctx.lineWidth = Math.max(0.5, mid.s * 0.35);
     ctx.stroke();
     if (label) {
       var fs = Math.max(4.5, mid.s * 5.6);
@@ -276,12 +275,11 @@
     var x0 = 44.4, x1 = 55.6, hgt = 2.44, depth = 2.1;
     var yb = y0 + dir * depth;
     var i, a, b;
-    var lw = Math.max(1.6, Q.project(50, y0, 1).s * 2.6);
-    var netC = 'rgba(236,252,246,0.34)';
-    var nw = Math.max(0.55, lw * 0.26);
-    /* 골문 안쪽 어두운 바탕 — 골대가 입체로 읽히게 */
-    wpoly(ctx, [[x0, y0, 0], [x1, y0, 0], [x1, yb, 0], [x0, yb, 0]], 'rgba(4,26,20,0.55)');
-    wpoly(ctx, [[x0, yb, 0], [x1, yb, 0], [x1, yb, hgt], [x0, yb, hgt]], 'rgba(6,32,26,0.42)');
+    var lw = Math.max(1.8, Q.project(50, y0, 1).s * 3.2);
+    var netC = 'rgba(240,255,250,0.50)';
+    var nw = Math.max(0.6, lw * 0.30);
+    /* 골문 안쪽 — 옅은 그늘만 (골대가 벽처럼 보이지 않게) */
+    wpoly(ctx, [[x0, y0, 0], [x1, y0, 0], [x1, yb, 0], [x0, yb, 0]], 'rgba(4,26,20,0.20)');
     /* 골망 — 뒤판 */
     for (i = 0; i <= 10; i++) {
       var gx = x0 + (x1 - x0) * i / 10;
@@ -310,9 +308,13 @@
     /* 프레임 */
     var postA = Q.project(x0, y0, 0), postB = Q.project(x0, y0, hgt);
     var postC = Q.project(x1, y0, 0), postD = Q.project(x1, y0, hgt);
-    seg(ctx, postA.x, postA.y, postB.x, postB.y, lw, 'rgba(255,255,255,0.97)');
-    seg(ctx, postC.x, postC.y, postD.x, postD.y, lw, 'rgba(255,255,255,0.97)');
-    seg(ctx, postB.x, postB.y, postD.x, postD.y, lw, 'rgba(255,255,255,0.97)');
+    /* 기둥은 어두운 테두리 + 흰 심 — 잔디·관중 위에서도 또렷하게 */
+    seg(ctx, postA.x, postA.y, postB.x, postB.y, lw * 2.1, 'rgba(4,20,16,0.55)');
+    seg(ctx, postC.x, postC.y, postD.x, postD.y, lw * 2.1, 'rgba(4,20,16,0.55)');
+    seg(ctx, postB.x, postB.y, postD.x, postD.y, lw * 2.1, 'rgba(4,20,16,0.55)');
+    seg(ctx, postA.x, postA.y, postB.x, postB.y, lw, 'rgba(255,255,255,0.98)');
+    seg(ctx, postC.x, postC.y, postD.x, postD.y, lw, 'rgba(255,255,255,0.98)');
+    seg(ctx, postB.x, postB.y, postD.x, postD.y, lw, 'rgba(255,255,255,0.98)');
     var pb = Q.project(x0, yb, 0), pd = Q.project(x1, yb, 0);
     var pbt = Q.project(x0, yb, hgt), pdt = Q.project(x1, yb, hgt);
     seg(ctx, pb.x, pb.y, pbt.x, pbt.y, lw * 0.7, 'rgba(226,240,236,0.68)');
