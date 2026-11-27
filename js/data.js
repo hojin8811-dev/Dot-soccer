@@ -1343,7 +1343,7 @@
 
   /* ─────────────────────────  리그 팀  ───────────────────────── */
   /* ── v22 — 1부 / 2부 리그 (각 20팀 · 총 40팀 체제) ──
-     1부: 전력 72~92 / 2부: 전력 56~72. 우리 구단(도트 유나이티드)은 2부에서 출발한다.
+     1부: 전력 72~92 / 2부: 전력 56~72. 우리 구단(기본값 꼬마일레븐 FC)은 2부에서 출발한다.
      division 필드로 소속을 들고 다니고, 시즌 종료 승격·강등은 game.js가 이 값을 옮긴다. */
   var TEAMS = [
     /* ── 1부 리그 (20팀) ── */
@@ -1628,7 +1628,7 @@
     var tr = traitOf(p.trait);
     var nick = p.nickname || '조용한 주인공';
     return t
-      .replace(/\{club\}/g, clubName || '도트 유나이티드')
+      .replace(/\{club\}/g, clubName || '꼬마일레븐 FC')
       .replace(/\{name\}/g, p.name)
       .replace(/\{nameJosa\}/g, josa(p.name, '은/는'))
       .replace(/\{posname\}/g, POS[p.pos].name)
