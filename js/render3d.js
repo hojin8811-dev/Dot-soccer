@@ -28,8 +28,8 @@
 
   /* ── 단위 지오메트리 (모든 파츠는 이걸 스케일해서 조립) ── */
   var GEO = {
-    sph: new THREE.SphereGeometry(1, 14, 10),
-    sphLo: new THREE.SphereGeometry(1, 10, 8),
+    sph: new THREE.SphereGeometry(1, 12, 9),
+    sphLo: new THREE.SphereGeometry(1, 8, 6),
     cyl: new THREE.CylinderGeometry(0.82, 1, 1, 12),
     torso: new THREE.CylinderGeometry(0.88, 1, 1, 16),
     box: new THREE.BoxGeometry(1, 1, 1)
@@ -329,7 +329,6 @@
         standParts.push([GEO.box, r % 2 ? 0x3c424f : 0x474e5d, 0, r * rh + rh / 2, sz * (HW + 5.4 + r * rd), 0, 0, 0, 118, rh, rd * 0.97]);
       }
       standParts.push([GEO.box, 0x232832, 0, rows * rh + 2.6, sz * (HW + 5.4 + rows * rd + 0.9), 0, 0, 0, 118, rows * rh + 5.2, 1.6]);
-      standParts.push([GEO.box, 0x181c24, 0, rows * rh + 5.6, sz * (HW + 5.4 + rows * rd * 0.45), 0, 0, 0, 120, 0.45, rows * rd + 4]);
     });
     [-1, 1].forEach(function (sx) {
       for (var r = 0; r < 6; r++) {
@@ -344,11 +343,11 @@
     /* 관중 (인스턴스) */
     var bodyGeo = mergeParts([[GEO.box, 0xffffff, 0, 0.22, 0, 0, 0, 0, 0.34, 0.44, 0.24], [GEO.box, 0xffffff, 0, 0.02, 0, 0, 0, 0, 0.3, 0.1, 0.22]]);
     var headGeo = mergeParts([[GEO.sphLo, 0xffffff, 0, 0, 0, 0, 0, 0, 0.115, 0.12, 0.115]]);
-    var seatPalette = [0xd93b3b, 0xf2f2f2, 0x2f63d9, 0xffd23f, 0x2f2f38, 0x28a06a, 0xe08b2f, 0x8a4fd9];
+    var seatPalette = [0x9c3535, 0xb9b9bb, 0x3b5aa0, 0xa8894a, 0x35353d, 0x2f6b52, 0x8c6136, 0x5c4470, 0x7a2f3a, 0x4a5a6b];
     var seatList = [];
     [-1, 1].forEach(function (sz) {
       for (var r = 0; r < rows; r++) {
-        for (var x = -55; x <= 55; x += 1.45) {
+        for (var x = -55; x <= 55; x += 1.75) {
           if (Math.abs(x) > 54) continue;
           if (((x * 13 + r * 7 + (sz > 0 ? 3 : 0)) % 11) === 0) continue;   /* 빈자리 */
           seatList.push([x + ((r % 2) ? 0.5 : 0), r * rh + rh + 0.02, sz * (HW + 5.4 + r * rd + 0.1)]);
@@ -369,7 +368,7 @@
     var mat4 = new THREE.Matrix4(), col = new THREE.Color();
     for (var si = 0; si < seatList.length; si++) {
       var s = seatList[si];
-      var sc = 0.88 + ((si * 37) % 23) / 100;
+      var sc = 0.8 + ((si * 37) % 23) / 100;
       mat4.makeRotationY(((si * 71) % 360) * Math.PI / 180 + (s[1] > 0 ? 0 : 0));
       mat4.scale(new THREE.Vector3(sc, sc, sc));
       mat4.setPosition(s[0], s[1], s[2]);
@@ -442,7 +441,7 @@
   /* ══════════════════════════════════════════════════════════
      3D 치비 선수 리그 (기하 도형 조립 · 관절 애니메이션)
      ══════════════════════════════════════════════════════════ */
-  GEO.hairCap = new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.53);
+  GEO.hairCap = new THREE.SphereGeometry(1, 12, 7, 0, Math.PI * 2, 0, Math.PI * 0.53);
   GEO.cone = new THREE.ConeGeometry(1, 1, 7);
   GEO.torus = new THREE.TorusGeometry(1, 0.08, 6, 12, Math.PI);
   GEO.cylFlat = new THREE.CylinderGeometry(1, 1, 1, 10);
@@ -552,6 +551,15 @@
     var kit = o.kit;
     var HR = o.headR || 0.265;
     var root = new THREE.Group();
+    /* 접지 그림자(발밑) — 실시간 그림자 위에 얹어 한층 더 땅에 붙어 보이게 */
+    if (o.blobTex) {
+      var blob = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 0.74),
+        new THREE.MeshBasicMaterial({ map: o.blobTex, transparent: true, opacity: 0.42, depthWrite: false }));
+      blob.rotation.x = -Math.PI / 2;
+      blob.position.y = 0.012;
+      blob.renderOrder = 1;
+      root.add(blob);
+    }
     var bob = new THREE.Group();
     root.add(bob);
 
@@ -694,7 +702,7 @@
 
     /* ── 렌더러 · 씬 ── */
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(global.devicePixelRatio || 1, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -718,17 +726,17 @@
 
     var camera = new THREE.PerspectiveCamera(38, 2.16, 0.5, 900);
 
-    var hemi = new THREE.HemisphereLight(0xa9c8ff, 0x2b4426, 0.85);
+    var hemi = new THREE.HemisphereLight(0xa9c8ff, 0x2b4426, 0.5);
     scene.add(hemi);
-    var amb = new THREE.AmbientLight(0xffffff, 0.22);
+    var amb = new THREE.AmbientLight(0xffffff, 0.12);
     scene.add(amb);
-    var sun = new THREE.DirectionalLight(0xffeed2, 2.35);
+    var sun = new THREE.DirectionalLight(0xffeed2, 2.7);
     sun.position.set(46, 74, 44);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
-    sun.shadow.camera.top = 62; sun.shadow.camera.bottom = -62;
+    sun.shadow.mapSize.width = 1536;
+    sun.shadow.mapSize.height = 1536;
+    sun.shadow.camera.left = -56; sun.shadow.camera.right = 56;
+    sun.shadow.camera.top = 46; sun.shadow.camera.bottom = -46;
     sun.shadow.camera.near = 10; sun.shadow.camera.far = 230;
     sun.shadow.bias = -0.0006;
     sun.shadow.normalBias = 0.03;
@@ -777,6 +785,7 @@
           mouthStyle: (idx * 2) % 4,
           headR: 0.246 + (idx % 5) * 0.012,
           number: p.number,
+          blobTex: blobTex,
           scale: 0.95 + ((idx * 13) % 9) * 0.013,
           phase: p.phase
         });
@@ -1410,22 +1419,22 @@
     /* ── 카메라 (완전 수평 · yaw = 0) ── */
     var CAM = {
       mode: 'broadcast',
-      tx: 0, ty: 1.7, tz: 0, dist: 70, pitch: 0.54,
+      tx: 0, ty: 1.7, tz: 3.2, dist: 46, pitch: 0.545,
       cx: 0, cy: 36, cz: 64, ready: false
     };
     function updateCamera(dt) {
-      var want = { tx: 0, ty: 1.6, tz: 2.4, dist: 71, pitch: 0.545 };
+      var want = { tx: 0, ty: 1.6, tz: 2.4, dist: 46, pitch: 0.545 };
       var o = S.ball;
       if (CAM.mode === 'full') {
-        want.tx = 0; want.tz = 0; want.ty = 0.5; want.dist = 128; want.pitch = 0.92;
+        want.tx = 0; want.tz = 0; want.ty = 0.5; want.dist = 132; want.pitch = 0.95;
       } else if (CAM.mode === 'closeup') {
-        want.tx = o.x; want.tz = o.z + 1.4; want.ty = 0.95; want.dist = 24; want.pitch = 0.42;
+        want.tx = o.x; want.tz = o.z + 0.8; want.ty = 0.95; want.dist = 16; want.pitch = 0.34;
       } else {
-        var inThird = U.smoothstep(HL - 34, HL - 6, Math.abs(o.x));
-        want.tx = U.clamp(o.x * 0.78, -26, 26);
-        want.tz = U.clamp(o.z * 0.2, -3.2, 3.2) + 2.6;
-        want.ty = 1.6;
-        want.dist = 72 - 13 * inThird;
+        var inThird = U.smoothstep(HL - 34, HL - 8, Math.abs(o.x));
+        want.tx = U.clamp(o.x * 0.92, -30, 30);
+        want.tz = U.clamp(o.z * 0.35, -5, 5) + 3.2;
+        want.ty = 1.7;
+        want.dist = 47 - 11 * inThird;
         want.pitch = 0.545;
       }
       var k = 1 - Math.exp(-(CAM.ready ? 3.2 : 60) * dt);
@@ -1450,7 +1459,7 @@
       var h = canvas.clientHeight || global.innerHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-      var vfov = h > w ? 52 : 38;
+      var vfov = h > w ? 54 : 36;
       camera.fov = vfov;
       camera.updateProjectionMatrix();
     }
@@ -1460,8 +1469,8 @@
     }
     global.addEventListener('resize', resize);
     resize();
-    camera.position.set(0, 1.6 + 72 * Math.sin(0.545), 2.6 + 72 * Math.cos(0.545));
-    camera.lookAt(0, 1.6, 2.6);
+    camera.position.set(0, 1.7 + 46 * Math.sin(0.545), 3.2 + 46 * Math.cos(0.545));
+    camera.lookAt(0, 1.7, 3.2);
 
     /* ── 메인 루프 ── */
     var running = false, lastT = 0, raf = 0;

@@ -129,6 +129,16 @@
   var pause = q.get('pause');
   if (pause === '1') demo.togglePause();
 
+  /* 모바일 844×390 실측 모드: 화면을 그 크기 박스로 고정 (검수용) */
+  var sz = q.get('size');
+  if (sz) {
+    var wh = sz.split('x'), W = parseInt(wh[0], 10), H = parseInt(wh[1], 10);
+    var stage = document.getElementById('stage'), hud = document.querySelector('.hud');
+    stage.style.width = W + 'px'; stage.style.height = H + 'px';
+    hud.style.width = W + 'px'; hud.style.height = H + 'px';
+    document.documentElement.style.background = '#000';
+  }
+
   setTimeout(function () { $('loading').classList.add('off'); }, 320);
 
   /* 콘솔 점검용: 1초마다 실측 지표 */
