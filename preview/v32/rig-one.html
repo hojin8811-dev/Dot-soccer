@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>rig-one</title>
+<style>body{margin:0;background:#3a8b43}canvas{display:block}</style></head>
+<body>
+<canvas id="c" width="1400" height="700"></canvas>
+<script src="../../js/chibi.js?v=32d"></script>
+<script>
+DS.CHIBI.RIG.setHeadBase(location.protocol==='file:' ? '../../assets/chibi/heads/' : 'assets/chibi/heads/');
+var c=document.getElementById('c'), ctx=c.getContext('2d');
+var q=new URLSearchParams(location.search);
+var TYPE=q.get('type')||'h0', POSE=q.get('pose')||'idle', U=parseFloat(q.get('u')||'0'), GAIT=parseFloat(q.get('gait')||'0'), SN=parseFloat(q.get('sn')||'1');
+function render(){
+  ctx.clearRect(0,0,c.width,c.height);
+  var g=ctx.createLinearGradient(0,0,0,c.height); g.addColorStop(0,'#4ea254'); g.addColorStop(1,'#3a8b43'); ctx.fillStyle=g; ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='rgba(255,255,255,0.12)';
+  for(var x=0;x<c.width;x+=20){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke();}
+  for(var y=0;y<c.height;y+=20){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke();}
+  var S=4;
+  DS.CHIBI.RIG.shadow(ctx, 340, 600, 17*S/1.7, 6*S/1.7, 0);
+  DS.CHIBI.RIG.draw(ctx, {x:340,y:600,scale:S,face:1,pose:POSE,u:U,gait:GAIT,speedN:SN,t:1.2,type:TYPE});
+  // 기준선: 머리끝/어깨/허리/발
+  var lines=[[600,'발'],[600-141*S,'머리끝']];
+}
+render();
+[100,300,700].forEach(function(ms){setTimeout(render,ms);});
+</script>
+</body></html>

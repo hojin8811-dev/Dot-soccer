@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>rig-lab</title>
+<style>body{margin:0;background:#2e7d3a;color:#fff;font:12px system-ui}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1440" height="960"></canvas>
+<script src="../../js/chibi.js?v=32c"></script>
+<script>
+DS.CHIBI.RIG.setHeadBase(location.protocol==='file:' ? '../../assets/chibi/heads/' : 'assets/chibi/heads/');
+var c = document.getElementById('c'), ctx = c.getContext('2d');
+var RIG = DS.CHIBI.RIG;
+var q = new URLSearchParams(location.search);
+var TYPE = q.get('type') || 'h0';
+var SC = parseFloat(q.get('sc') || '1.7');
+var MODE = q.get('mode') || 'poses';
+
+function bg(){ var g=ctx.createLinearGradient(0,0,0,c.height); g.addColorStop(0,'#4ea254'); g.addColorStop(1,'#3a8b43'); ctx.fillStyle=g; ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=1;
+  for (var x=0;x<c.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke();}
+  for (var y=0;y<c.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke();}
+}
+function cell(x, y, spec) {
+  RIG.shadow(ctx, x, y, 17*SC*spec.scale/1.7, 6*SC*spec.scale/1.7, 0);
+  RIG.draw(ctx, Object.assign({x:x, y:y}, spec));
+}
+function label(txt, x, y){ ctx.fillStyle='#fff'; ctx.font='13px system-ui'; ctx.fillText(txt, x, y); }
+
+function poses() {
+  bg();
+  var list = [
+    ['idle',{pose:'idle',t:1.0,u:0}],
+    ['dribble',{pose:'dribble',t:1.0,u:0}],
+    ['run 0',{pose:'run',gait:0.0,speedN:1,u:0}],
+    ['run 90',{pose:'run',gait:1.57,speedN:1,u:0}],
+    ['run 180',{pose:'run',gait:3.14,speedN:1,u:0}],
+    ['run slow',{pose:'run',gait:0.8,speedN:0.35,u:0}],
+    ['kick .35',{pose:'kick',u:0.35}],
+    ['kick .55',{pose:'kick',u:0.55}],
+    ['kick .8',{pose:'kick',u:0.8}],
+    ['pass .6',{pose:'pass',u:0.6}],
+    ['tackle .25',{pose:'tackle',u:0.25}],
+    ['tackle .5',{pose:'tackle',u:0.5}],
+    ['tackle .85',{pose:'tackle',u:0.85}],
+    ['dive .3',{pose:'dive',u:0.3}],
+    ['dive .65',{pose:'dive',u:0.65}],
+    ['jump .5',{pose:'jump',u:0.5}],
+    ['celebrate',{pose:'celebrate',t:0.2}],
+    ['stun',{pose:'stun',t:0.2}]
+  ];
+  var cols=6, cw=240, ch=320;
+  for (var i=0;i<list.length;i++) {
+    var x = 120 + (i%cols)*cw, y = 300 + Math.floor(i/cols)*ch;
+    cell(x, y, Object.assign({type:TYPE, scale:SC, face:1}, list[i][1]));
+    label(list[i][0], x-30, y+30);
+  }
+}
+
+function strip() {
+  bg();
+  var n = 12;
+  for (var i=0;i<n;i++) {
+    var x = 130 + (i%6)*230, y = 320 + Math.floor(i/6)*340;
+    cell(x, y, {type:TYPE, scale:SC, face:1, pose:'run', gait:(i/n)*Math.PI*2, speedN:1, t:0, u:0});
+    label('θ='+((i/n)*360).toFixed(0)+'°', x-24, y+30);
+  }
+}
+
+function gamesize() {
+  bg();
+  var scales=[0.24,0.30,0.38];
+  for (var k=0;k<scales.length;k++){
+    label('scale '+scales[k]+' → 높이 '+Math.round(RIG.BODY_H*scales[k])+'px', 20, 40+k*120);
+    for (var i=0;i<10;i++){
+      var x = 60 + i*120, y = 100 + k*120;
+      cell(x, y, {type:TYPE, scale:scales[k], face: i<5?1:-1, pose:'run', gait:i*0.9, speedN:1, u:0});
+    }
+  }
+  var types=['h0','h1','h2','a0','a1','a2','g0','g1'];
+  for (var j=0;j<types.length;j++){
+    cell(120+j*170, 900, {type:types[j], scale:1.5, face:1, pose:'run', gait:1.0, speedN:1, u:0});
+    label(types[j], 100+j*170, 930);
+  }
+}
+
+function render(){ 
+function compare() {
+  bg();
+  var types=['h0','h1','h2','a0','a1','a2','g0','g1'];
+  var imgs={}; var pending=types.length;
+  types.forEach(function(t){
+    var im=new Image();
+    im.onload=function(){ imgs[t]=im; render(); };
+    im.src='../../assets/chibi/'+(t==='g0'||t==='g1'?t+'_idle':t+'_run_a')+'.png';
+  });
+  function render(){
+    bg();
+    var S=2.2;
+    types.forEach(function(t,i){
+      var x = 90 + i*300, y = 430;
+      // 기준(v31) 스프라이트
+      if (imgs[t]) { ctx.drawImage(imgs[t], x-46*S+10, y-150*S, 150*S*imgs[t].width/150, 150*S); }
+      label(t+' old', x-40, y+22);
+      RIG.draw(ctx, {type:t, x:x+120, y:y, scale:S*1.5, face:1, pose:'run', gait:1.2, speedN:1, u:0, t:0});
+      label(t+' new (1.5x)', x+60, y+40);
+    });
+  }
+}
+
+if (MODE==='compare') compare(); else if (MODE==='poses') poses(); else if (MODE==='strip') strip(); else gamesize(); }
+render();
+[80,200,500,900].forEach(function(ms){ setTimeout(render, ms); });
+</script>
+</body></html>
