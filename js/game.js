@@ -900,7 +900,7 @@
         '<div class="kpi"><b class="' + (S.condition < COND_WARN ? 'coral' : '') + '">' + S.condition + '</b><span>팀 컨디션</span></div>' +
         '</div>' +
         (S.condition < COND_WARN ? '<div class="cond-warn">⚠ 컨디션 ' + S.condition + ' — 경기 후 -6~10. <b>팀 휴식</b>으로 회복할 수 있습니다.' +
-          (restAvailable() ? ' <button class="btn sm" data-act="rest">무료 휴식 +' + REST_GAIN + '</button>' : ' <span class="tiny muted">이번 라운드 휴식 사용함</span>') + '</div>' : '') +
+          (restAvailable() ? ' <button class="btn sm" data-act="rest">무료 휴식 +' + restGainNow() + '</button>' : ' <span class="tiny muted">이번 라운드 휴식 사용함</span>') + '</div>' : '') +
         '<button class="btn primary wide" data-act="kickoff">' + (S.condition < COND_GATE ? '컨디션 회복 후 킥오프 · ' + S.condition : '공식전 킥오프') + '</button></div>' +
         scoutHTML(prepareOpp('league'));
     }
@@ -1250,6 +1250,14 @@
   var COND_WARN = 40;
   var pendingStart = null;
 
+  /* v25c (B2) — +7로 줄이면서, 컨디션이 이미 게이트(25) 미만일 때 휴식 한 번으로
+     게이트를 넘지 못하면 (돈이 없고 이번 라운드 휴식을 이미 쓴 경우) 라운드를 진행할 수 없는
+     소프트락이 생긴다. 그래서 그 경우만 게이트를 넘길 만큼 더 회복시킨다. */
+  function restGainNow() {
+    if (S.condition >= COND_GATE) { return REST_GAIN; }
+    return Math.max(REST_GAIN, COND_GATE - S.condition + 2);
+  }
+
   function restAvailable() { return S.restRound !== S.round; }
   function restTeam() {
     if (!restAvailable()) {
@@ -1258,7 +1266,7 @@
     }
     if (S.condition >= 100) { toast('컨디션이 이미 최상입니다.'); return false; }
     var before = S.condition;
-    S.condition = clamp(S.condition + REST_GAIN, 0, 100);
+    S.condition = clamp(S.condition + restGainNow(), 0, 100);
     S.restRound = S.round;
     save();
     renderAll();
@@ -1274,7 +1282,7 @@
       '<div class="cond-bar"><i class="' + (S.condition < COND_WARN ? 'low' : '') + '" style="width:' + clamp(S.condition, 0, 100) + '%"></i></div>' +
       '<div class="tiny muted" style="margin:6px 0 8px">경기 1회당 -6~10 · 메디컬룸 Lv.' + med + ' 회복 +' + facValue('medical') +
       ' · 이번 라운드 무료 휴식 ' + (restAvailable() ? '가능' : '사용함') + '</div>' +
-      '<button class="btn primary wide" data-act="condrest" ' + (restAvailable() ? '' : 'disabled') + '>팀 휴식 · 무료 (컨디션 +' + REST_GAIN + ')</button>' +
+      '<button class="btn primary wide" data-act="condrest" ' + (restAvailable() ? '' : 'disabled') + '>팀 휴식 · 무료 (컨디션 +' + restGainNow() + ')</button>' +
       '<button class="btn dark wide" style="margin-top:5px" data-act="conddrink" ' + (S.money < 600 ? 'disabled' : '') + '>컨디션 드링크 · 600 (+20)</button>' +
       (inClub ? '' : '<button class="btn ghost wide" style="margin-top:5px" data-act="condclub">클럽 → 메디컬룸 업그레이드</button>') +
       (pendingStart ? '<button class="btn ' + (canStart ? 'primary' : 'ghost') + ' wide" style="margin-top:5px" data-act="condgo" ' + (canStart ? '' : 'disabled') + '>' +
