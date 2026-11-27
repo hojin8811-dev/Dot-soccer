@@ -1697,7 +1697,7 @@
       });
     }
     return {
-      onPitch: onPitch, bench: bench, subsLeft: M.subsLeft,
+      onPitch: onPitch, bench: bench, subsLeft: M.subsLeft, subsMax: MAX_SUBS,
       minute: minute(), score: M.homeScore + ' : ' + M.awayScore, halftime: M.paused
     };
   };

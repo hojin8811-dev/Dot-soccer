@@ -10,8 +10,11 @@
   var pick = U.pick;
 
   var SAVE_KEY = 'dot-soccer-v3-save';
-  var MAX_SQUAD = 20;
-  var BENCH_SIZE = 5;
+  var MAX_SQUAD = 22;
+  var BENCH_SIZE = 7;
+  var DIV_SIZE = 20;              /* 1부 · 2부 각 20팀 */
+  var DIV_TV = { 1: 260, 2: 90 }; /* 리그별 경기당 중계권 수입 */
+  var DIV_SPONSOR = { 1: 1.6, 2: 1 };
   var CAND_COST = 2200;
   var REROLL_COST = 300;
   var EVO_COST = 900;
@@ -66,22 +69,23 @@
   function rarityColor(p) { return DS.RARITY[p.rarity].color; }
 
   /* ═════════════════  상태  ═════════════════ */
-  function makeTable() {
-    var rows = [{ id: 'me', name: '도트 유나이티드', short: '도트', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }];
-    var i;
-    for (i = 0; i < DS.TEAMS.length; i++) {
-      rows.push({ id: DS.TEAMS[i].id, name: DS.TEAMS[i].name, short: DS.TEAMS[i].short, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
+  /* v22 — 리그 표. 1부·2부 각 20팀이고, 우리 구단은 소속 리그 표에만 들어간다. */
+  function makeTable(division, withMe) {
+    var rows = [], list = divTeams(division), i;
+    if (withMe) { rows.push({ id: 'me', name: '도트 유나이티드', short: '도트', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }); }
+    for (i = 0; i < list.length; i++) {
+      rows.push({ id: list[i].id, name: list[i].name, short: list[i].short, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
     }
     return rows;
   }
 
-  /* ═════════════════  리그 대진표 (v21: 20팀 · 38라운드 더블 라운드 로빈) ═════════════════
+  /* ═════════════════  리그 대진표 (v22: 20팀 · 38라운드 더블 라운드 로빈) ═════════════════
      19팀 + 우리 구단 = 20팀. 전반 19라운드(홈/원정 1회씩)를 표준 라운드 로빈으로 짜고,
      후반 19라운드는 같은 대진을 홈/원정만 뒤집어 순서를 반대로 붙인다 → 총 38라운드.
      (Circle Method — 매 라운드 모든 팀이 정확히 1경기.) */
-  function makeFixtures() {
-    var ids = ['me'], i;
-    for (i = 0; i < DS.TEAMS.length; i++) { ids.push(DS.TEAMS[i].id); }
+  function makeFixtures(division, withMe) {
+    var ids = withMe ? ['me'] : [], i, list = divTeams(division);
+    for (i = 0; i < list.length; i++) { ids.push(list[i].id); }
     var n = ids.length;
     if (n % 2 !== 0) { ids.push('__bye'); n++; }
     var arr = ids.slice(), first = [], r, j, homeCount = {};
@@ -114,8 +118,9 @@
   }
 
   /* 대진표 검사 — 20팀 38라운드 더블 라운드 로빈인지. 예전(8팀 7라운드) 세이브는 걸러낸다. */
-  function fixturesValid(fx) {
-    var teamCount = DS.TEAMS.length + 1;
+  function fixturesValid(fx, division, withMe) {
+    var list = divTeams(division);
+    var teamCount = list.length + (withMe ? 1 : 0);
     var want = (teamCount - 1) * 2;
     if (!fx || !fx.length || fx.length !== want) { return false; }
     var pairHome = {}, r, i;
@@ -132,14 +137,72 @@
       }
       if (cnt !== teamCount / 2) { return false; }
       if (Object.keys(used).length !== teamCount) { return false; }
-      if (!used.me) { return false; }
+      if (withMe && !used.me) { return false; }
     }
     /* 각 팀이 홈·원정 한 번씩 서로 만나야 한다 */
-    for (r = 0; r < DS.TEAMS.length; r++) {
-      var t = DS.TEAMS[r].id;
-      if (pairHome['me>' + t] !== 1 || pairHome[t + '>me'] !== 1) { return false; }
+    for (r = 0; r < list.length; r++) {
+      var t = list[r].id;
+      if (pairHome[t + '>' + t]) { return false; }
+      if (withMe && (pairHome['me>' + t] !== 1 || pairHome[t + '>me'] !== 1)) { return false; }
     }
     return true;
+  }
+
+  /* v22 — 리그 헬퍼: 표 구성원 검사 · 정렬 · 득점 반영 */
+  function tableFits(table, division) {
+    var list = divTeams(division), i, have = {};
+    if (!table || table.length !== list.length + 1) { return false; }
+    for (i = 0; i < table.length; i++) { have[table[i].id] = 1; }
+    if (!have.me) { return false; }
+    for (i = 0; i < list.length; i++) { if (!have[list[i].id]) { return false; } }
+    return true;
+  }
+  function cmpRows(a, b, pre) {
+    if (!pre) {
+      if (b.pts !== a.pts) { return b.pts - a.pts; }
+      var da = a.gf - a.ga, db = b.gf - b.ga;
+      if (db !== da) { return db - da; }
+      if (b.gf !== a.gf) { return b.gf - a.gf; }
+    } else {
+      var sa = rowStrength(a), sb = rowStrength(b);
+      if (sb !== sa) { return sb - sa; }
+    }
+    return a.name < b.name ? -1 : 1;
+  }
+  function sortRows(rows) {
+    var pre = true, i;
+    for (i = 0; i < rows.length; i++) { if (rows[i].p > 0) { pre = false; } }
+    rows.sort(function (a, b) { return cmpRows(a, b, pre); });
+    return rows;
+  }
+  function tableRowIn(table, id) {
+    var i;
+    if (!table) { return null; }
+    for (i = 0; i < table.length; i++) { if (table[i].id === id) { return table[i]; } }
+    return null;
+  }
+  function applyScoreTo(table, id, gf, ga) {
+    var row = tableRowIn(table, id);
+    if (!row) { return; }
+    row.p++; row.gf += gf; row.ga += ga;
+    if (gf > ga) { row.w++; row.pts += 3; }
+    else if (gf === ga) { row.d++; row.pts += 1; }
+    else { row.l++; }
+  }
+  /* 소속 리그 — 시즌 종료 승격·강등 결과(divs)가 기본값보다 우선한다.
+     세이브를 읽는 동안에는 아직 S가 없으므로 DIV_OVERRIDE로 같은 값을 쓴다. */
+  var DIV_OVERRIDE = null;
+  function divTeams(division) {
+    var out = [], i;
+    for (i = 0; i < DS.TEAMS.length; i++) { if (teamDiv(DS.TEAMS[i].id) === division) { out.push(DS.TEAMS[i]); } }
+    return out;
+  }
+  function teamDiv(id) {
+    var map = (S && S.divs) ? S.divs : DIV_OVERRIDE;
+    if (map && map[id]) { return map[id]; }
+    var i;
+    for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].id === id) { return DS.TEAMS[i].division || 1; } }
+    return 1;
   }
 
   function autoLineup(squad, formation) {
@@ -213,6 +276,11 @@
       season: 1,
       round: 0,
       seasonOver: false,
+      /* v22 — 1부/2부 리그. 새 게임은 2부에서 출발한다. */
+      division: 2,
+      divs: {},
+      divView: 2,
+      seasonReview: null,
       formation: '4-2-3-1',
       tactics: 'balanced',
       uiMode: 'basic',
@@ -224,8 +292,10 @@
       facilities: { training: 0, medical: 0, shop: 0, fanclub: 0, cafe: 0 },
       sponsor: 'kimbap',
       combos: [],
-      table: makeTable(),
-      fixtures: makeFixtures(),
+      table: makeTable(2, true),
+      fixtures: makeFixtures(2, true),
+      otherTable: makeTable(1, false),
+      otherFixtures: makeFixtures(1, false),
       career: [],
       challengeLeft: 1,
       smatchTickets: 3,
@@ -272,34 +342,47 @@
       if (!raw) { return null; }
       var d = JSON.parse(raw);
       if (!d || (d.v !== 3 && d.v !== 4 && d.v !== 5 && d.v !== 6 && d.v !== 7) || !d.squad || !d.lineup || !d.club) { return null; }
-      if (!d.table || !d.table.length) { d.table = makeTable(); }
-      /* v21 — 리그 8팀 7라운드 → 20팀 38라운드. 팀 수가 바뀌었으면 표와 대진표를 새로 만들고
-         지금까지의 성적은 진행도에 맞춰 옮긴다 (판 수가 같은 라운드까지만). */
-      var needRounds = (DS.TEAMS.length + 1 - 1) * 2;
-      void needRounds;
-      if (!d.table || d.table.length !== DS.TEAMS.length + 1) {
-        /* 8팀 리그 표는 20팀 포맷으로 옮길 수 없다 — 표는 0에서 시작하고
-           누적 기록(S.totals · career)은 그대로 둔다. */
-        d.table = makeTable();
+      /* v22 — 1부/2부 리그: division 필드가 없는 구버전 세이브는 1부 유지로 안전 처리 */
+      if (!d.divs || typeof d.divs !== 'object') { d.divs = {}; }
+      DIV_OVERRIDE = d.divs;
+      if (!d.log) { d.log = []; }
+      if (d.division !== 1 && d.division !== 2) {
+        d.division = 1;
+        d.migrated22 = 1;
+        /* 1부는 20팀 정원 — 우리 구단이 들어가므로 가장 약한 1부 구단 하나를 2부로 내린다 */
+        var weakD1 = DS.teamsOf(1).slice().sort(function (a, b) { return a.strength - b.strength; })[0];
+        if (weakD1) { d.divs[weakD1.id] = 2; }
+        d.log.push('S' + (d.season || 1) + ' 1·2부 리그 도입 — 기존 구단은 1부로 이어받고 ' + (weakD1 ? weakD1.name + '은(는) 2부로' : ''));
+      }
+      if (!tableFits(d.table, d.division)) {
+        d.table = makeTable(d.division, true);
         d.round = 0;
         d.seasonOver = false;
-        if (!d.log) { d.log = []; }
-        d.log.push('S' + (d.season || 1) + ' 20팀 38라운드 프리미어리그로 리그 재편');
+        d.seasonReview = null;
+        d.log.push('S' + (d.season || 1) + ' ' + d.division + '부 리그 20팀 38라운드로 리그 재편');
       }
       /* v15 — 깨진 대진표(팀 중복/누락·라운드 수 오류)는 표준 라운드 로빈으로 재생성 */
       if (!d.fixtures || !d.fixtures.length) {
-        d.fixtures = makeFixtures();
+        d.fixtures = makeFixtures(d.division, true);
         d.round = 0; d.seasonOver = false;
-      } else if (!fixturesValid(d.fixtures)) {
-        d.fixtures = makeFixtures();
+      } else if (!fixturesValid(d.fixtures, d.division, true)) {
+        d.fixtures = makeFixtures(d.division, true);
         d.round = 0;
         d.seasonOver = false;
         d.fixtureFixed = 1;
-        if (!d.log) { d.log = []; }
-        d.log.push('S' + (d.season || 1) + ' 20팀 ' + d.fixtures.length + '라운드 대진표 재생성');
+        d.log.push('S' + (d.season || 1) + ' ' + d.division + '부 ' + d.fixtures.length + '라운드 대진표 재생성');
       }
+      /* 반대 리그(1부↔2부) 표·대진표 — 관전·순위표 탭용. 없으면 새로 만든다 */
+      if (!d.otherTable || d.otherTable.length !== divTeams(3 - d.division).length) {
+        d.otherTable = makeTable(3 - d.division, false);
+      }
+      if (!d.otherFixtures || !fixturesValid(d.otherFixtures, 3 - d.division, false)) {
+        d.otherFixtures = makeFixtures(3 - d.division, false);
+      }
+      if (d.divView !== 1 && d.divView !== 2) { d.divView = d.division; }
+      if (!('seasonReview' in d)) { d.seasonReview = null; }
       if (!DS.FORMATIONS[d.formation]) { d.formation = '4-2-3-1'; }
-      if (!d.bench) { d.bench = autoBench(d.squad, d.lineup); }
+      if (!d.bench || d.bench.length < BENCH_SIZE) { d.bench = autoBench(d.squad, d.lineup); }
       if (!d.roles) { d.roles = {}; }
       if (!d.facilities) { d.facilities = { training: 0, medical: 0, shop: 0, fanclub: 0, cafe: 0 }; }
       if (!d.dex) { d.dex = { players: {}, emblems: {}, kits: {} }; }
@@ -356,7 +439,7 @@
       if (!d.homeFormation) { d.homeFormation = d.formation; }
       d.v = 6;
       return d;
-    } catch (e) { return null; }
+    } catch (e) { global.__DS_LOAD_ERR = String((e && e.stack) || e); return null; }
   }
 
   /* ═════════════════  조회 ═════════════════ */
@@ -543,7 +626,7 @@
       '<div class="tb-club">' +
       '<canvas class="tb-emblem" data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="30" height="34"></canvas>' +
       '<div class="tb-txt"><div class="tb-name">' + esc(S.club.name) + '</div>' +
-      '<div class="tb-sub">시즌 ' + S.season + ' · ' + roundLabel() + ' · ' + ourRank() + '위 · ' + S.formation + '</div></div>' +
+      '<div class="tb-sub">시즌 ' + S.season + ' · ' + divName(S.division) + ' · ' + roundLabel() + ' · ' + ourRank() + '위 · ' + S.formation + '</div></div>' +
       '</div>' +
       '<div class="tb-chips">' +
       '<span class="tb-chip gold"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10h5M9.5 14h5"/></svg>' + fmt(S.money) + '</span>' +
@@ -562,11 +645,6 @@
     var i;
     for (i = 0; i < DS.TEAMS.length; i++) { if (DS.TEAMS[i].id === r.id) { return DS.TEAMS[i].strength; } }
     return 0;
-  }
-  function tablePreseason() {
-    var i;
-    for (i = 0; i < S.table.length; i++) { if (S.table[i].p > 0) { return false; } }
-    return true;
   }
   /* v21b ⑥ — 첫 방문자를 위한 3단계 가이드. 진행은 S.guide 에 저장되고
      완료/접기/다시 보지 않기가 모두 기억된다. */
@@ -620,24 +698,10 @@
   }
 
   function sortTable() {
-    var pre = tablePreseason();
-    S.table.sort(function (a, b) {
-      if (!pre) {
-        if (b.pts !== a.pts) { return b.pts - a.pts; }
-        var da = a.gf - a.ga, db = b.gf - b.ga;
-        if (db !== da) { return db - da; }
-        if (b.gf !== a.gf) { return b.gf - a.gf; }
-      } else {
-        var sa = rowStrength(a), sb = rowStrength(b);
-        if (sb !== sa) { return sb - sa; }
-      }
-      return a.name < b.name ? -1 : 1;
-    });
+    sortRows(S.table);
   }
   function tableRow(id) {
-    var i;
-    for (i = 0; i < S.table.length; i++) { if (S.table[i].id === id) { return S.table[i]; } }
-    return null;
+    return tableRowIn(S.table, id);
   }
   function ourRank() {
     sortTable();
@@ -655,12 +719,26 @@
     var r = roundInfo();
     return r.cur + '/' + r.total + 'R';
   }
-  /* 리그 존 — 1~4 UCL · 5~6 UEL · 18~20 강등 */
-  function zoneOf(rank, total) {
+  /* 리그 존 — 1부: 1~4 UCL · 5~6 UEL · 18~20 강등 / 2부: 1~2 자동 승격 · 3~6 승격 PO */
+  function zoneOf(rank, total, division) {
+    if (division === 2) {
+      if (rank <= 2) { return { key: 'pro', name: '승격' }; }
+      if (rank <= 6) { return { key: 'po', name: 'PO' }; }
+      return null;
+    }
     if (rank <= 4) { return { key: 'ucl', name: 'UCL' }; }
     if (rank <= 6) { return { key: 'uel', name: 'UEL' }; }
     if (rank > total - 3) { return { key: 'rel', name: '강등' }; }
     return null;
+  }
+  function divName(div) { return div === 1 ? '1부' : '2부'; }
+  /* 우리 구단이 보는 리그 순위표 (1부/2부 탭) */
+  function viewRows() {
+    var v = S.divView === 1 || S.divView === 2 ? S.divView : S.division;
+    return v === S.division ? S.table : S.otherTable;
+  }
+  function viewDivision() {
+    return S.divView === 1 || S.divView === 2 ? S.divView : S.division;
   }
 
   function deckCards() {
@@ -675,30 +753,43 @@
   function renderHome() {
     var box = document.getElementById('screen-home');
     if (!box) { return; }
+    if (S.seasonOver && !S.seasonReview) { ensureSeasonReview(); }
     var power = teamPower(), chem = chemistry(), rank = ourRank();
     var next = currentOpponent();
+    sortRows(S.table); sortRows(S.otherTable);
+    var view = viewDivision();
+    var vrows = viewRows();
     var rows = '', i, r, isMe, zone;
-    sortTable();
-    var totalTeams = S.table.length;
-    for (i = 0; i < S.table.length; i++) {
-      r = S.table[i];
+    var totalTeams = vrows.length;
+    for (i = 0; i < vrows.length; i++) {
+      r = vrows[i];
       isMe = r.id === 'me';
-      zone = zoneOf(i + 1, totalTeams);
+      zone = zoneOf(i + 1, totalTeams, view);
       rows += '<tr class="' + (isMe ? 'me' : '') + (zone ? ' z-' + zone.key : '') + '"><td class="rk">' +
         (zone ? '<i class="zbar"></i>' : '') + (i + 1) + '</td>' +
         '<td class="tm">' + esc(isMe ? S.club.name : r.name) + '</td>' +
         '<td>' + r.p + '</td><td>' + (r.gf - r.ga > 0 ? '+' : '') + (r.gf - r.ga) + '</td>' +
         '<td class="pts">' + r.pts + '</td></tr>';
     }
+    var legendInner = view === 2
+      ? '<span class="z-pro"><i></i>승격 1~2</span><span class="z-po"><i></i>PO 3~6</span>'
+      : '<span class="z-ucl"><i></i>UCL 1~4</span><span class="z-uel"><i></i>UEL 5~6</span><span class="z-rel"><i></i>강등 18~20</span>';
+    var divTabs = '<div class="seg mini divs">' +
+      '<button data-act="divview" data-v="1" class="' + (view === 1 ? 'on' : '') + '">1부' + (S.division === 1 ? ' ·우리' : '') + '</button>' +
+      '<button data-act="divview" data-v="2" class="' + (view === 2 ? 'on' : '') + '">2부' + (S.division === 2 ? ' ·우리' : '') + '</button></div>';
 
     var nextHTML = '';
     if (S.seasonOver) {
       var w = S.table[0];
+      var rv = S.seasonReview;
+      var outcome = rv ? rv.outcome : (S.division === 2 ? '잔류' : '잔류');
+      var outCls = outcome === '승격' ? 'lime' : (outcome === '강등' ? 'coral' : '');
       nextHTML = '<div class="card">' +
-        '<div class="card-head"><span class="dot"></span><b>시즌 ' + S.season + ' 종료</b><span class="meta">FINAL</span></div>' +
-        '<div class="row between"><div><div class="b" style="font-size:12.5px">우승 · ' + esc(w.id === 'me' ? S.club.name : w.name) + '</div>' +
-        '<div class="tiny muted">최종 ' + rank + '위 · 승점 ' + tableRow('me').pts + '</div></div>' +
-        '<button class="btn primary sm" data-act="newseason">새 시즌</button></div></div>';
+        '<div class="card-head"><span class="dot"></span><b>시즌 ' + S.season + ' 종료</b><span class="meta">FINAL · ' + divName(S.division) + '</span></div>' +
+        '<div class="row between"><div><div class="b" style="font-size:12.5px">우승 · ' + esc(w.id === 'me' ? S.club.name : w.name) + ' · <b class="' + outCls + '">' + outcome + '</b></div>' +
+        '<div class="tiny muted">최종 ' + rank + '위 · 승점 ' + tableRow('me').pts + (rv && rv.playoffText ? ' · ' + rv.playoffText : '') + '</div></div>' +
+        '<div class="row" style="gap:4px"><button class="btn sm" data-act="seasonreview">결산 보기</button>' +
+        '<button class="btn primary sm" data-act="newseason">새 시즌</button></div></div></div>';
     } else if (next) {
       var opp = opponentTeam(next.id);
       nextHTML = '<div class="card">' +
@@ -723,6 +814,7 @@
       '<div class="card-head"><b>전술 카드 덱</b><span class="meta">' + dcs.length + '장 편성 · 경기 중 손패 3장</span></div>' +
       '<div class="deckgrid">' + dcs.map(function (d) {
         return '<div class="deckcard" style="--cc:' + d.color + '">' +
+          DS.tacticArtHTML(d.key, 'dc-art') +
           '<div class="tg">' + d.tag + '</div>' +
           '<div class="nm">' + d.name + '</div>' +
           '<div class="mt">MOM <em>' + d.cost + '</em></div></div>';
@@ -748,22 +840,23 @@
       '<div class="hero-in">' +
       '<div class="hero-kicker">MODERN TACTICAL SOCCER RPG</div>' +
       '<div class="hero-title">' + esc(S.club.name) + '</div>' +
-      '<div class="hero-sub">리그 ' + rank + '위 · 전력 ' + power + ' · 조직력 ' + chem + ' · 시즌 ' + S.season + '</div>' +
+      '<div class="hero-sub">' + divName(S.division) + ' 리그 ' + rank + '위 · 전력 ' + power + ' · 조직력 ' + chem + ' · 시즌 ' + S.season + '</div>' +
       '</div></div>' +
 
       '<div class="card tight">' +
       '<div class="club-line">' +
       '<canvas class="club-emblem" data-emblem="' + S.club.emblem + '" data-kit="' + S.club.kit.shirt + '|' + S.club.kit.trim + '" width="46" height="52"></canvas>' +
       '<div class="club-meta"><div class="nm">' + esc(S.club.name) + ' ' + stars(powerStars(power)) + '</div>' +
-      '<div class="sub">리그 ' + rank + '위 · 사기 ' + S.morale + ' · 컨디션 ' + S.condition + ' · 팬 ' + fmt(S.fans) + '</div></div>' +
+      '<div class="sub">' + divName(S.division) + ' ' + rank + '위 · 사기 ' + S.morale + ' · 컨디션 ' + S.condition + ' · 팬 ' + fmt(S.fans) + '</div></div>' +
       '<div class="rank-badge">' + rank + '<span>RANK</span></div>' +
       '</div></div>' +
 
       nextHTML + deckHTML +
       '<div class="card">' +
-      '<div class="card-head"><b>리그 순위</b><span class="meta">' + totalTeams + '팀 · ' + roundInfo().total + '라운드 · ' + roundLabel() + '</span></div>' +
+      '<div class="card-head"><b>' + divName(view) + ' 리그 순위</b>' + divTabs + '</div>' +
       '<table class="tbl"><thead><tr><th>#</th><th style="text-align:left">구단</th><th>경기</th><th>득실</th><th>승점</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      '<div class="zlegend"><span class="z-ucl"><i></i>UCL 1~4</span><span class="z-uel"><i></i>UEL 5~6</span><span class="z-rel"><i></i>강등 18~20</span></div>' +
+      '<div class="zlegend">' + legendInner + '</div>' +
+      '<div class="tiny muted" style="margin-top:3px">' + (view === S.division ? '우리 리그' : '관전용 · ' + divName(view) + ' 다른 리그') + ' · ' + totalTeams + '팀 · ' + roundInfo().total + '라운드 · ' + roundLabel() + '</div>' +
       '</div>' +
       lastHTML +
       '<div class="card">' +
@@ -945,7 +1038,7 @@
       '</div>' +
       '<div class="pitch sq-pitch" id="pitch-squad">' +
       '<canvas id="pitch-bg"></canvas>' + toks + '</div>' +
-      '<div class="sq-bench"><span class="sqb-lbl">벤치</span>' + benchHTML + '</div>' +
+      '<div class="sq-bench"><span class="sqb-lbl">벤치 ' + bench.length + '/' + BENCH_SIZE + '</span>' + benchHTML + '</div>' +
       '</div>' +
 
       '<aside class="sq-right">' +
@@ -1271,7 +1364,10 @@
       '<button class="btn sm ' + (mgrSync() ? 'ghost' : 'primary') + '" data-act="mgrform" ' + (mgrSync() ? 'disabled' : '') + '>' +
       (mgrSync() ? '고유 포메이션 적용중' : '고유 포메이션 적용') + '</button>' +
       '<button class="btn sm" data-act="mgrmodal">감독 영입 · 교체</button></div></div>' +
-      '<div class="card"><div class="card-head"><b>스폰서</b><span class="meta">경기당 보너스</span></div>' + spHTML + '</div>' +
+      '<div class="card"><div class="card-head"><b>스폰서</b><span class="meta">' + divName(S.division) + ' · 경기당</span></div>' +
+      '<div class="tiny muted" style="margin-bottom:4px">중계권 ' + fmt(DIV_TV[S.division] || 0) + ' · 스폰서 배율 ×' + (DIV_SPONSOR[S.division] || 1) +
+      (S.division === 2 ? ' <span class="chip lime">1부 승격 시 ×' + DIV_SPONSOR[1] + ' · 중계권 ' + fmt(DIV_TV[1]) + '</span>' : '') + '</div>' +
+      spHTML + '</div>' +
       '<div class="card">' +
       '<div class="card-head"><b>구단 꾸미기</b><span class="meta">이름 · 유니폼 · 엠블럼</span></div>' +
       '<div class="row" style="margin-bottom:6px"><input id="club-name-input" maxlength="12" value="' + esc(S.club.name) + '" style="flex:1 1 auto;height:32px;border-radius:9px;border:1px solid var(--line);padding:0 8px;font-size:11px;font-weight:700">' +
@@ -1731,7 +1827,8 @@
       d = DS.CARDS[i];
       on = deckDraft.indexOf(d.key) >= 0;
       cards += '<button class="deckrow' + (on ? ' on' : '') + '" data-act="deckpick" data-k="' + d.key + '">' +
-        '<span class="dtag" style="background:' + d.color + '22;color:' + d.color + '">' + d.tag + '</span>' +
+        '<span class="dr-art" style="--cc:' + d.color + '">' + DS.tacticArtHTML(d.key) +
+        '<em style="color:' + d.color + '">' + d.tag + '</em></span>' +
         '<span class="dtxt"><b>' + d.name + ' <em>M ' + d.cost + '</em></b><span>' + d.desc + '</span></span>' +
         '<span class="dstate' + (on ? ' on' : '') + '">' + (on ? '편성' : '추가') + '</span></button>';
     }
@@ -2273,11 +2370,15 @@
     var base = win ? (420 + gf * 60 + (gf - ga) * 40) : (draw ? 210 : 110 + gf * 30);
     if (kind === 'challenge') { base = Math.round(base * 2); }
     if (kind === 'smatch') { base = Math.round(base * 1.35); }
-    var spBonus = 0, i;
+    /* v22 — 1부는 스폰서 배율·중계권 수입이 커진다 */
+    var spBonus = 0, i, tv = 0;
     for (i = 0; i < DS.SPONSORS.length; i++) {
-      if (DS.SPONSORS[i].id === S.sponsor && S.fans >= DS.SPONSORS[i].fans) { spBonus = DS.SPONSORS[i].bonus; }
+      if (DS.SPONSORS[i].id === S.sponsor && S.fans >= DS.SPONSORS[i].fans) {
+        spBonus = Math.round(DS.SPONSORS[i].bonus * (DIV_SPONSOR[S.division] || 1));
+      }
     }
-    var reward = base + spBonus + facValue('shop');
+    if (kind === 'league') { tv = DIV_TV[S.division] || 0; }
+    var reward = base + spBonus + tv + facValue('shop');
     if (kind === 'smatch' && S.smatchStreak >= 3) { reward = Math.round(reward * 1.25); }
 
     var fanGain = win ? U.irange(40, 90) : (draw ? U.irange(10, 30) : -U.irange(10, 30));
@@ -2296,7 +2397,7 @@
       playMatchRows(gf, ga, oppId);
       S.round++;
       points = win ? 3 : (draw ? 1 : 0);
-      if (S.round >= S.fixtures.length) { S.seasonOver = true; }
+      if (S.round >= S.fixtures.length) { S.seasonOver = true; ensureSeasonReview(); }
     } else if (kind === 'challenge') {
       S.challengeLeft = Math.max(0, S.challengeLeft - 1);
     } else if (kind === 'smatch') {
@@ -2424,17 +2525,28 @@
   }
 
   function playMatchRows(gf, ga, oppId) {
-    var pairs = S.fixtures[S.round], i;
+    var pairs = S.fixtures[S.round], i, a, b, sa, sb, g1, g2;
     for (i = 0; i < pairs.length; i++) {
-      var a = pairs[i][0], b = pairs[i][1];
+      a = pairs[i][0]; b = pairs[i][1];
       if (a === 'me' || b === 'me') { continue; }
-      var sa = strengthOf(a), sb = strengthOf(b);
-      applyScore(a, simGoals(sa, sb), simGoals(sb, sa));
-      applyScore(b, simGoals(sb, sa), simGoals(sa, sb));
+      sa = strengthOf(a); sb = strengthOf(b);
+      g1 = simGoals(sa, sb); g2 = simGoals(sb, sa);
+      applyScoreTo(S.table, a, g1, g2);
+      applyScoreTo(S.table, b, g2, g1);
     }
-    applyScore('me', gf, ga);
-    applyScore(oppId, ga, gf);
-    sortTable();
+    applyScoreTo(S.table, 'me', gf, ga);
+    applyScoreTo(S.table, oppId, ga, gf);
+    sortRows(S.table);
+    /* v22 — 반대 리그도 같은 라운드를 함께 진행한다 (승격·강등 판정용) */
+    var oPairs = S.otherFixtures && S.otherFixtures[S.round] ? S.otherFixtures[S.round] : [];
+    for (i = 0; i < oPairs.length; i++) {
+      a = oPairs[i][0]; b = oPairs[i][1];
+      sa = strengthOf(a); sb = strengthOf(b);
+      g1 = simGoals(sa, sb); g2 = simGoals(sb, sa);
+      applyScoreTo(S.otherTable, a, g1, g2);
+      applyScoreTo(S.otherTable, b, g2, g1);
+    }
+    if (S.otherTable) { sortRows(S.otherTable); }
   }
   function simGoals(atk, def) {
     var exp = 1.35 * Math.pow(atk / Math.max(35, def), 1.9);
@@ -2444,36 +2556,166 @@
     return g;
   }
   function applyScore(id, gf, ga) {
-    var row = tableRow(id);
-    if (!row) { return; }
-    row.p++; row.gf += gf; row.ga += ga;
-    if (gf > ga) { row.w++; row.pts += 3; }
-    else if (gf === ga) { row.d++; row.pts += 1; }
-    else { row.l++; }
+    applyScoreTo(S.table, id, gf, ga);
+  }
+
+  /* ═════════════════  v22 — 시즌 결산 · 승격 / 강등 / 승격 플레이오프  ═════════════════
+     2부 1~2위 자동 승격 + 3~6위 승격 플레이오프(4강 → 결승) 우승 1팀 = 3팀 승격,
+     1부 18~20위 = 3팀 강등. 플레이오프는 전력·홈 이점으로 결산 처리한다. */
+  function simStrength(id) { return id === 'me' ? teamPower() : strengthOf(id); }
+  function rowName(r) { return r.id === 'me' ? S.club.name : r.name; }
+  function simH2H(aRow, bRow) {
+    var sa = simStrength(aRow.id) + 2, sb = simStrength(bRow.id);
+    var ga = simGoals(sa, sb), gb = simGoals(sb, sa), winner, pk = false;
+    if (ga > gb) { winner = aRow; }
+    else if (gb > ga) { winner = bRow; }
+    else {
+      pk = true;
+      winner = Math.random() < (0.5 + (sa - sb) * 0.02) ? aRow : bRow;
+    }
+    return { a: aRow, b: bRow, ga: ga, gb: gb, pk: pk, winner: winner };
+  }
+  function playoffOf(rows) {
+    if (!rows || rows.length < 6) { return null; }
+    var s = rows.slice(2, 6);
+    var sf1 = simH2H(s[0], s[3]);
+    var sf2 = simH2H(s[1], s[2]);
+    var fin = simH2H(sf1.winner, sf2.winner);
+    return { sf: [sf1, sf2], final: fin, winner: fin.winner };
+  }
+  function rankedTable(div) {
+    var rows = (div === S.division ? S.table : S.otherTable).slice();
+    rows.sort(function (a, b) { return cmpRows(a, b, false); });
+    return rows;
+  }
+  function ensureSeasonReview() {
+    if (!S.seasonOver) { return null; }
+    if (S.seasonReview) { return S.seasonReview; }
+    var r1 = rankedTable(1), r2 = rankedTable(2);
+    if (!r1.length || !r2.length) { return null; }
+    var po = playoffOf(r2);
+    var promoted = [r2[0], r2[1], po.winner];
+    var relegated = [r1[r1.length - 3], r1[r1.length - 2], r1[r1.length - 1]];
+    var myRank = 0, i, outcome = '잔류', mine = S.division === 1 ? r1 : r2;
+    for (i = 0; i < mine.length; i++) { if (mine[i].id === 'me') { myRank = i + 1; } }
+    if (S.division === 1) {
+      outcome = myRank >= 18 ? '강등' : '잔류';
+    } else if (myRank <= 2) {
+      outcome = '승격';
+    } else if (myRank >= 3 && myRank <= 6) {
+      outcome = po.winner.id === 'me' ? '승격' : '잔류';
+    }
+    var poText = '';
+    if (S.division === 2 && myRank >= 3 && myRank <= 6) {
+      poText = po.winner.id === 'me' ? '승격 PO 승리' : '승격 PO 탈락';
+    }
+    var lines = [], sf = po.sf, fin = po.final;
+    lines.push({ stage: 'PO 4강', home: rowName(sf[0].a), away: rowName(sf[0].b), hs: sf[0].ga, as: sf[0].gb, pk: sf[0].pk, win: rowName(sf[0].winner) });
+    lines.push({ stage: 'PO 4강', home: rowName(sf[1].a), away: rowName(sf[1].b), hs: sf[1].ga, as: sf[1].gb, pk: sf[1].pk, win: rowName(sf[1].winner) });
+    lines.push({ stage: 'PO 결승', home: rowName(fin.a), away: rowName(fin.b), hs: fin.ga, as: fin.gb, pk: fin.pk, win: rowName(fin.winner) });
+    var nextDiv = outcome === '승격' ? 1 : (outcome === '강등' ? 2 : S.division);
+    S.seasonReview = {
+      season: S.season,
+      division: S.division,
+      nextDivision: nextDiv,
+      rank: myRank,
+      pts: tableRow('me') ? tableRow('me').pts : 0,
+      outcome: outcome,
+      playoffText: poText,
+      promoted: promoted.map(function (r) { return { id: r.id, name: rowName(r) }; }),
+      relegated: relegated.map(function (r) { return { id: r.id, name: rowName(r) }; }),
+      playoff: lines,
+      playoffWinner: rowName(po.winner),
+      champion1: rowName(r1[0]),
+      champion2: rowName(r2[0]),
+      tvFrom: DIV_TV[S.division] || 0,
+      tvTo: DIV_TV[nextDiv] || 0,
+      sponsorFrom: DIV_SPONSOR[S.division] || 1,
+      sponsorTo: DIV_SPONSOR[nextDiv] || 1
+    };
+    return S.seasonReview;
   }
 
   function newSeason() {
+    var rv = ensureSeasonReview();
     var rank = ourRank();
-    var prize = rank === 1 ? 3200 : (rank === 2 ? 2100 : (rank === 3 ? 1400 : 800));
+    var prize = S.division === 1
+      ? (rank === 1 ? 5200 : (rank === 2 ? 3600 : (rank === 3 ? 2400 : 1400)))
+      : (rank === 1 ? 3200 : (rank === 2 ? 2100 : (rank === 3 ? 1400 : 800)));
+    var promoBonus = rv && rv.outcome === '승격' ? 2500 : 0;
     var me = tableRow('me');
-    S.career.push({ season: S.season, rank: rank, p: me.p, w: me.w, d: me.d, l: me.l, gf: me.gf, ga: me.ga, pts: me.pts });
-    S.money += prize;
+    S.career.push({
+      season: S.season, division: S.division, rank: rank, outcome: rv ? rv.outcome : '',
+      p: me.p, w: me.w, d: me.d, l: me.l, gf: me.gf, ga: me.ga, pts: me.pts
+    });
+    S.money += prize + promoBonus;
+    /* 이적: 2부 승격 3팀 ↔ 1부 강등 3팀 */
+    var i;
+    if (rv) {
+      for (i = 0; i < rv.promoted.length; i++) {
+        if (rv.promoted[i].id !== 'me') { S.divs[rv.promoted[i].id] = 1; }
+      }
+      for (i = 0; i < rv.relegated.length; i++) {
+        if (rv.relegated[i].id !== 'me') { S.divs[rv.relegated[i].id] = 2; }
+      }
+      if (rv.nextDivision && rv.nextDivision !== S.division) { S.division = rv.nextDivision; }
+    }
     S.season++;
     S.seasonOver = false;
     S.round = 0;
-    S.table = makeTable();
-    S.fixtures = makeFixtures();
+    S.seasonReview = null;
+    S.divView = S.division;
+    S.table = makeTable(S.division, true);
+    S.fixtures = makeFixtures(S.division, true);
+    S.otherTable = makeTable(3 - S.division, false);
+    S.otherFixtures = makeFixtures(3 - S.division, false);
     S.challengeLeft = 1;
     S.smatchTickets = 3;
     S.smatchStreak = 0;
     S.fans += 120;
     S.morale = clamp(S.morale + 4, 0, 100);
     S.condition = clamp(S.condition + 20, 0, 100);
-    var i;
-    for (i = 0; i < DS.TEAMS.length; i++) { DS.TEAMS[i].strength = clamp(DS.TEAMS[i].strength + 1, 55, 92); }
+    for (i = 0; i < DS.TEAMS.length; i++) { DS.TEAMS[i].strength = clamp(DS.TEAMS[i].strength + 1, 52, 94); }
     save();
-    toast('시즌 ' + S.season + ' 시작 · 우승 상금 ' + fmt(prize));
+    var msg = '시즌 ' + S.season + ' 시작 · ' + divName(S.division) + ' 리그';
+    if (rv && rv.outcome === '승격') { msg = '시즌 ' + S.season + ' · 1부 리그 승격! 중계권과 스폰서 수입이 올랐습니다'; }
+    if (rv && rv.outcome === '강등') { msg = '시즌 ' + S.season + ' · 2부 리그로 강등 · 다시 올라가야 합니다'; }
+    toast(msg);
     renderAll();
+  }
+
+  /* 시즌 결산 모달 — 승격/잔류/강등 결과 · 플레이오프 · 1부 진출 보상 상향 */
+  function openSeasonReview() {
+    var rv = ensureSeasonReview();
+    if (!rv) { return; }
+    var i, poHTML = '', proHTML = '', relHTML = '';
+    for (i = 0; i < rv.playoff.length; i++) {
+      var L = rv.playoff[i];
+      poHTML += '<div class="rv-po"><span class="st">' + L.stage + '</span>' +
+        '<span class="tm">' + esc(L.home) + '</span>' +
+        '<b class="sc">' + L.hs + ' : ' + L.as + '</b>' +
+        '<span class="tm away">' + esc(L.away) + '</span>' +
+        (L.pk ? '<em>PK</em>' : '') + '</div>';
+    }
+    for (i = 0; i < rv.promoted.length; i++) { proHTML += '<span class="chip lime">' + esc(rv.promoted[i].name) + '</span>'; }
+    for (i = 0; i < rv.relegated.length; i++) { relHTML += '<span class="chip coral">' + esc(rv.relegated[i].name) + '</span>'; }
+    var outCls = rv.outcome === '승격' ? 'lime' : (rv.outcome === '강등' ? 'coral' : '');
+    var body =
+      '<div class="rv-hero"><span class="rv-out ' + outCls + '">' + rv.outcome + '</span>' +
+      '<div><b>' + divName(rv.division) + ' 최종 ' + rv.rank + '위 · 승점 ' + rv.pts + '</b>' +
+      '<em>' + (rv.division === 2 ? '2부 우승 ' + esc(rv.champion2) : '1부 우승 ' + esc(rv.champion1)) + (rv.playoffText ? ' · ' + rv.playoffText : '') + '</em></div></div>' +
+      '<div class="rv-sec"><div class="rv-h">승격 플레이오프 <span>3~6위 · 4강 → 결승</span></div>' + poHTML +
+      '<div class="tiny muted" style="margin-top:3px">승격 PO 우승 · ' + esc(rv.playoffWinner) + '</div></div>' +
+      '<div class="rv-sec"><div class="rv-h">1부 승격 3팀</div><div class="rv-chips">' + proHTML + '</div></div>' +
+      '<div class="rv-sec"><div class="rv-h">2부 강등 3팀</div><div class="rv-chips">' + relHTML + '</div></div>' +
+      '<div class="rv-sec"><div class="rv-h">다음 시즌 보상</div>' +
+      '<div class="rv-rows">' +
+      '<div class="rv-row"><span>중계권</span><b>' + fmt(rv.tvFrom) + ' → ' + fmt(rv.tvTo) + '</b><em>경기당</em></div>' +
+      '<div class="rv-row"><span>스폰서 배율</span><b>×' + rv.sponsorFrom + ' → ×' + rv.sponsorTo + '</b><em>1부 상향</em></div>' +
+      '<div class="rv-row"><span>리그</span><b>' + divName(rv.division) + ' → ' + divName(rv.nextDivision) + '</b><em>20팀 · 38라운드</em></div>' +
+      '</div></div>' +
+      '<button class="btn primary wide" style="margin-top:8px" data-act="newseason">새 시즌 시작</button>';
+    setSheet('시즌 ' + rv.season + ' 결산 · ' + divName(rv.division), body, 'rv-sheet');
   }
 
   function renderMatchIdle() {
@@ -2725,7 +2967,7 @@
         for (i = 0; i < st.hand.length; i++) {
           c = st.hand[i];
           h += '<button class="tcard v7" style="--cc:' + c.color + '" data-act="playcard" data-k="' + c.key + '">' +
-            '<span class="tc-face">' + (c.face ? '<img src="' + c.face + '" alt="">' : '') + '</span>' +
+            '<span class="tc-face">' + DS.tacticArtHTML(c.key) + '</span>' +
             '<span class="tc-main"><span class="tag">' + c.tag + '</span><span class="nm">' + c.name + '</span>' +
             '<span class="tc-desc">' + c.desc + '</span><span class="cd"></span></span>' +
             '<span class="cost"><em>' + c.cost + '</em> M</span>' +
@@ -2745,6 +2987,51 @@
         cd.textContent = noUse ? '이번 경기 개입 완료' : (c.cooldown > 0 ? ('재장전 ' + c.cooldown + 's') : '');
       }
     }
+  }
+
+  /* v22 ⑤ — 모멘텀 눈금 라벨(22M · 30M · 34M …)이 가까울 때 서로 겹치지 않게 배치한다.
+     실제 글자 폭을 재서 좌우 3px 여유를 두고 줄을 나누고(r0·r1·r2), 세 줄로도 자리가 없으면
+     오른쪽으로 밀어 최소 간격을 지킨다. */
+  function layoutMomScale(scale) {
+    var labels = scale.querySelectorAll('b'), i, j, r;
+    if (!labels.length) { return; }
+    var w = scale.clientWidth || 0;
+    if (w < 40) { w = 220; }
+    var rows = [[], [], []], used = 0;
+    for (i = 0; i < labels.length; i++) {
+      var el = labels[i];
+      var pct = parseFloat(el.getAttribute('data-c')) || 0;
+      var lw = el.offsetWidth || 22;
+      var cx = w * pct / 100;
+      var left = cx - lw / 2, right = cx + lw / 2;
+      if (left < 1) { left = 1; right = left + lw; }
+      if (right > w - 1) { right = w - 1; left = right - lw; if (left < 1) { left = 1; } }
+      var placed = -1;
+      for (r = 0; r < rows.length && placed < 0; r++) {
+        var ok = true;
+        for (j = 0; j < rows[r].length; j++) {
+          if (left < rows[r][j][1] + 3 && right > rows[r][j][0] - 3) { ok = false; break; }
+        }
+        if (ok) { rows[r].push([left, right]); placed = r; }
+      }
+      if (placed < 0) {
+        var last = rows[2][rows[2].length - 1];
+        var nl = last ? Math.min(w - lw - 1, last[1] + 3) : left;
+        if (nl < 1) { nl = 1; }
+        rows[2].push([nl, nl + lw]);
+        placed = 2;
+      }
+      if (placed + 1 > used) { used = placed + 1; }
+      var finalLeft = ((left + right) / 2) / w * 100;
+      if (placed >= 0 && rows[placed][rows[placed].length - 1][0] !== left) {
+        var rw = rows[placed][rows[placed].length - 1];
+        finalLeft = ((rw[0] + rw[1]) / 2) / w * 100;
+      }
+      el.className = 'r' + placed;
+      el.style.left = finalLeft.toFixed(2) + '%';
+    }
+    scale.style.height = used >= 3 ? '31px' : (used === 2 ? '21px' : '11px');
+    scale.setAttribute('data-w', String(w));
   }
 
   /* v21b ⑤ — 손패 카드들의 발동 기준(코스트)을 게이지 위 눈금과 틱으로 보여주고,
@@ -2769,15 +3056,14 @@
       ticks.innerHTML = th;
       ticks.setAttribute('data-costs', sig);
     }
-    if (scale && scale.getAttribute('data-costs') !== sig) {
-      var sh = '', prev = -99, row = 0;
+    if (scale && (scale.getAttribute('data-costs') !== sig || scale.getAttribute('data-w') !== String(scale.clientWidth))) {
+      var sh = '';
       for (t = 0; t < costs.length; t++) {
-        if (costs[t] - prev < 9) { row = 1 - row; } else { row = 0; }
-        prev = costs[t];
-        sh += '<b class="r' + row + '" style="left:' + costs[t] + '%">' + costs[t] + '<i>M</i></b>';
+        sh += '<b data-c="' + costs[t] + '" style="left:' + costs[t] + '%">' + costs[t] + '<i>M</i></b>';
       }
       scale.innerHTML = sh;
       scale.setAttribute('data-costs', sig);
+      layoutMomScale(scale);
     }
     /* 지금 바로 누를 수 있는 카드 중 가장 싼 코스트 */
     var next = null;
@@ -2841,7 +3127,7 @@
         '<span class="sp">' + it.pos + '</span><span class="sn">' + esc(it.name) + '</span><span class="sr">' + it.rating + '</span></button>';
     }
     ov.innerHTML = '<div class="sub-panel">' +
-      '<div class="sub-head"><b>선수 교체</b><span>남은 교체 ' + st.subsLeft + '회' + (halftime ? ' · 하프타임' : '') + '</span></div>' +
+      '<div class="sub-head"><b>선수 교체</b><span>남은 교체 ' + st.subsLeft + '/' + (st.subsMax || 5) + '회 · 최대 5회 · 벤치 ' + st.bench.length + '명' + (halftime ? ' · 하프타임' : '') + '</span></div>' +
       '<div class="sub-min">현재 ' + st.minute + '분 · 스코어 ' + st.score + '</div>' +
       '<div class="sub-cols"><div><div class="sub-title">OUT · 선발</div><div class="sub-list">' + outHTML + '</div></div>' +
       '<div><div class="sub-title">IN · 벤치</div><div class="sub-list">' + inHTML + '</div></div></div>' +
@@ -3272,8 +3558,14 @@
       if (S.money < 800) { toast('금화가 부족합니다.'); return; }
       S.money -= 800; S.smatchTickets++; save(); renderAll(); toast('S매치 이용권 +1'); return;
     }
-    if (act === 'newseason') { newSeason(); return; }
+    if (act === 'newseason') { closeModal(); newSeason(); return; }
     if (act === 'report') { if (S.lastReport) { showReport(S.lastReport); } return; }
+    if (act === 'seasonreview') { openSeasonReview(); return; }
+    if (act === 'divview') {
+      var dv = parseInt(t.getAttribute('data-v'), 10);
+      if (dv === 1 || dv === 2) { S.divView = dv; save(); renderHome(); }
+      return;
+    }
 
     if (act === 'playcard') {
       var ck = t.getAttribute('data-k');
@@ -3510,9 +3802,18 @@
       checkRotate();
       if (currentTab === 'squad') { drawPitchBG(); placePitchPlayers(); }
       if (DS.Match && DS.Match.running) { DS.Match.resize(); }
+      var sc = document.getElementById('m-mom-scale');
+      if (sc) { layoutMomScale(sc); }
     });
     if (global.addEventListener) { global.addEventListener('orientationchange', checkRotate); }
     checkRotate();
+    /* v22 — assets/tactics/{cardId}.webp 가 있으면 그 이미지로 바꿔 그린다 */
+    if (DS.probeTacticArt) {
+      DS.probeTacticArt(function () {
+        if (DS.Match && DS.Match.running) { return; }
+        if (currentTab === 'home') { renderHome(); }
+      });
+    }
 
     document.addEventListener('visibilitychange', function () { if (document.hidden) { save(); } });
     global.addEventListener('beforeunload', save);
@@ -3540,7 +3841,29 @@
     defaultState: defaultState,
     saveKey: SAVE_KEY,
     sellPlayer: removeFromSquad,
-    fixturesValid: fixturesValid
+    fixturesValid: fixturesValid,
+    /* v22 — 1·2부 리그 검증용 */
+    newSeason: newSeason,
+    ensureSeasonReview: ensureSeasonReview,
+    openSeasonReview: openSeasonReview,
+    makeTable: makeTable,
+    makeFixtures: makeFixtures,
+    teamPower: teamPower,
+    divTeams: divTeams,
+    teamDiv: teamDiv,
+    /* 리그 한 라운드를 경기 화면 없이 즉시 결산 (QA 시즌 시뮬레이션용) */
+    simRound: function () {
+      if (S.seasonOver) { return null; }
+      var o = currentOpponent();
+      if (!o) { return null; }
+      var sa = strengthOf(o.id);
+      var g1 = simGoals(teamPower(), sa), g2 = simGoals(sa, teamPower());
+      playMatchRows(g1, g2, o.id);
+      S.round++;
+      if (S.round >= S.fixtures.length) { S.seasonOver = true; ensureSeasonReview(); }
+      save();
+      return { me: g1, opp: g2, round: S.round };
+    }
   };
 
   if (document.readyState === 'loading') {

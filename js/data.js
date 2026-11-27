@@ -729,6 +729,178 @@
   };
   DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'tikitaka', 'longshot'];
 
+  /* ─────────────────────────  v22 — 전술 카드 고유 전략 일러스트  ─────────────────────────
+     선수 얼굴 대신 카드마다 다른 전술보드 도트 일러스트(SVG)를 그린다.
+     assets/tactics/{cardId}.webp 가 있으면 그 이미지가 먼저 표시되고, 없으면 이 SVG가 쓰인다. */
+  var TACTIC_IMG = {};
+  DS.TACTIC_IMG = TACTIC_IMG;
+  var TART_CACHE = {};
+
+  function tDot(x, y, c, r) {
+    return '<circle cx="' + x + '" cy="' + y + '" r="' + (r || 3.4) + '" fill="' + c + '" stroke="#0a231d" stroke-width="1"/>';
+  }
+  function tBall(x, y) {
+    return '<circle cx="' + x + '" cy="' + y + '" r="2.6" fill="#f6ffd9" stroke="#0a231d" stroke-width=".8"/>';
+  }
+  function tArrow(mid, x1, y1, x2, y2, w) {
+    return '<path d="M' + x1 + ' ' + y1 + 'L' + x2 + ' ' + y2 + '" stroke="currentColor" stroke-width="' + (w || 2) + '" fill="none" stroke-linecap="round" marker-end="url(#a' + mid + ')"/>';
+  }
+  function tPath(d, w, dash) {
+    return '<path d="' + d + '" stroke="currentColor" stroke-width="' + (w || 2) + '" fill="none" stroke-linecap="round"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>';
+  }
+  function tFrame(key, accent, body) {
+    var mid = key.replace(/[^a-z]/g, '');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" width="120" height="80">' +
+      '<defs><marker id="a' + mid + '" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">' +
+      '<path d="M0 0L10 5L0 10z" fill="' + accent + '"/></marker></defs>' +
+      '<rect width="120" height="80" rx="7" fill="#0b241e"/>' +
+      '<rect x="3" y="3" width="114" height="74" rx="4" fill="#11453a"/>' +
+      '<g stroke="#dfefd2" stroke-opacity=".20" fill="none" stroke-width="1">' +
+      '<rect x="11" y="7" width="98" height="66"/>' +
+      '<path d="M11 40h98"/><circle cx="60" cy="40" r="9"/>' +
+      '<path d="M38 7v11h44V7M38 73V62h44v11"/>' +
+      '</g>' +
+      '<g color="' + accent + '">' + body + '</g>' + '</svg>';
+  }
+
+  var TACTIC_ART = {
+    /* 전방 압박 화살표 — 상대 진영에서 셋이 동시에 볼을 문다 */
+    gegen: function () {
+      return '<rect x="14" y="9" width="92" height="30" fill="currentColor" opacity=".13"/>' +
+        tArrow('gegen', 38, 50, 52, 30) + tArrow('gegen', 60, 54, 60, 32) + tArrow('gegen', 82, 50, 68, 30) +
+        tDot(38, 52) + tDot(60, 56) + tDot(82, 52) + tBall(60, 27);
+    },
+    /* 하프스페이스 침투 — 윙어가 안쪽 채널로 접어 들어간다 */
+    halfspace: function () {
+      return tPath('M40 8v64M80 8v64', 1.2, '3 4') +
+        tPath('M16 54Q16 30 40 24', 2.2) + tPath('M104 54Q104 30 80 24', 2.2) +
+        tDot(16, 56) + tDot(104, 56) + tDot(40, 24) + tDot(80, 24) + tBall(40, 24) +
+        tPath('M40 24h40', 1.6, '3 3') +
+        '<path d="M60 30l7-6-7-6" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+    },
+    /* 원톱 고립 차단 — 최전방을 포위하고 지원선을 끊는다 */
+    isolate: function () {
+      return '<circle cx="60" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 3"/>' +
+        tDot(48, 34) + tDot(72, 34) + tDot(60, 40) + tDot(60, 24, '#e9f4dd', 3) +
+        '<path d="M30 12l10 10M40 12l-10 10M80 12l10 10M90 12l-10 10" stroke="currentColor" stroke-width="1.8"/>' +
+        tPath('M60 58v12', 1.4, '3 3');
+    },
+    /* 골키퍼 빌드업 — 후방에서 짧은 패스 삼각형 */
+    build: function () {
+      return tDot(60, 68, '#e9f4dd') + tDot(42, 56) + tDot(78, 56) + tDot(60, 42) +
+        tArrow('build', 55, 66, 45, 59, 1.8) + tArrow('build', 65, 66, 75, 59, 1.8) +
+        tArrow('build', 45, 54, 56, 44, 1.8) + tArrow('build', 75, 54, 64, 44, 1.8) +
+        tPath('M42 56L78 56', 1.2, '2 3') + tPath('M60 42v14', 1.2, '2 3');
+    },
+    /* 조커 타임 — 투입된 조커가 템포를 끌어올린다 */
+    joker: function () {
+      return '<path d="M64 12l-16 26h12l-6 22 22-28H62l8-20z" fill="currentColor" opacity=".92"/>' +
+        '<path d="M26 56l8-8M30 64l8-8M90 56l-8-8M86 64l-8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+        tDot(22, 64, '#e9f4dd', 2.6) + tDot(98, 64, '#e9f4dd', 2.6);
+    },
+    /* 세트피스 트릭 — 벽을 넘기는 프리킥 궤적 */
+    setpiece: function () {
+      return '<path d="M38 8h44" stroke="#dfefd2" stroke-opacity=".45" stroke-width="2"/>' +
+        tPath('M58 52Q100 34 62 12', 2.2) +
+        tDot(46, 42) + tDot(53, 42) + tDot(60, 42) + tDot(67, 42) + tDot(74, 42) +
+        tBall(58, 54) + '<circle cx="62" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+    },
+    /* 라인 브레이크 — 수비 라인 사이로 스루패스 */
+    linebreak: function () {
+      return '<path d="M24 36h72" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3" opacity=".8"/>' +
+        tDot(30, 36) + tDot(50, 36) + tDot(70, 36) + tDot(90, 36) +
+        tArrow('linebreak', 60, 62, 60, 16, 2.4) + tBall(60, 62) +
+        tPath('M56 24l4-6 4 6', 1.6);
+    },
+    /* 압박 트리거 — 백패스 순간을 신호로 압박 개시 */
+    trigger: function () {
+      return tPath('M62 20Q46 30 48 44', 1.8, '3 3') + tBall(62, 20) +
+        '<path d="M44 42l4 8 8-3-4-8z" fill="currentColor" opacity=".85"/>' +
+        tArrow('trigger', 30, 56, 42, 46, 2) + tArrow('trigger', 74, 58, 54, 46, 2) +
+        tDot(30, 58) + tDot(74, 60) +
+        '<path d="M44 34l-4-4M48 30l-2-5M36 38l-5-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>';
+    },
+    /* 티키타카 — 짧은 원투패스 연결망 */
+    tikitaka: function () {
+      var dots = [[40, 58], [60, 66], [80, 58], [50, 42], [70, 42], [60, 26]];
+      var links = [[0, 1], [1, 2], [0, 3], [1, 3], [1, 4], [2, 4], [3, 4], [3, 5], [4, 5]];
+      var s = '', i;
+      for (i = 0; i < links.length; i++) {
+        s += '<path d="M' + dots[links[i][0]][0] + ' ' + dots[links[i][0]][1] + 'L' + dots[links[i][1]][0] + ' ' + dots[links[i][1]][1] + '" stroke="currentColor" stroke-width="1.5" opacity=".85"/>';
+      }
+      for (i = 0; i < dots.length; i++) { s += tDot(dots[i][0], dots[i][1]); }
+      return s + tBall(60, 26);
+    },
+    /* 오프사이드 트랩 — 라인을 동시에 올려 침투를 잡는다 */
+    offside: function () {
+      return '<path d="M20 44h80" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 3"/>' +
+        tDot(32, 44) + tDot(52, 44) + tDot(72, 44) + tDot(92, 44) +
+        tArrow('offside', 62, 54, 62, 46, 2) +
+        '<path d="M100 16v22" stroke="currentColor" stroke-width="1.8"/>' +
+        '<path d="M100 16l12 5-12 5z" fill="currentColor"/>' +
+        '<circle cx="60" cy="22" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+    },
+    /* 중거리 대포알 — 박스 외곽 슈팅 궤적 */
+    longshot: function () {
+      return '<path d="M36 62q24-10 24-30" stroke="currentColor" stroke-width="1.4" fill="none" stroke-dasharray="3 3" opacity=".8"/>' +
+        tArrow('longshot', 60, 56, 60, 14, 2.6) + tBall(60, 56) +
+        '<circle cx="60" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
+        '<path d="M54 12h12M60 6v12" stroke="currentColor" stroke-width="1.2" opacity=".8"/>';
+    },
+    /* 라커룸 일갈 — 벤치의 외침이 전원을 달구다 */
+    roar: function () {
+      return '<path d="M30 34h12l12-9v30l-12-9H30z" fill="currentColor" opacity=".9"/>' +
+        '<path d="M62 30q7 10 0 20M70 26q10 14 0 28M78 22q13 18 0 36" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
+        tArrow('roar', 34, 62, 34, 48, 1.8) + tArrow('roar', 60, 66, 60, 50, 1.8) + tArrow('roar', 86, 62, 86, 48, 1.8) +
+        tDot(34, 63, '#e9f4dd', 2.4) + tDot(60, 67, '#e9f4dd', 2.4) + tDot(86, 63, '#e9f4dd', 2.4);
+    }
+  };
+
+  /* 카드 색을 밝게 섞어 어두운 전술판 위에서도 화살표가 읽히게 한다 */
+  function artShade(hex, amt) {
+    var h = String(hex || '#c8f169').replace('#', '');
+    if (h.length === 3) { h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; }
+    var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    r = Math.round(r + (255 - r) * amt); g = Math.round(g + (255 - g) * amt); b = Math.round(b + (255 - b) * amt);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  DS.tacticArt = function (key) {
+    var c = DS.cardOf(key);
+    if (!c) { return ''; }
+    if (!TART_CACHE[key]) {
+      var fn = TACTIC_ART[key];
+      var accent = { build: '#9df3c2', tikitaka: '#8ef0bd', gegen: '#ff9a7e' }[key] || artShade(c.color, 0.32);
+      TART_CACHE[key] = tFrame(key, accent, fn ? fn() : '');
+    }
+    return TART_CACHE[key];
+  };
+  DS.tacticArtURI = function (key) {
+    var svg = DS.tacticArt(key);
+    return svg ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) : '';
+  };
+  /* assets/tactics/{cardId}.webp 가 있으면 그 이미지, 없으면 SVG 폴백.
+     이미지 유무는 부팅 시 한 번만 조용히 확인한다(404 콘솔 오류 없이). */
+  DS.probeTacticArt = function (done) {
+    /* assets/tactics/manifest.json = { "images": ["gegen", ...] }.
+       등록된 카드만 webp 를 쓰고 나머지는 SVG 로 그린다 (없는 파일 404 요청을 만들지 않음). */
+    if (!global.fetch) { if (done) { done(); } return; }
+    global.fetch('assets/tactics/manifest.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (j && j.images && j.images.length) {
+          for (var i = 0; i < j.images.length; i++) { TACTIC_IMG[j.images[i]] = 1; }
+        }
+        if (done) { done(); }
+      })
+      .catch(function () { if (done) { done(); } });
+  };
+  DS.tacticArtHTML = function (key, cls) {
+    var uri = DS.tacticArtURI(key);
+    var src = TACTIC_IMG[key] ? ('assets/tactics/' + key + '.webp') : uri;
+    return '<span class="tac-art ' + (cls || '') + '"><img src="' + src + '" alt="" data-svg="' + uri + '" ' +
+      'onerror="this.onerror=null;this.src=this.getAttribute(\'data-svg\')"></span>';
+  };
+
   /* ─────────────────────────  감독 특기 (버프 8종)  ───────────────────────── */
   /* v: 특기 레벨(2~8) — 수치 효과는 이 값을 기준으로 환산한다 */
   var MANAGER_TRAITS = {
@@ -1071,29 +1243,59 @@
   DS.traitOf = traitOf;
 
   /* ─────────────────────────  리그 팀  ───────────────────────── */
+  /* ── v22 — 1부 / 2부 리그 (각 20팀 · 총 40팀 체제) ──
+     1부: 전력 72~92 / 2부: 전력 56~72. 우리 구단(도트 유나이티드)은 2부에서 출발한다.
+     division 필드로 소속을 들고 다니고, 시즌 종료 승격·강등은 game.js가 이 값을 옮긴다. */
   var TEAMS = [
-    { id: 'byeoksan', name: '벽산 유나이티드', short: '벽산', kit: { shirt: '#2f5fa8', shorts: '#f0e6cc', trim: '#a8c4f0' }, emblem: 'bolt', strength: 72 },
-    { id: 'hangang',  name: '한강 FC',        short: '한강', kit: { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' }, emblem: 'wave', strength: 69 },
-    { id: 'dokdo',    name: '독도 웨일즈',    short: '독도', kit: { shirt: '#41368a', shorts: '#221e3d', trim: '#cfd0f5' }, emblem: 'wave', strength: 76 },
-    { id: 'cheongchun', name: '청춘 FC',      short: '청춘', kit: { shirt: '#c85a1e', shorts: '#2b2622', trim: '#ffd8a8' }, emblem: 'flame', strength: 66 },
-    { id: 'cheolma',  name: '철마 SC',        short: '철마', kit: { shirt: '#a82020', shorts: '#f2e8d2', trim: '#f0a8a8' }, emblem: 'claw', strength: 74 },
-    { id: 'byeolbit', name: '별빛 레인저스',  short: '별빛', kit: { shirt: '#6a34c0', shorts: '#241634', trim: '#dcc8f8' }, emblem: 'star', strength: 71 },
-    { id: 'baekho',   name: '백호 유나이티드', short: '백호', kit: { shirt: '#1b7f88', shorts: '#f2e8d2', trim: '#b0eef2' }, emblem: 'moon', strength: 68 },
-    /* ── v21 — 프리미어리그 20팀 (우리 구단 + 아래 19팀) ── */
-    { id: 'seorak',   name: '설악 FC',        short: '설악', kit: { shirt: '#2c6fa8', shorts: '#14202c', trim: '#bfe0ff' }, emblem: 'claw', strength: 70 },
-    { id: 'haeundae', name: '해운대 웨이브',  short: '해운대', kit: { shirt: '#197f8c', shorts: '#f2e8d2', trim: '#b6f0f4' }, emblem: 'wave', strength: 67 },
-    { id: 'mudeung',  name: '무등 산악',      short: '무등', kit: { shirt: '#b8461e', shorts: '#241a14', trim: '#ffcf9e' }, emblem: 'flame', strength: 65 },
-    { id: 'jeonju',   name: '전주 청솔',      short: '전주', kit: { shirt: '#2f7a55', shorts: '#1b2a20', trim: '#c9f0cf' }, emblem: 'moon', strength: 73 },
-    { id: 'ulsan',    name: '울산 강철',      short: '울산', kit: { shirt: '#34427e', shorts: '#1a1f30', trim: '#c8d0ff' }, emblem: 'bolt', strength: 77 },
-    { id: 'suwon',    name: '수원 성곽',      short: '수원', kit: { shirt: '#8a2f3f', shorts: '#f2e8d2', trim: '#ffc8cf' }, emblem: 'crown', strength: 75 },
-    { id: 'incheon',  name: '인천 항로',      short: '인천', kit: { shirt: '#1f6f9e', shorts: '#0e1e28', trim: '#a8e2ff' }, emblem: 'wave', strength: 72 },
-    { id: 'daegu',    name: '대구 열매',      short: '대구', kit: { shirt: '#c07a12', shorts: '#241a10', trim: '#ffe0a8' }, emblem: 'ball', strength: 70 },
-    { id: 'jeju',     name: '제주 바람',      short: '제주', kit: { shirt: '#3b8a3f', shorts: '#f2e8d2', trim: '#cff5c0' }, emblem: 'star', strength: 78 },
-    { id: 'busan',    name: '부산 갈매기',    short: '부산', kit: { shirt: '#2a5f9e', shorts: '#f2e8d2', trim: '#ffe9a8' }, emblem: 'wave', strength: 79 },
-    { id: 'taebaek',  name: '태백 정상',      short: '태백', kit: { shirt: '#5c6b3a', shorts: '#1d2418', trim: '#e6f0bc' }, emblem: 'claw', strength: 66 },
-    { id: 'hanseong', name: '한성 레전드',    short: '한성', kit: { shirt: '#1f2430', shorts: '#c8a83a', trim: '#ffd34d' }, emblem: 'crown', strength: 92 }
+    /* ── 1부 리그 (20팀) ── */
+    { id: 'byeoksan', name: '벽산 유나이티드', short: '벽산', division: 1, kit: { shirt: '#2f5fa8', shorts: '#f0e6cc', trim: '#a8c4f0' }, emblem: 'bolt', strength: 72 },
+    { id: 'dokdo',    name: '독도 웨일즈',    short: '독도', division: 1, kit: { shirt: '#41368a', shorts: '#221e3d', trim: '#cfd0f5' }, emblem: 'wave', strength: 76 },
+    { id: 'cheolma',  name: '철마 SC',        short: '철마', division: 1, kit: { shirt: '#a82020', shorts: '#f2e8d2', trim: '#f0a8a8' }, emblem: 'claw', strength: 74 },
+    { id: 'jeonju',   name: '전주 청솔',      short: '전주', division: 1, kit: { shirt: '#2f7a55', shorts: '#1b2a20', trim: '#c9f0cf' }, emblem: 'moon', strength: 73 },
+    { id: 'ulsan',    name: '울산 강철',      short: '울산', division: 1, kit: { shirt: '#34427e', shorts: '#1a1f30', trim: '#c8d0ff' }, emblem: 'bolt', strength: 77 },
+    { id: 'suwon',    name: '수원 성곽',      short: '수원', division: 1, kit: { shirt: '#8a2f3f', shorts: '#f2e8d2', trim: '#ffc8cf' }, emblem: 'crown', strength: 75 },
+    { id: 'incheon',  name: '인천 항로',      short: '인천', division: 1, kit: { shirt: '#1f6f9e', shorts: '#0e1e28', trim: '#a8e2ff' }, emblem: 'wave', strength: 72 },
+    { id: 'jeju',     name: '제주 바람',      short: '제주', division: 1, kit: { shirt: '#3b8a3f', shorts: '#f2e8d2', trim: '#cff5c0' }, emblem: 'star', strength: 78 },
+    { id: 'busan',    name: '부산 갈매기',    short: '부산', division: 1, kit: { shirt: '#2a5f9e', shorts: '#f2e8d2', trim: '#ffe9a8' }, emblem: 'wave', strength: 79 },
+    { id: 'hanseong', name: '한성 레전드',    short: '한성', division: 1, kit: { shirt: '#1f2430', shorts: '#c8a83a', trim: '#ffd34d' }, emblem: 'crown', strength: 92 },
+    { id: 'hwangto',  name: '황토 유나이티드', short: '황토', division: 1, kit: { shirt: '#7a4b2a', shorts: '#f2e8d2', trim: '#e8c9a0' }, emblem: 'claw', strength: 80 },
+    { id: 'sejong',   name: '세종 하모니',    short: '세종', division: 1, kit: { shirt: '#2a4f8a', shorts: '#f0e6cc', trim: '#b8d0ff' }, emblem: 'crown', strength: 74 },
+    { id: 'gwangju',  name: '광주 빛고을',    short: '광주', division: 1, kit: { shirt: '#d08a1e', shorts: '#1b2a20', trim: '#ffe3a8' }, emblem: 'flame', strength: 73 },
+    { id: 'namhae',   name: '남해 청람',      short: '남해', division: 1, kit: { shirt: '#1f7a7a', shorts: '#f2e8d2', trim: '#a8f0e8' }, emblem: 'wave', strength: 76 },
+    { id: 'yangyang', name: '양양 서핑',      short: '양양', division: 1, kit: { shirt: '#0f6f9e', shorts: '#12222c', trim: '#b0e8ff' }, emblem: 'wave', strength: 75 },
+    { id: 'chungju',  name: '충주 호수',      short: '충주', division: 1, kit: { shirt: '#3a5fbf', shorts: '#f2e8d2', trim: '#c8d8ff' }, emblem: 'moon', strength: 77 },
+    { id: 'andong',   name: '안동 하회',      short: '안동', division: 1, kit: { shirt: '#8a2f2f', shorts: '#241414', trim: '#ffc0b0' }, emblem: 'moon', strength: 81 },
+    { id: 'pohang',   name: '포항 제철',      short: '포항', division: 1, kit: { shirt: '#b8461e', shorts: '#1a1512', trim: '#ffd0a0' }, emblem: 'bolt', strength: 83 },
+    { id: 'changwon', name: '창원 기계',      short: '창원', division: 1, kit: { shirt: '#4a4f7a', shorts: '#1a1c2c', trim: '#c8ccf0' }, emblem: 'ball', strength: 78 },
+    { id: 'ilsan',    name: '일산 호수',      short: '일산', division: 1, kit: { shirt: '#2f8f62', shorts: '#12241c', trim: '#b6f0cf' }, emblem: 'star', strength: 84 },
+    /* ── 2부 리그 (20팀 · 우리 구단 포함) ── */
+    { id: 'hangang',  name: '한강 FC',        short: '한강', division: 2, kit: { shirt: '#2a7a45', shorts: '#20301f', trim: '#c8ecc0' }, emblem: 'wave', strength: 69 },
+    { id: 'cheongchun', name: '청춘 FC',      short: '청춘', division: 2, kit: { shirt: '#c85a1e', shorts: '#2b2622', trim: '#ffd8a8' }, emblem: 'flame', strength: 66 },
+    { id: 'byeolbit', name: '별빛 레인저스',  short: '별빛', division: 2, kit: { shirt: '#6a34c0', shorts: '#241634', trim: '#dcc8f8' }, emblem: 'star', strength: 71 },
+    { id: 'baekho',   name: '백호 유나이티드', short: '백호', division: 2, kit: { shirt: '#1b7f88', shorts: '#f2e8d2', trim: '#b0eef2' }, emblem: 'moon', strength: 68 },
+    { id: 'seorak',   name: '설악 FC',        short: '설악', division: 2, kit: { shirt: '#2c6fa8', shorts: '#14202c', trim: '#bfe0ff' }, emblem: 'claw', strength: 70 },
+    { id: 'haeundae', name: '해운대 웨이브',  short: '해운대', division: 2, kit: { shirt: '#197f8c', shorts: '#f2e8d2', trim: '#b6f0f4' }, emblem: 'wave', strength: 67 },
+    { id: 'mudeung',  name: '무등 산악',      short: '무등', division: 2, kit: { shirt: '#b8461e', shorts: '#241a14', trim: '#ffcf9e' }, emblem: 'flame', strength: 65 },
+    { id: 'daegu',    name: '대구 열매',      short: '대구', division: 2, kit: { shirt: '#c07a12', shorts: '#241a10', trim: '#ffe0a8' }, emblem: 'ball', strength: 70 },
+    { id: 'taebaek',  name: '태백 정상',      short: '태백', division: 2, kit: { shirt: '#5c6b3a', shorts: '#1d2418', trim: '#e6f0bc' }, emblem: 'claw', strength: 66 },
+    { id: 'gimpo',    name: '김포 바람개비',  short: '김포', division: 2, kit: { shirt: '#c8a83a', shorts: '#1d2418', trim: '#fff0b8' }, emblem: 'star', strength: 63 },
+    { id: 'paju',     name: '파주 헤이리',    short: '파주', division: 2, kit: { shirt: '#7a5cc0', shorts: '#1e1830', trim: '#d8c8ff' }, emblem: 'ball', strength: 61 },
+    { id: 'wonju',    name: '원주 치악',      short: '원주', division: 2, kit: { shirt: '#2f6f4a', shorts: '#f2e8d2', trim: '#b8e8c8' }, emblem: 'claw', strength: 64 },
+    { id: 'gunsan',   name: '군산 항구',      short: '군산', division: 2, kit: { shirt: '#1f5f8a', shorts: '#0e1e28', trim: '#a8d8f0' }, emblem: 'wave', strength: 60 },
+    { id: 'mokpo',    name: '목포 갯바람',    short: '목포', division: 2, kit: { shirt: '#3f8a7a', shorts: '#12241f', trim: '#aef0e0' }, emblem: 'wave', strength: 58 },
+    { id: 'jecheon',  name: '제천 한방',      short: '제천', division: 2, kit: { shirt: '#8a6a2f', shorts: '#241c10', trim: '#f0dca8' }, emblem: 'moon', strength: 62 },
+    { id: 'sokcho',   name: '속초 설악',      short: '속초', division: 2, kit: { shirt: '#2c5f8a', shorts: '#f2e8d2', trim: '#c0e0ff' }, emblem: 'claw', strength: 66 },
+    { id: 'boryeong', name: '보령 머드',      short: '보령', division: 2, kit: { shirt: '#5c4a3a', shorts: '#1d1814', trim: '#d8c0a0' }, emblem: 'ball', strength: 59 },
+    { id: 'tongyeong', name: '통영 한산',     short: '통영', division: 2, kit: { shirt: '#2f7a8a', shorts: '#10202a', trim: '#b0e8f0' }, emblem: 'crown', strength: 65 },
+    { id: 'sancheon', name: '산청 지리산',    short: '산청', division: 2, kit: { shirt: '#4a7a2f', shorts: '#f2e8d2', trim: '#d0f0a0' }, emblem: 'moon', strength: 57 }
   ];
   DS.TEAMS = TEAMS;
+  /* 소속 리그별 팀 목록 (우리 구단 'me'는 game.js 상태가 들고 있다) */
+  DS.teamsOf = function (division) {
+    var out = [], i;
+    for (i = 0; i < TEAMS.length; i++) { if ((TEAMS[i].division || 1) === division) { out.push(TEAMS[i]); } }
+    return out;
+  };
 
   var EMBLEMS = [
     { id: 'flame', name: '불꽃' }, { id: 'star', name: '별' },
@@ -1451,24 +1653,38 @@
     return style + '형 ' + best;
   }
 
+  /* ── v22 — 새 게임 초기 1군 18명 (선발 11 + 벤치 7)을 동(브론즈) 등급으로 ──
+     2부 리그 출발에 맞춰 OVR 52~64 · 팀 전력 58~62 수준으로 맞춘다.
+     [스피드, 테크닉, 파워]를 직접 지정해 등급 기본값(3~5)의 운빨을 없앤다. */
+  var INITIAL_ROLES = ['GK', 'CB', 'CB', 'LB', 'RB', 'DM', 'CM', 'AM', 'LWF', 'ST', 'RWF',
+                       'GK', 'CB', 'LB', 'DM', 'CM', 'AM', 'ST'];
+  var INITIAL_STATS = [
+    [5, 5, 6], [5, 5, 5], [5, 4, 5], [5, 5, 4], [5, 5, 4], [4, 5, 5], [5, 5, 5],
+    [5, 6, 4], [6, 5, 4], [6, 6, 5], [6, 4, 4],
+    [4, 4, 5], [4, 4, 5], [5, 4, 4], [4, 5, 4], [4, 5, 4], [5, 5, 4], [5, 4, 5]
+  ];
   function makeInitialSquad() {
-    var squad = [];
-    var roles = ['GK', 'CB', 'CB', 'LB', 'RB', 'DM', 'CM', 'AM', 'LWF', 'ST', 'RWF', 'CB', 'DM', 'CM', 'GK', 'ST'];
-    var i;
-    for (i = 0; i < roles.length; i++) {
-      var r;
-      if (roles[i] === 'GK') { r = 'eun'; }
-      else if (i < 11) { r = chance(0.4) ? 'geum' : 'eun'; }
-      else { r = chance(0.5) ? 'dong' : 'eun'; }
-      var p = makePlayer({ pos: roles[i], rarity: r });
+    var squad = [], i, st, p;
+    for (i = 0; i < INITIAL_ROLES.length; i++) {
+      p = makePlayer({ pos: INITIAL_ROLES[i], rarity: 'dong' });
+      p.rarity = 'dong';
+      st = INITIAL_STATS[i] || [5, 5, 5];
+      p.s = st[0]; p.t = st[1]; p.p = st[2];
+      p.pot = Math.min(78, ratingOf(p) + 10);
       if (i === 9) {
-        p.name = '차도훈'; p.rarity = 'geum'; p.s = 8; p.t = 8; p.p = 5;
-        p.trait = 'clutch'; p.stats = statSheet(p); p.nickname = '마지막 한 방';
+        p.name = '차도훈'; p.trait = 'clutch'; p.nickname = '마지막 한 방';
       }
       if (i === 0) {
-        p.name = '한지호'; p.s = 6; p.t = 6; p.p = 8; p.pos = 'GK';
-        p.apt = makeAptitude('GK', p.foot); p.stats = statSheet(p);
+        p.name = '한지호'; p.nickname = '우리 골문의 마지막 벽';
       }
+      p.apt = makeAptitude(p.pos, p.foot);
+      /* 동 등급 신인 — 포지션 적성도 아직 낮다 (기본값의 45% 수준, 2~6) */
+      var ak;
+      for (ak in p.apt) {
+        if (p.apt.hasOwnProperty(ak)) { p.apt[ak] = clamp(Math.round(p.apt[ak] * 0.45), 2, 6); }
+      }
+      p.stats = statSheet(p);
+      p.role = null;
       squad.push(p);
     }
     DS.assignUniquePics(squad);

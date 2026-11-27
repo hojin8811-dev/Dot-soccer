@@ -1,12 +1,12 @@
-/*! 도트싸커 v21 — 프리미어리그 20팀 38라운드 · 이적시장 · 유소년 아카데미 · 경기 EXP 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v21-20261127b';
+/*! 도트싸커 v22 — 1부·2부 리그 승격/강등 · 벤치 7명 · 전술 카드 일러스트 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v22-20261127a';
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=21&b=8', './js/data.js?v=21&b=8', './js/match.js?v=21&b=8', './js/game.js?v=21&b=8',
+        './css/style.css?v=22&b=9', './js/data.js?v=22&b=9', './js/match.js?v=22&b=9', './js/game.js?v=22&b=9',
         './assets/hero-banner.jpg', './assets/stadium-pitch.png'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

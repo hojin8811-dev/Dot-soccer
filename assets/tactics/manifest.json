@@ -1,0 +1,4 @@
+{
+  "_comment": "assets/tactics/{cardId}.webp 를 추가하고 여기에 cardId를 적으면 게임이 그 이미지를 먼저 표시합니다. 목록에 없으면 내장 SVG 일러스트로 그립니다.",
+  "images": []
+}
