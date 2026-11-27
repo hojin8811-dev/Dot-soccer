@@ -57,13 +57,13 @@
      v30 — 기본 프레임을 1.035 → 1.15로 당기고(중계뷰), 선수 원은 13% 축소해
      화면상 얼굴 크기는 v29와 같게 두면서 선수 간 간격·피치 공간감을 넓혔다.
      전체뷰(토글)는 줌 1.0으로 전술 전체 배치를 한눈에 본다. */
-  var CAM_Z0 = 1.15;                                        /* v30 잔존값 — viewState 호환용 */
+  var CAM_Z0 = 1.55;                                        /* v32b — 중계뷰 1.35× 줌 반영(128/95×1.15) */
   var CAM_Z_FULL = 1.0;
   var CAM_Z_CHANCE = 1.20;
   var cam = { x: W / 2, y: H / 2, z: CAM_Z0 };              /* v31 UI 호환용 (실제 시점은 DS.Q) */
   /* v31 — 쿼터뷰 3D 카메라 (DS.Q). 거리 = 시점에서 시선 목표까지(m) */
   var QV = global.DS.Q;
-  var CAM_D_BASE = 128, CAM_D_CHANCE = 110, CAM_D_GOAL = 116, CAM_D_FULL = 205;
+  var CAM_D_BASE = 94, CAM_D_CHANCE = 81, CAM_D_GOAL = 85, CAM_D_FULL = 205;   /* v32b — 중계뷰 1.35× 줌인(128/110/116 → 94/81/85) */
   var PLAYER_K = 1.16;                                      /* 치비 전신 스프라이트 크기 배율 */
   var camMode = 'broadcast';                                /* v30 — 'broadcast' | 'full' */
   var slowmo = { t: 0, t0: 0, k: 1 };                       /* v30 — 골 순간 짧은 슬로우 모션 */
@@ -1676,6 +1676,7 @@
     var qs = QV.state();
     return {
       mode: camMode, zoom: Math.round((CAM_D_BASE / Math.max(1, qs.dist)) * 1000) / 1000,
+      zoomAbs: Math.round((128 / Math.max(1, qs.dist)) * 1000) / 1000,   /* v32b — v32(128m) 기준 절대 줌 */
       zoomBase: 1, zoomFull: Math.round((CAM_D_BASE / CAM_D_FULL) * 1000) / 1000,
       camX: Math.round(qs.tx), camY: Math.round(qs.tz), dist: qs.dist,
       tokenScale: tokenScale(), viewW: Math.round(qs.dist), viewH: qs.fov || 0, ppm: qs.ppm
@@ -2964,6 +2965,7 @@
     if (play.phase === 'setpiece' && p.setPos) { spd *= 2.2; }
     var dx = p.tx - p.x, dy = p.ty - p.y;
     var d = Math.hypot(dx, dy);
+    var ox = p.x, oy = p.y;                    /* v32b — 이번 프레임 실제 이동량 측정용 */
     if (d > 0.35) {
       var step = Math.min(d, spd * dt);
       p.vx = (dx / d) * spd;
@@ -2971,8 +2973,6 @@
       p.x += (dx / d) * step;
       p.y += (dy / d) * step;
       p.phase += dt * (6.4 + spd * 0.26) * Math.min(1.35, d / 3 + 0.55);
-      /* v32 — 관절 리그 걸음 위상: 실제 이동 속도에 연동된 연속 위상 */
-      p.gait = (p.gait || 0) + dt * (2.35 + spd * 0.42) * Math.min(1.25, Math.hypot(p.vx, p.vy) / 6 + 0.55);
       p.frame = Math.floor(p.phase) % 4;
       if (Math.abs(dx) > 0.4) { p.facing = dx > 0 ? 1 : -1; }
       p.moving = true;
@@ -2995,12 +2995,30 @@
         }
       }
       p.dustT = (p.dustT || 0) + dt;
-      if (spd > 11.4 && p.dustT > 0.12) { p.dustT = 0; fxDust(p, 1, 0.75); }
+      if (spd > 12.6 && p.dustT > 0.15) { p.dustT = 0; fxDust(p, 1, 0.6); }
     } else {
       p.vx = 0; p.vy = 0; p.moving = false; p.frame = 0; p.speed = 0;
     }
     p.x = clamp(p.x, 2, WORLD_W - 2);
     p.y = clamp(p.y, 2, WORLD_H - 2);
+
+    /* ── v32b — 걸음 위상은 '실제로 움직인 거리'로 적분한다 ──
+       v32는 목표 속도(spd)로 위상을 적분해, 목표 지점에 다가가 몸이 거의 멈춘 순간에도
+       다리가 전속력으로 헛돌았다(발 헛돌기·스케이트). 이제 한 걸음(위상 π)마다 S 월드 단위를
+       나아가도록 거리로 적분하고, 속도가 빠를수록 보폭 S가 길어진다. */
+    var moved = Math.hypot(p.x - ox, p.y - oy);
+    var vAct = dt > 0 ? moved / dt : 0;
+    p.gaitV = vAct;
+    if (vAct > 0.15) {
+      var strideW = 2.3 + vAct * 0.15;
+      var g0 = p.gait || 0;
+      p.gait = g0 + Math.PI * (moved / strideW);
+      /* 발을 딛는 타이밍(위상 kπ)마다 잔디 먼지 톡톡 — 달릴 때만, 공중에 뜬 포즈는 제외 */
+      if (vAct > 6.2 && !p.stun && p.pose !== 'tackle' && p.pose !== 'dive' && p.pose !== 'jump'
+          && Math.floor(p.gait / Math.PI) !== Math.floor(g0 / Math.PI)) {
+        fxDust(p, 1, 0.34 + 0.28 * Math.min(1, vAct / 16));
+      }
+    }
 
     /* v32 — 급턴: 진행 방향이 크게 꺾이는 순간 발밑에 잔디 먼지가 튄다 */
     if (p.moving && p.vx != null && p._pvx != null) {
@@ -7342,34 +7360,21 @@
       }
     } else if (p._diveSeen) { p._diveSeen = 0; }
 
-    /* ── 발밑 접지 그림자 (v32 — 공중으로 뜰수록 작고 옅어진다) ── */
+    /* ── 발밑 접지 그림자 (v32b — 발바닥 바로 아래에 진하게 붙는 접지 그림자) ──
+       v32b: 발밑 파랑/빨강 네온 링(ringCol·ringGlow)은 완전히 제거했다.
+       팀 구분은 유니폼 색으로 충분하고, 공 소유자는 머리 위 ▼ 마커로 표시한다. */
+      var lift = air * SPR_H * PLAYER_K * gs * 0.42;   /* 점프·다이빙·헤딩으로 뜬 화면 오프셋 */
     if (RIG) {
-      RIG.shadow(ctx, gx + slideX * 0.45, gy + Math.max(0.6, gs * 1.2), bw * 0.42, Math.max(1.6, bw * 0.16), air);
+      RIG.shadow(ctx, gx + slideX * 0.38, gy + Math.max(0.3, gs * 0.5), bw * 0.37, Math.max(1.4, bw * 0.132), air);
     } else {
       ctx.save();
-      ctx.globalAlpha = 0.40 - air * 0.16;
+      ctx.globalAlpha = 0.58 - air * 0.26;
       ctx.fillStyle = '#02110c';
       ctx.beginPath();
-      ctx.ellipse(gx + slideX * 0.4, gy + Math.max(1, gs * 1.4), bw * 0.34, Math.max(1.6, bw * 0.115), 0, 0, PI2);
+      ctx.ellipse(gx + slideX * 0.4, gy + Math.max(0.8, gs * 1.0), bw * 0.32, Math.max(1.5, bw * 0.105), 0, 0, PI2);
       ctx.fill();
       ctx.restore();
     }
-
-    /* ── 피아 식별 링 (발밑) — v32: shadowBlur 대신 2겹 스트로크(같은 발광, 훨씬 빠르다) ── */
-    ctx.save();
-    var ringCol = p.side === 'home' ? 'rgba(90,175,255,0.95)' : 'rgba(255,96,96,0.95)';
-    var ringGlow = p.side === 'home' ? 'rgba(70,150,255,0.30)' : 'rgba(255,80,80,0.30)';
-    ctx.beginPath();
-    ctx.ellipse(gx, gy, bw * 0.40, bw * 0.155, 0, 0, PI2);
-    ctx.strokeStyle = ringGlow;
-    ctx.lineWidth = Math.max(2.6, bw * 0.085);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse(gx, gy, bw * 0.40, bw * 0.155, 0, 0, PI2);
-    ctx.strokeStyle = ringCol;
-    ctx.lineWidth = Math.max(1.3, bw * 0.032);
-    ctx.stroke();
-    ctx.restore();
 
     /* ── v32 — 60fps 관절 리그 본체 (머리·몸통·양팔·양다리 분리 렌더) ── */
     if (RIG) {
@@ -7378,9 +7383,10 @@
       var ru = 0, rdur = p.poseD || 0;
       if (pose === 'dive') { ru = clamp(1 - p.diveT / Math.max(0.01, p.diveD || 0.7), 0, 1); }
       else if (p.pose === pose && rdur > 0) { ru = clamp(1 - p.poseT / rdur, 0, 1); }
-      var spdN = clamp((p.speed || 0) / 17.5, 0, 1);
+      /* v32b — 다리 스윙 세기는 '실제로 움직인 속도'를 따른다(목표에 붙을 때 헛도는 현상 방지) */
+      var spdN = clamp((p.gaitV != null ? p.gaitV : (p.speed || 0)) / 17.5, 0, 1);
       RIG.draw(ctx, {
-        type: rtype, x: gx + slideX, y: gy - air * SPR_H * PLAYER_K * gs * 0.42,
+        type: rtype, x: gx + slideX, y: gy - lift,
         scale: scale, face: face, pose: pose, u: ru,
         gait: p.gait || 0, speedN: spdN, t: t
       });
@@ -7393,24 +7399,8 @@
       ctx.restore();
     }
 
-    /* ── 공 소유자 — 시안/골드 펄스 링 ── */
-    if (isCarrier) {
-      var pz = 0.5 + 0.5 * Math.sin(t * 6.2);
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(gx, gy, bw * (0.52 + 0.05 * pz), bw * (0.20 + 0.02 * pz), 0, 0, PI2);
-      ctx.strokeStyle = 'rgba(120,242,255,' + (0.55 + 0.30 * pz) + ')';
-      ctx.lineWidth = Math.max(1.2, bw * 0.03);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(gx, gy, bw * (0.60 + 0.07 * pz), bw * (0.235 + 0.028 * pz), 0, 0, PI2);
-      ctx.strokeStyle = 'rgba(255,222,126,' + (0.30 + 0.35 * pz) + ')';
-      ctx.lineWidth = Math.max(1.2, bw * 0.035);
-      ctx.shadowColor = 'rgba(255,214,90,0.9)';
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.restore();
-    }
+    /* ── 공 소유자 표시는 공 위 ▼ 마커(drawMatchBall) + 이름표가 맡는다.
+       v32b: 발밑 시안/골드 펄스 링은 링 제거 요청에 따라 없앴다. ── */
 
     /* ── 카드·특기 발동 금빛 링 ── */
     if (p.skillT > 0 || p.glow > 0) {
@@ -8219,6 +8209,9 @@
         head: (function () { var hrec = heads[(p.player && p.player.pic) || 1]; return hrec && hrec.ready ? 'loaded' : 'pending'; })(),
         tx: Math.round(p.tx), ty: Math.round(p.ty), kind: p.kind,
         pose: poseOf(p), moving: !!p.moving, support: !!(p.supportT > 0), run: !!(p.runT > 0),
+        /* v32b — 걸음 위상 QA: gait(위상)와 실제 지면 속도(gaitV) — 발 헛돌기(위상만 도는) 판정용 */
+        gait: Math.round((p.gait || 0) * 1000) / 1000, gaitV: Math.round((p.gaitV || 0) * 100) / 100,
+        fx: Math.round(p.x * 100) / 100, fy: Math.round(p.y * 100) / 100,
         stam: Math.round(p.stam), tokenR: Math.round(SPR_H * scr(p.x, p.y).s * TOKEN_R * tokenScale() * 10) / 10,
         ring: p.side === 'home' ? TEAM_FX.home.ring : TEAM_FX.away.ring, gk: isGK(p),
         carrier: ball.carrier === p, ringColor: (p.side === 'home' ? 'blue' : 'red'),

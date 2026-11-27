@@ -136,11 +136,11 @@
     var headTilt = 0;
 
     /* 기본 달리기/걷기 — 위상(gait)에 따른 역위상 스윙 */
-    var amp = 0.20 + 0.44 * sn;
+    var amp = 0.22 + 0.50 * sn;
     var sw = Math.sin(gait);
     thN = amp * sw;
     thF = -amp * sw;
-    var kAmp = 0.22 + 0.62 * sn;
+    var kAmp = 0.24 + 0.66 * sn;
     flexN = 0.10 + kAmp * (0.5 - 0.5 * Math.cos(gait - 0.7));
     flexF = 0.10 + kAmp * (0.5 - 0.5 * Math.cos(gait + Math.PI - 0.7));
     var aAmp = 0.22 + 0.46 * sn;
@@ -148,8 +148,10 @@
     armFa = 0.08 + aAmp * sw;
     elbN = 0.45 + 0.55 * sn;
     elbF = 0.45 + 0.55 * sn;
-    bob = (0.6 + 2.6 * sn) * Math.cos(2 * gait);
-    headPitch = -lean * 0.5 - (0.015 + 0.04 * sn) * Math.cos(2 * gait);
+    /* v32b — 발을 딛는 순간(위상 kπ)에 몸이 꿀렁 내려앉는 2배 위상 바운스.
+       기본 코사인에 4배 위상 항을 더해 디딤-반동 리듬을 살짝 눌러 준다. */
+    bob = (1.0 + 5.0 * sn) * (Math.cos(2 * gait) - 0.16 * Math.cos(4 * gait));
+    headPitch = -lean * 0.5 - (0.015 + 0.045 * sn) * Math.cos(2 * gait);
 
     if (pose === 'idle' || pose === 'dribble') {
       var br = Math.sin(t * 2.05);
@@ -232,6 +234,9 @@
     }
 
     /* ── 관절 좌표 ── */
+    /* v32b — 달릴 때는 상체를 살짝 내려 발바닥이 잔디에 닿게 한다(그림자가 떠 보이지 않도록) */
+    if (pose === 'run') { hipY += 2.6 + 2.0 * sn; }
+    else if (pose === 'idle' || pose === 'dribble') { hipY += 1.2; }
     var hip = { x: 0, y: hipY };
     var shN = add(hip, rot({ x: 15.2, y: SH_Y - HIP_Y + 1 }, lean), 1);
     var shF = add(hip, rot({ x: -13.2, y: SH_Y - HIP_Y + 1 }, lean), 1);
@@ -263,7 +268,8 @@
   }
 
   /* ───────────────── 그리기 ───────────────── */
-  /* 접지 그림자 — 방사형 그라데이션을 한 번만 만들어 두고 스케일해서 쓴다(매 프레임 생성 비용 제거) */
+  /* 접지 그림자 — 방사형 그라데이션을 한 번만 만들어 두고 스케일해서 쓴다(매 프레임 생성 비용 제거)
+     v32b — 중심은 진하고(0.58~0.65) 가장자리는 빨리 사라지게: 발바닥 바로 아래에 딱 붙는 그림자 */
   var shadowSpr = null;
   function shadowSprite() {
     if (shadowSpr) { return shadowSpr; }
@@ -271,9 +277,11 @@
     c.width = 64; c.height = 64;
     var x = c.getContext('2d');
     var gd = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gd.addColorStop(0, 'rgba(2,14,10,1)');
-    gd.addColorStop(0.55, 'rgba(2,14,10,0.62)');
-    gd.addColorStop(1, 'rgba(2,14,10,0)');
+    gd.addColorStop(0, 'rgba(2,13,9,1)');
+    gd.addColorStop(0.42, 'rgba(2,13,9,0.88)');
+    gd.addColorStop(0.68, 'rgba(2,13,9,0.44)');
+    gd.addColorStop(0.88, 'rgba(2,13,9,0.12)');
+    gd.addColorStop(1, 'rgba(2,13,9,0)');
     x.fillStyle = gd;
     x.beginPath(); x.arc(32, 32, 32, 0, TAU); x.fill();
     shadowSpr = c;
@@ -506,12 +514,13 @@
     loadHead: loadHead,
     setHeadBase: function (p) { HEAD_BASE = p; },
     shadow: function (ctx, x, y, w, h, air) {
-      /* 발밑 접지 그림자 — 공중으로 뜰수록 작아지고 옅어진다 */
-      var k = clamp(1 - (air || 0) * 0.5, 0.5, 1);
-      var a = clamp(0.40 - (air || 0) * 0.24, 0.10, 0.40);
+      /* 발밑 접지 그림자 — 공중으로 뜰수록 작아지고 옅어진다 (v32b: 지면 중심 alpha ≈0.62) */
+      var a0 = air || 0;
+      var k = clamp(1 - a0 * 0.42, 0.56, 1);
+      var a = clamp(0.66 - a0 * 0.38, 0.14, 0.66);
       var spr = shadowSprite();
       ctx.save();
-      ctx.globalAlpha = a / 0.40 * 0.92;
+      ctx.globalAlpha = a;
       ctx.drawImage(spr, x - w * k, y - h * k, w * 2 * k, h * 2 * k);
       ctx.restore();
     }
