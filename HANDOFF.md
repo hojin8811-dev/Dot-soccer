@@ -308,15 +308,17 @@ v39b 확인값 (2026-11-28, 로컬 Playwright Chromium 844×390 · `?v=39&b=40`)
 | --- | --- |
 | 성장 상수 | `expToNext` 4700/15450/26200/47700 · `LEVEL_GAIN` 0.38 · `RESERVE_LEVEL_GAIN` 0.46 · `TRAIN_GAIN_K` 0.02 · `TRAIN_EXP_SHARE` 0.04 · `RESERVE_KIND_MULT` 0.50 · 훈련 1회 EXP **188** |
 | 성장 페이스 (2-7절) | 유소년 16세 58/85 **R240(6.3시즌)** · 60/85 아카2 **R225** / 아카4 **R243** / 아카5 **R266** · 62/90 **R273(7.2)** · 58/76 **R157** · 일반 22세 58/70 **R130(3.4)** · 24세 70/85 **R180(4.7)** |
-| 실제 세이브 아카데미 성장 (2군 등록·훈련 없음) | 16세 61/80 CM **65→70→73→77→79→80**(21세) · 17세 62/83 RB **67→72→74→76→80** · 17세 61/72 CB **66→71→72**(18세 상한) |
+| 실제 세이브 아카데미 성장 (2군 등록·훈련 없음) | 15세 62/80 LB **67→71→76→78→79→80**(20세 완성) · 15세 56/86 RB **62→67→72→74→76→78**(20세, 8 남음) · 17세 58/73 CB **63→68→71→73**(20세 완성) — 아카데미만으로 **시즌 +4~5** |
 | 새 세이브 1경기 EXP | 출전 11명 **20~109 EXP / 요구 4700** (레벨업 0) — 한 시즌에 약 1레벨 |
 | 상세창 성장 블록 | `레벨 Lv.0 · 성숙기 ×1` · `경기 EXP 98 / 4700 · 누적 98` · `누적 성장 +0 포인트 · 훈련 성장 ×1.23` + `잠재까지 22 남았습니다 — 출전·특훈으로 채우세요` (`preview/v39b/v39b-detail-growth-844x390.png`) |
 | 특훈 3회 (실제 UI 경로) | 토스트 `특훈 콤보 원터치 캐논 · 각성 · 훈련 EXP +188 · 성향 보정 ×1.06` ×3 → EXP 25→**589**, s 2→**2.06**, t 5→**5.18**, 누적 성장 **0.24** (`preview/v39b/v39b-train-844x390.png`) |
 | 90분 완주 (844×390) | **완주** — clock 90 · `phase ended` · running false · **fps 59.8~60.6** · 토큰 22/22 · 3:0 (`preview/v39b/v39b-result-844x390.png`) |
 | v39 기능 회귀 (`v39_smoke.py`·`v39_check.py`) | 카드 **18종**·일러스트 18/18·덱 18행 · 잠재 구간 동68~78/은75~84/금82~88/전설88~94 · 교체 배너+컷인+subLog · 신규 카드 6종 `qaCard` true · 세로 회전 안내 · 90분 완주 · **오류 0** |
 | 오류 | `window.__DS_ERRS` **0** · pageerror **0** (콘솔 404는 sparse 체크아웃의 `icons/` 1건) |
+| **라이브** (`?v=39&b=40`, 844×390) | 상수 `expToNext` 4700/26200 · `LEVEL_GAIN` 0.38 · `RESERVE_KIND_MULT` 0.50 · `TRAIN_EXP_SHARE` 0.04 · 카드 18종 · 훈련 EXP 188 → **90분 완주**(clock 90 · ended) · **fps 60.2~60.3** · 상세창 `경기 EXP 73 / 4700` · 세로 회전 안내 · **오류 0 · 콘솔 0 · HTTP 4xx 0** · `data.js?v=39&b=40`·`game.js`·`match.js`·`style.css` **200** (`preview/v39b/v39b-live-result-844x390.png`·`v39b-live-detail-844x390.png`) |
+| 라이브 배포 | push → **40초** 만에 `data.js` md5 `e729c371…` 일치 · `sw.js` 캐시 `dot-soccer-v39b-20261128` |
 
-스크린샷: `preview/v39b/` — `v39b-result-844x390.png` · `v39b-detail-growth-844x390.png` · `v39b-train-844x390.png`
+스크린샷: `preview/v39b/` — `v39b-result-844x390.png` · `v39b-detail-growth-844x390.png` · `v39b-train-844x390.png` · `v39b-live-result-844x390.png` · `v39b-live-detail-844x390.png`
 
 스크린샷: `preview/v39/` — `v39-sub-cutin-844x390.png` · `v39-card-overlay-844x390.png` · `v39-deck-844x390.png` · `v39-potgauge-844x390.png` · `v39-result-844x390.png` · `v39-rotate-390x844.png` · `v39-newseason-0r-844x390.png`
 스크린샷: `preview/v38b/` — `v38b-squad-844x390.png` · `v38b-squad-915x412.png` · `v38b-squad-right-844x390.png` · `v38b-match-844x390.png` · `v38b-ball-zoom-844x390.png` · `v38b-result-844x390.png` · `v38b-rotate-390x844.png` · `v38b-before-squad-844x390.png`(수정 전)
@@ -356,6 +358,7 @@ v39b 확인값 (2026-11-28, 로컬 Playwright Chromium 844×390 · `?v=39&b=40`)
 | `scripts/v38_*.py` · `scripts/v38b_*.py` | v38 검증 하네스 4종 + v38b 5종 | — |
 | `scripts/v39b_pace.py` | **v39b 성장 페이스 계측** — 시즌(38R) 단위로 나이·유소년 배율·훈련을 함께 굴려 잠재 도달 라운드/시즌을 잽다. `--cfg` 로 상수 덮어쓰기, `--grid` 로 후보 격자 탐색 | — |
 | `scripts/v39b_check.py` | **v39b 검증** — 상수 · 새 세이브 유소년 6시즌 실제 성장 · 90분 완주 · 상세창 성장 블록 · 특훈 3회 체감 | — |
+| `scripts/v39b_live.py` | **v39b 라이브 검증** — `?v=39&b=40` 상수·90분 완주·상세창·회전·오류/4xx (기본 URL이 라이브) | — |
 | `preview/v39b/` | v39b 스크린샷(결과서 · 상세창 성장 · 특훈) | — |
 | `preview/v38/` · `preview/v38b/` | v38 · v38b 스크린샷 | — |
 

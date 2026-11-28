@@ -117,6 +117,17 @@ try:
           requestAnimationFrame(tick);
         })""")
         pg.wait_for_timeout(900)
+        pg.evaluate("""() => {
+          const ov = document.getElementById('m-overlay');
+          if (ov) { ov.classList.remove('on'); ov.innerHTML = ''; }
+          const S = DS.game.state();
+          if (S.lastReport) { DS.game.showReport(S.lastReport); }
+          ['m-overlay', 'm-advice'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && id === 'm-overlay') { el.classList.remove('on'); el.innerHTML = ''; }
+          });
+        }""")
+        pg.wait_for_timeout(800)
         pg.screenshot(path=f'{OUT}/v39b-result-844x390.png')
         res['expReport'] = pg.evaluate("""() => {
           const S = DS.game.state();
