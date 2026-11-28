@@ -7536,7 +7536,7 @@
      양복 차림 감독이 파 포스트 옆 기술 구역에 서서 경기를 지켜본다.
      공이 공격 3분의 1에 들어오면 지시(point), 우리 팀 득점 직후엔 만세(cheer),
      위기엔 외침(shout) — 시뮬레이션에는 전혀 관여하지 않는다. */
-  var coach = { kind: 'coach', x: 98.6, y: 58, px: 98.6, py: 58, gait: 0, dirView: 'down', face: 1, moving: false, _look: null, pose: 'idle', cheerT: 0, _lastHome: 0 };
+  var coach = { kind: 'coach', x: 98.8, y: 88, px: 98.8, py: 88, gait: 0, dirView: 'down', face: 1, moving: false, _look: null, pose: 'idle', cheerT: 0, _lastHome: 0 };
 
   function updateCoach(dt) {
     if (!PX) { return; }
