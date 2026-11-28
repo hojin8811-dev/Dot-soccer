@@ -177,7 +177,8 @@
   var cautions = [];
   var possession = { home: 0.001, away: 0.001 };
   var halfScore = [[0, 0], [0, 0]];
-  var formFactor = 1;
+  var formFactor = 1;            /* v38b — 홈(우리 팀) 폼 계수 */
+  var formFactorAway = 1;        /* v38b — 원정(AI) 폼 계수 · 같은 곡선을 대칭으로 쓴다 */
   var qaTurbo = false;             /* v33 QA — 검증 하네스에서만 참 */
   /* v33 — 두 팀 선발 평균 OVR 차이(홈 − 원정). 경합·차단·슛 확률과 전술 카드 무게에 반영한다. */
   var powerGap = 0;
@@ -1603,6 +1604,21 @@
   }
 
   /* ─────────────────────────  시작 · 종료  ───────────────────────── */
+  /* v38b — 폼 계수 곡선(양 팀 공용). 기준선은 컨디션 80 · 사기 66 → 정확히 1.0.
+     · 컨디션 70~100: 완만(80 대비 ±1.6% 이내) — 보통 컨디션에서 페널티가 과하지 않게
+     · 컨디션 70 미만: 1점당 -0.4%p (60 → 0.96 · 50 → 0.92 · 40 → 0.88)
+     · 사기: 66 기준 ±0.12%p (40 → -3.1% · 90 → +2.9%)
+     홈은 내 컨디션·사기, 원정은 기본값(80·66 = 1.0)이라 '무조작이면 우리만 손해'가 없다. */
+  function formOf(cond, morale) {
+    var c = (typeof cond === 'number' && isFinite(cond)) ? clamp(cond, 0, 100) : 80;
+    var m = (typeof morale === 'number' && isFinite(morale)) ? clamp(morale, 0, 100) : 66;
+    var f = 1;
+    if (c >= 70) { f += (Math.min(c, 100) - 80) * 0.0008; }
+    else { f -= (70 - c) * 0.004; }
+    f += (m - 66) * 0.0012;
+    return clamp(f, 0.84, 1.08);
+  }
+
   M.start = function (config) {
     cfg = config;
     canvas = document.getElementById('m-pitch');
@@ -1706,9 +1722,13 @@
     renderAlpha = 1;
     mgrFx = cfg.managerFx || {};
     buildHomeMetrics(cfg.homeFormation);
-    formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
-    /* v38 — 라커룸 분위기(사기 + 연승·연패)를 결정력에 반영 (사기 66 = 기준선) */
-    formFactor = clamp(formFactor + ((typeof cfg.morale === 'number' ? cfg.morale : 66) - 66) * 0.0015, 0.90, 1.12);
+    /* v38b — 폼 계수는 **양 팀 대칭**이다. 예전엔 홈에만 0.94~1.12가 붙어
+       컨디션 100이면 정확도 +5%, 컨디션이 바닥이면 -10%까지 벌어졌지만 AI는 항상 1.0이라
+       '무조작으로 두면 우리 팀만 손해'라는 비대칭이 있었다.
+       지금은 같은 곡선을 홈(내 컨디션·사기)과 원정(AI 기본값 = 컨디션 80·사기 66)에 똑같이
+       적용한다. 기준선(80·66)이 정확히 1.0이고, 60~80 구간은 완만하며, 아주 낮을 때만 크게 깎인다. */
+    formFactor = formOf(cfg.condition, cfg.morale);
+    formFactorAway = formOf(cfg.awayCondition, cfg.awayMorale);
     /* v38 — 커스텀 전술 지시값과 라커룸 성향 분포 */
     ctac = {
       line: (cfg.ctac && typeof cfg.ctac.line === 'number') ? clamp(cfg.ctac.line, 0, 100) : 50,
@@ -4196,7 +4216,7 @@
   function shoot(p, dist) {
     var gy = attackGoalY(p.side);
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
-    var acc = 0.50 + p.player.stats.atk / 520 + (p.side === 'home' ? (formFactor - 1) * 0.9 : 0);
+    var acc = 0.50 + p.player.stats.atk / 520 + ((p.side === 'home' ? formFactor : formFactorAway) - 1) * 0.9;
     /* v33 — 팀 전력차가 결정력에 그대로 드러나게 (OVR 1당 0.5%p) */
     acc += gapOf(p.side) * 0.005;
     var qk = qualityK(p.side);
@@ -7258,7 +7278,23 @@
     arrowTo(g.x, g.y, g.x, g.y - s.y * 12, hexA(col, 0.45 * a), 1.2, 5, [4, 4]);
   }
 
-  /* 실제 경기 공 — 일러스트에 그려진 공과 헷갈리지 않게 네온 링·진한 외곽선·그림자 */
+  /* 실제 경기 공 — v38b: 픽셀 사각형 대신 **선명한 클래식 흰 축구공**.
+     예전(v30)엔 지름 16px 안에 6×6 검은 사각형 4개 + 외곽선 24칸을 찍어 공이
+     시커멓게 뭉개졌다. 지금은 밝은 원형 바디(위가 밝은 구(球) 그라데이션) +
+     얇은 진초록 외곽선 + 반지름에 비례하는 가운데 오각형·이음새 + 입체 하이라이트로
+     잔디(짙은 초록)·그림자 위에서도 또렷하게 하얗게 뜬다. 무늬는 공이 구르는
+     위치에 따라 함께 돌아간다(별도 상태 없이 좌표에서 유도). */
+  function ballPenta(cx, cy, rad, rot) {
+    ctx.beginPath();
+    for (var k = 0; k < 5; k++) {
+      var an = rot - Math.PI / 2 + k * TAU / 5;
+      var px2 = cx + Math.cos(an) * rad, py2 = cy + Math.sin(an) * rad;
+      if (k === 0) { ctx.moveTo(px2, py2); } else { ctx.lineTo(px2, py2); }
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawMatchBall(x, y, r, groundY) {
     var hot = ball.kind === 'shot';
     var airborne = ball.z > 0.05;
@@ -7273,46 +7309,63 @@
       ctx.fill();
       ctx.restore();
     }
-    var px = Math.max(1, Math.round(r * 0.34));      /* 픽셀 한 칸 */
-    var R = Math.max(2, Math.round(r));
-    /* 슛 순간만 따뜻한 잔광 (픽셀 톤 유지) */
+    var R = Math.max(3.8, r);
+    /* 구르는 방향으로 도는 무늬 — 좌표에서 유도해 상태를 늘리지 않는다 */
+    var spin = (ball.x * 0.42 + ball.y * 0.26) % TAU;
+    /* 슛 순간만 따뜻한 잔광 (부드러운 원) */
     if (hot) {
       ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = 'rgba(255,214,110,0.55)';
-      ctx.beginPath(); ctx.arc(x, y, R * 1.9, 0, Math.PI * 2); ctx.fill();
+      var hg = ctx.createRadialGradient(x, y, R * 0.4, x, y, R * 2.2);
+      hg.addColorStop(0, 'rgba(255,224,130,0.62)');
+      hg.addColorStop(1, 'rgba(255,150,40,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(x, y, R * 2.2, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    /* 흰 공 — 픽셀 원(가로/세로 정수 칸) */
     ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#f4f7f2';
-    for (var yy = -R; yy <= R; yy += px) {
-      var half = Math.sqrt(Math.max(0, R * R - (yy + px * 0.5) * (yy + px * 0.5)));
-      var w2 = Math.round(half / px) * px;
-      ctx.fillRect(x - w2, y + yy, w2 * 2, px);
+    /* ① 바디 — 위·왼쪽이 밝고 아래가 살짝 가라앉는 공 */
+    var bg = ctx.createRadialGradient(x - R * 0.34, y - R * 0.40, R * 0.10, x, y, R * 1.04);
+    bg.addColorStop(0, '#ffffff');
+    bg.addColorStop(0.52, '#f7fbf3');
+    bg.addColorStop(1, '#c9d7c6');
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU);
+    ctx.fillStyle = bg; ctx.fill();
+    /* ② 얇은 외곽선 — 밝은 잔디·그림자 위에서도 윤곽이 선다 */
+    ctx.lineWidth = Math.max(0.85, R * 0.17);
+    ctx.strokeStyle = 'rgba(15,36,25,0.92)';
+    ctx.stroke();
+    /* ③ 무늬 — 공 안쪽만 보이게 클립해 그린다 */
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, R * 0.90, 0, TAU); ctx.clip();
+    /* 가운데 오각형 (작은 공에서는 이것만) */
+    ctx.fillStyle = 'rgba(19,42,30,0.90)';
+    var cr = R * (R >= 6 ? 0.34 : 0.42);
+    ballPenta(x, y, cr, spin);
+    if (R >= 5.4) {
+      /* 이음새 5줄 → 가장자리 오각형 조각 */
+      ctx.strokeStyle = 'rgba(22,46,33,0.66)';
+      ctx.lineWidth = Math.max(0.7, R * 0.09);
+      for (var k = 0; k < 5; k++) {
+        var a = spin + k * TAU / 5;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(a) * cr, y + Math.sin(a) * cr);
+        ctx.lineTo(x + Math.cos(a) * R * 1.1, y + Math.sin(a) * R * 1.1);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(19,42,30,0.86)';
+      for (k = 0; k < 5; k++) {
+        var a3 = spin + k * TAU / 5 + TAU / 10;
+        ballPenta(x + Math.cos(a3) * R * 1.02, y + Math.sin(a3) * R * 1.02, R * 0.30, a3);
+      }
     }
-    /* 외곽선 */
-    ctx.fillStyle = '#12241a';
-    for (var a3 = 0; a3 < 24; a3++) {
-      var th = a3 / 24 * Math.PI * 2;
-      var ex = x + Math.cos(th) * (R - px * 0.2), ey = y + Math.sin(th) * (R - px * 0.2);
-      ctx.fillRect(Math.round(ex / px) * px - px / 2, Math.round(ey / px) * px - px / 2, px, px);
-    }
-    /* 검은 패널 — 가운데 오각 + 주변 3개(회전) */
-    ctx.fillStyle = '#1d2b22';
-    ctx.fillRect(x - px * 1.5, y - px * 0.5, px * 2, px * 2);
-    for (var k = 0; k < 3; k++) {
-      var a2 = simTime * 1.5 + k * Math.PI * 2 / 3;
-      var ox = Math.cos(a2) * R * 0.55, oy = Math.sin(a2) * R * 0.55;
-      ctx.fillRect(Math.round((x + ox) / px) * px - px, Math.round((y + oy) / px) * px - px, px * 2, px * 2);
-    }
-    /* 하이라이트 */
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x - R * 0.55, y - R * 0.62, px, px);
-    ctx.fillRect(x - R * 0.55 + px, y - R * 0.62, px, px);
     ctx.restore();
-    /* 공 위치 표식 — 일러스트에 그려진 공과 헷갈리지 않게 살짝 떠 있는 표식 */
+    /* ④ 입체 하이라이트 — 왼쪽 위 작은 점 */
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.beginPath();
+    ctx.arc(x - R * 0.36, y - R * 0.42, Math.max(0.7, R * 0.18), 0, TAU);
+    ctx.fill();
+    ctx.restore();
+    /* ⑤ 공 위치 표식 — 일러스트에 그려진 공과 헷갈리지 않게 살짝 떠 있는 삼각 표식 */
     if (!hot) {
       var my = y - r * 2.0 - 2 - Math.sin(simTime * 4.2) * 1.2;
       ctx.beginPath();
@@ -8593,7 +8646,7 @@
       /* v29 — 세트피스 대형·전술 상성 QA용 */
       setpiece: play.setpiece ? { type: play.setpiece.type, side: play.setpiece.side, timer: Math.round(play.setpiece.t * 100) / 100 } : null,
       touch: { mentality: touch.mentality, pressing: touch.pressing, line: touch.line, focus: touch.focus },
-      v38: { ctac: ctacState(), lock: { home: lockCount.home, away: lockCount.away }, formFactor: Math.round(formFactor * 1000) / 1000 },
+      v38: { ctac: ctacState(), lock: { home: lockCount.home, away: lockCount.away }, formFactor: Math.round(formFactor * 1000) / 1000, formAway: Math.round(formFactorAway * 1000) / 1000 },
       view: {
         mode: 'landscape', w: W, h: H, sprH: SPR_H, field: field,
         pitchImage: !!(pitchImg && pitchImg.naturalWidth),
@@ -8840,6 +8893,43 @@
 
   /* v33 QA — 빠른 대량 경기 검증용 터보(그리기 생략). 하네스 밖에서는 켜지지 않는다. */
   M.qaTurbo = function (on) { qaTurbo = !!on; return qaTurbo; };
+  /* v38b QA — 공의 화면 좌표(스크린샷 클로즈업용). CSS 픽셀 기준. */
+  M.ballScreen = function () {
+    var bp = scr(ball.x, ball.y), zpx = depthPx(ball.z), rc = canvas.getBoundingClientRect();
+    return {
+      x: Math.round(rc.left + bp.x), y: Math.round(rc.top + bp.y - zpx - Math.max(4.4, W / 108) * 0.35),
+      groundY: Math.round(rc.top + bp.y), z: Math.round(ball.z * 10) / 10,
+      kind: ball.kind, r: Math.round(Math.max(4.4, W / 108) * 100) / 100
+    };
+  };
+  /* v38b QA — 대칭 OVR 무조작 밸런스 측정용 동기 시뮬(하네스 전용).
+     rAF 루프·컷인 정지·하프타임 대기를 건너뛰고 step()만 60Hz로 돌린다.
+     cfg.onHalftime 은 부르지 않으므로 UI 모달이 끼어들지 않는다. 일반 플레이에는 영향 없음. */
+  M.qaSim = function (opts) {
+    opts = opts || {};
+    if (!M.running || M.phase === 'ended') { return null; }
+    var stepDt = 1 / 60;
+    var maxSteps = Math.round((opts.maxMin || 110) * PER_MIN / stepDt);
+    var n = 0;
+    while (M.phase !== 'ended' && n < maxSteps) {
+      if (cutinHold > 0) { cutinHold = 0; }
+      if (M.paused) { M.paused = false; M.halftime = false; }
+      step(stepDt);
+      n += 1;
+    }
+    var pos = possession.home / (possession.home + possession.away) * 100;
+    return {
+      steps: n, clock: Math.round(M.clock * 10) / 10, phase: M.phase,
+      home: M.homeScore, away: M.awayScore,
+      shots: { home: goalStats.homeShots, away: goalStats.awayShots },
+      xg: { home: Math.round(homeXg * 100) / 100, away: Math.round(awayXg * 100) / 100 },
+      poss: Math.round(pos * 10) / 10,
+      formFactor: Math.round(formFactor * 1000) / 1000,
+      formAway: Math.round(formFactorAway * 1000) / 1000,
+      aiShifts: v19t.aiShifts.length,
+      gap: Math.round(powerGap * 10) / 10
+    };
+  };
   /* v35 QA — 양 사이드 활용도 계측: 레인 분포·윙 폭·전환/크로스/컷백/측면 진입 */
   M.v35 = function () {
     var t = v35t.laneTicks.home, tot = t.l + t.c + t.r || 1;
@@ -8985,7 +9075,8 @@
       pressOffset: Math.round(ctacPress() * 10) / 10,
       wing: Math.round(ctacWing() * 100) / 100,
       lock: { home: lockCount.home, away: lockCount.away },
-      formFactor: Math.round(formFactor * 1000) / 1000
+      formFactor: Math.round(formFactor * 1000) / 1000,
+      formAway: Math.round(formFactorAway * 1000) / 1000
     };
   }
   /* v38 QA — 커스텀 전술·성향 계수가 실제 엔진에 들어갔는지 확인하는 프로브 */
@@ -8996,6 +9087,7 @@
       lineY: { home: Math.round(lineYOf('home') * 10) / 10, away: Math.round(lineYOf('away') * 10) / 10 },
       syn: { home: { fight: synOf('home', 'fight'), crea: synOf('home', 'crea'), dev: synOf('home', 'dev'), calm: synOf('home', 'calm') } },
       formFactor: Math.round(formFactor * 1000) / 1000,
+      formAway: Math.round(formFactorAway * 1000) / 1000,
       counts: { n: players.length, recounts: recountN, faceDupes: faceDupes, locks: (function () {
         var o = [], i2, q2; for (i2 = 0; i2 < players.length; i2++) { q2 = players[i2]; o.push(q2.side + ':' + (q2.player && q2.player.lock) + ':' + (q2.player && q2.player.pic)); } return o;
       })() }

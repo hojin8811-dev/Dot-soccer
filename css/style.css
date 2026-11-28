@@ -1369,14 +1369,44 @@ body.rot { overflow: hidden; }
 }
 .sq-card .fchip.anom.on b { color: #241436; }
 .sq-card .fchip.anom.on span { color: #3a2360; opacity: 1; }
-.sq-syn { padding: 5px 9px; }
-.sq-syn .card-head { margin-bottom: 2px; }
-.sq-syn { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow: hidden; }
-.sq-syn .card-head { flex: 0 0 auto; margin: 0; }
-.sq-syn .card-head .meta { display: none; }
-.sq-syn .row { flex: 0 0 auto; padding: 0 !important; }
-.sq-syn .row b { display: none; }
-.sq-syn .chip { font-size: 8px; height: 17px; padding: 0 6px; }
+/* v38b — 라커룸 성향 카드는 일반 카드처럼 세로로 쌓는다.
+   v7 시절의 한 줄 flex(nowrap·overflow:hidden) 규칙이 v38의 .syn-fx 설명과 부딪혀
+   칩이 찌그러지고 설명이 잘리던 것을 정리했다 — 칩은 감싸지고(wrap) 설명은 아래에 온다. */
+.sq-syn { padding: 6px 9px; }
+.sq-syn .card-head { margin-bottom: 3px; }
+.sq-syn .row { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; padding: 2px 0 !important; }
+.sq-syn .row b { font-size: 9.5px; flex: 0 0 auto; }
+.sq-syn .chip { font-size: 8.5px; height: 18px; padding: 0 6px; }
+.sq-syn .syn-fx { margin-top: 4px; font-size: 8.5px; line-height: 1.4; word-break: keep-all; }
+/* ═════════════ v38b — 가로 마이팀: 전술판을 화면 높이에 고정 ═════════════
+   844×390·915×412처럼 낮은 가로 화면에서 #screen-squad 높이가 제한되지 않아
+   .sq-right(카드 713px) 높이만큼 .sq·.sq-pitch가 608~652px까지 늘어나고
+   전술판 아래가 잘리고 벤치 줄이 화면 밖으로 밀려났다.
+   → 스크린은 main 높이에 딱 맞추고, 왼쪽(모드·전술판·벤치)은 한 화면에,
+     오른쪽 카드 열만 자기 안에서 스크롤한다. */
+@media (orientation: landscape) {
+  #screen-squad.on { display: block; height: 100%; overflow: hidden; }
+  .sq { height: 100%; min-height: 0; }
+  .sq-left { min-height: 0; }
+  .sq-pitch { flex: 1 1 auto; min-height: 110px; max-height: none; }
+  .sq-bench { flex: 0 0 auto; }
+  .sq-right { height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .sq-right > * { flex-shrink: 0; }
+}
+/* 세로가 큰 가로 화면(1920×1080 등): 전술판이 화면 높이만큼 늘어나 세로로 길쭉해지지 않게
+   높이에 상한을 두고, 모드·전술판은 위에 두고 벤치는 화면 아래에 붙인다. */
+@media (orientation: landscape) and (min-height: 520px) {
+  .sq-pitch { max-height: 66vh; }
+  .sq-bench { margin-top: auto; }
+}
+@media (orientation: landscape) and (max-height: 420px) {
+  /* 아주 낮은 가로: 벤치·모드 줄 간격을 조금 조여 전술판에 높이를 넘긴다 */
+  .sq { gap: 4px; }
+  .sq-left { gap: 4px; }
+  .sq-bench { padding: 2px 5px; }
+  .sq-bench .pcard .ph { width: 22px; height: 22px; }
+  .sq-bench .pcard .pb { height: 10px; }
+}
 .mgr-strip-btn { margin-left: auto; font-size: 9px; font-weight: 800; color: var(--lime); border: 1px solid rgba(200,241,105,.4); border-radius: 7px; padding: 3px 7px; white-space: nowrap; position: relative; }
 .mgr-strip-btn::after { content: ""; position: absolute; inset: -5px; }
 
