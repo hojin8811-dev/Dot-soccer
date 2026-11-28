@@ -3943,7 +3943,7 @@
       }
       /* v39c — 좌우 균형: 최근 공이 한쪽으로 쏠렸으면 반대편 넓은 동료에게 가중치 */
       if (play.stage !== 'build' && (p.side !== 'home' || touch.focus === 'balance') && Math.abs(q.x - 50) > 20) {
-        score -= laneBalance(p.side) * ((q.x - 50) / 50) * 24;
+        score -= laneBalance(p.side) * ((q.x - 50) / 50) * 40;
       }
       score += Math.random() * 5;
       /* v21 ② — 자기 진영 정체 중에는 무조건 앞으로: 백패스·CB 돌리기를 감점하고 전진 패스에 힘을 준다 */
@@ -4356,7 +4356,7 @@
         + (d > 26 ? 5 : 0) + Math.random() * 3;
       /* v38 — 커스텀 측면 비중과 창의형 성향이 넓은 동료의 가치를 올린다 */
       if (p.side === 'home') { v += ctacWing() * 10; }
-      if ((p.side !== 'home' || touch.focus === 'balance')) { v -= laneBalance(p.side) * ((q.x - 50) / 50) * 20; }
+      if ((p.side !== 'home' || touch.focus === 'balance')) { v -= laneBalance(p.side) * ((q.x - 50) / 50) * 30; }
       if (lockKeyOf(p) === 'crea') { v += 4; }
       if (lockKeyOf(q) === 'crea' || lockKeyOf(q) === 'fight') { v += 2; }
       if (v > bv) { bv = v; best = q; }
