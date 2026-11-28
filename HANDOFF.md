@@ -139,6 +139,8 @@ v38b 확인값 (2026-11-28, 로컬 Playwright Chromium):
 | 대칭 밸런스(OVR 62 vs 62, 컨디션 80·사기 66) | 60경기 **19승 28무 13패(35:26)** · 60경기 **21승 31무 8패(38:20)** · 슈팅 275:166 / 251:185 |
 | 대칭 밸런스(컨디션 45·사기 40) | 60경기 **18승 30무 12패(30:21)** — 폼 페널티가 걸려도 홈이 무너지지 않음 |
 | 실제 새 세이브 3경기(선발 평균 58 vs 2부 60~71) | 0승 **(0:0, 0:1, 0:0)** · 슈팅 2:3 / 1:2 / 3:6 — 로스터 격차가 체감 약세의 주 원인 |
+| **라이브** (`?v=38&b=38`, 844×390) | 마이팀 전술판 **242px**·벤치 bottom 382·`main` 스크롤 0 · **90분 완주**(clock 90·0:0·슈팅 2:0) · **fps 61** · 토큰 **22/22** · `__DS_ERRS` **0** · 콘솔 오류 **0** · HTTP 4xx **0** (`preview/v38b/v38b-live-squad-844x390.png`·`v38b-live-ball-zoom.png`) |
+| 라이브 자산 | `css/style.css?v=38&b=38`·`js/match.js`·`js/game.js`·`sw.js` **200** · `assets/portraits/head/p500.png` **200** · 배포 반영 7회 폴링(~40초) |
 
 스크린샷: `preview/v38b/` — `v38b-squad-844x390.png` · `v38b-squad-915x412.png` · `v38b-squad-right-844x390.png` · `v38b-match-844x390.png` · `v38b-ball-zoom-844x390.png` · `v38b-result-844x390.png` · `v38b-rotate-390x844.png` · `v38b-before-squad-844x390.png`(수정 전)
 스크린샷: `preview/v38/` — `v38-live-match.png` · `v38-live-tutorial.png` · `v38-live-result.png` · `v38-live-detail.png` · `v38-live-market.png` · `v38-player-detail-844x390.png` · `v38-market-compare2-844x390.png` · `v38-squad-aside-844x390.png` · `v38-tutorial-1/2/4-844x390.png` · `v38-result-844x390.png` · `v38-rotate-390x844.png` · `v38-club-detail-844x390.png` · `v38-squad-844x390.png` · `v38-oldsave-844x390.png`
