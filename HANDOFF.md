@@ -81,11 +81,17 @@
 | 초상화 토큰 | 피치 22명 **`portraitsReady 22 / portraitsTotal 22`**, 원본 500장 + 두상 500장 파일 존재 |
 | 세로 회전 안내 (390×844) | `#rotate` `display:flex` / `opacity:1` |
 | 터보 1경기(그리기 생략, `M.qaTurbo(true)`) | 90분 **58.4초**, 오프사이드 **3:2**, v35 레인 **L25.2 / C48.2 / R26.6%**, 전환 패스 **53**, 대각 **42**, 크로스 **3**, 컷백 **2**, 측면 진입 **15** — 사이드 AI·오프사이드 수정이 실제로 돌아간다 |
+| **라이브 90분 완주** (844×390, `?v=37&b=36`) | **완주** — `clock 90`·`phase ended`, 0:0, **fps 59.8**, `__DS_ERRS` 0, 콘솔/404 0, 토큰 **22/22** (`preview/v37/v37-live-result.png`) |
+| 라이브 자산 | `js/match.js?v=37&b=36` **200**(410,218B) · `js/quarter.js`·`js/pixel_player.js` **404**(삭제 확인) · 두상 `p01/p250/p500` **200** |
+| 중계/전체뷰 (viewState 실측) | 중계 `zoom 1.17(목표 1.15~1.22)`·`tokenScale 0.87` → 전체뷰 `zoom 1`·`tokenScale 1` 토글 정상 |
+| 오프사이드 재현 (`M.debugOffside('home')`) | `type indirect`·키커 `고태양`(away)·공격팀 최소 이탈 17.9 — 반칙팀이 공에서 물러난 뒤 간접 프리킥(`preview/v37/v37-offside.png`) |
 | 결과서 | xG·점유율·MVP·평점 정상 표시(`preview/v37/v37-result-844x390.png`) |
 
 검증 스크립트: `python3 scripts/v37_full.py [출력폴더] [all|844x390|844x360|390x844]` (포트 8127 로컬 서버를 스스로 띄웠다 내린다)
 
-스크린샷: `preview/v37/v37-match.png`(경기) · `v37-closeup.png`(토큰 클로즈업) · `v37-half-844x390.png` · `v37-result-844x390.png` · `v37-rotate-390x844.png` · `v37-after-844x390.png`
+검증 스크립트(라이브): `python3 scripts/v37_live.py [출력폴더]` — 배포 반영을 폴링한 뒤 라이브에서 90분 완주·fps·오류·스샷을 남긴다.
+
+스크린샷: `preview/v37/v37-match.png`(라이브 경기) · `v37-closeup.png`(토큰 클로즈업) · `v37-fullview.png`(전체뷰) · `v37-offside.png`(오프사이드 간접 FK) · `v37-half-844x390.png` · `v37-result-844x390.png` · `v37-live-result.png` · `v37-rotate-390x844.png` · `v37-after-844x390.png`
 
 ---
 
