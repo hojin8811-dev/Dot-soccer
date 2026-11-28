@@ -68,6 +68,7 @@ try:
         pg.evaluate("""() => { const c=document.querySelector('[data-act="subclose"]'); if (c) c.click(); }""")
         pg.wait_for_timeout(2200)
         pg.screenshot(path=os.path.join(OUT, 'v39-live-match.png'))
+        res['tokensStart'] = pg.evaluate("() => { const p = DS.Match.probe ? DS.Match.probe() : null; return p ? { ready: p.view.portraitsReady, total: p.view.portraitsTotal, n: p.players } : null; }")
 
         # 90분 완주 + fps
         res['full'] = pg.evaluate("""() => new Promise(resolve => {
@@ -93,6 +94,7 @@ try:
         res['rotate'] = pg.evaluate("""() => { const el=document.getElementById('rotate'); const cs=el?getComputedStyle(el):null;
           return { display: cs?cs.display:null, opacity: cs?cs.opacity:null }; }""")
         pg.screenshot(path=os.path.join(OUT, 'v39-live-rotate.png'))
+        res['tokens'] = pg.evaluate("() => { const p = DS.Match.probe ? DS.Match.probe() : null; return p ? { ready: p.view.portraitsReady, total: p.view.portraitsTotal, n: p.players } : null; }")
         res['errs'] = errs[:5]
         res['console'] = cons[:5]
         res['bad'] = bad[:6]
