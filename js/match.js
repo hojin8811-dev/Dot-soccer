@@ -184,8 +184,14 @@
   var powerGap = 0;
   var teamOvr = { home: 0, away: 0 };
   function gapOf(side) { return side === 'home' ? powerGap : -powerGap; }
-  /* 기본 능력치 차이를 경기력으로 옮기는 계수 (OVR 1당 1.4%, ±32% 상한) */
-  function duelK(side) { return clamp(1 + gapOf(side) * 0.018, 0.68, 1.36); }
+  /* 기본 능력치 차이를 경기력으로 옮기는 계수.
+     v39 — OVR 1당 1.8% → 2.8%, 상한 ±32% → ±58%.
+     (OVR +10이면 1.28, +20이면 1.56 — 경합·태클이 확실히 기운다) */
+  function duelK(side) {
+    var g = gapOf(side), a = Math.abs(g);
+    /* v39 — 보통 격차(+10)는 약팀도 비벼 볼 수 있게 완만히, 큰 격차(+20)는 확실히 갈리게 볼록 곡선 */
+    return clamp(1 + (g >= 0 ? 1 : -1) * (0.008 * a + 0.0011 * a * a), 0.62, 1.62);
+  }
   /* 전술 카드·감독 보정의 무게 — 크게 열세인 팀은 카드로 판을 쉽게 뒤집지 못한다 */
   function cardK(side) {
     var g = gapOf(side);
@@ -194,8 +200,16 @@
     return 1;
   }
   /* v33 — 슛 결정력의 상대 수준: 같은 위치의 슛도 상대 수비·GK가 강하면 xG가 낮다.
-     (v32는 슈터 스탯만 보고 상대 전력을 전혀 반영하지 않았다) */
-  function qualityK(side) { return clamp(1 + gapOf(side) * 0.03, 0.58, 1.45); }
+     (v32는 슈터 스탯만 보고 상대 전력을 전혀 반영하지 않았다)
+     v39 — OVR 1당 3% → 5%, 상한 1.45 → 2.0 (OVR +20이면 xG가 2배). */
+  function qualityK(side) {
+    var g = gapOf(side), a = Math.abs(g);
+    return clamp(1 + (g >= 0 ? 1 : -1) * (0.018 * a + 0.0015 * a * a), 0.42, 1.75);
+  }
+  /* v39 — 마무리 기준선. 두 팀 전력이 비슷한 경기에서 골이 너무 안 나오던(0.96골·0:0 48%) 문제를
+     풀기 위해 기준선을 올리고, 전력차가 벌어지면 qualityK 가 이미 차이를 만들므로 1.0 밀으로 돌아간다.
+     (OVR 차 0 → ×1.46 · +10 → ×1.18 · +20 → ×0.90) */
+  function finishBase(side) { return clamp(1.46 - Math.abs(gapOf(side)) * 0.028, 0.85, 1.46); }
 
   /* ── v15 — 추가시간 · 세트피스 · 오프사이드 계측 ── */
   var addedTime = { first: 0, second: 0 };      /* 45+N · 90+N 의 N */
@@ -345,6 +359,28 @@
     };
   }
   var v35t = blankV35();
+  /* ── v39 계측기 — 오픈 찬스 슈팅 · 공격 3분의 1 백패스 차단 · 카드별 발동 ── */
+  function blankV39() {
+    return {
+      openChance: { home: 0, away: 0 }, openShots: { home: 0, away: 0 },
+      atkThirdBlocked: 0, atkThirdPass: 0, finishK: 1, solo: 0, soloBy: { home: 0, away: 0 },
+      zone: { home: [0, 0, 0, 0, 0], away: [0, 0, 0, 0, 0] },
+      shotDist: { home: [0, 0, 0, 0, 0], away: [0, 0, 0, 0, 0] },
+      act: { home: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 }, away: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 } }
+    };
+  }
+  /* v39 계측 — 골문까지 거리 구간 (0-8 / 8-14 / 14-22 / 22-30 / 30+) */
+  function bandOf(dist) {
+    if (dist < 8) { return 0; }
+    if (dist < 14) { return 1; }
+    if (dist < 22) { return 2; }
+    if (dist < 30) { return 3; }
+    return 4;
+  }
+  var v39t = blankV39();
+  /* v39 — 마무리 계수 (튜닝 지점). 박스 안 확률·xG에 같은 계수를 건다. */
+  var V39_ACC = 0.085;
+  var V39_XG = 1.80;
   /* 공 위치의 좌/중/우 레인 비율 — '가운데만 공격'인지 한눈에 보는 계측 */
   function laneOf(x) { return x < 33.3 ? 'l' : (x > 66.6 ? 'r' : 'c'); }
   function tickLanes() {
@@ -1112,6 +1148,13 @@
     press += ((lockCount[side] || {}).dev || 0) * 1.4 + synOf(side, 'dev') * 100;
     if (side === 'home') {
       if (buffOf('press') > 0) { press += 26; }
+      /* v39 카드 — 하이프레스 역습은 압박 인원·반경을 넓히고, 인버티드 풀백은 중원 수를 더한다.
+         파이브백 잠그기는 전방 압박을 줄이고 블록을 내린다. */
+      if (buffOf('counter') > 0) { press += 14; }
+      if (buffOf('invert') > 0) { press += 6; }
+      if (buffOf('parkbus') > 0) { press -= 10; }
+      /* v39 — 전력차: 강팀은 압박 인원·반경이 넓다 */
+      press += gapOf('home') * 0.45;
       press += mfx('press') * 1.2;
       /* v20 ① — 압박 강도 지시: 트리거 반경과 붙는 인원이 함께 달라진다 */
       press += TOUCH_PRESSURE[touch.pressing] || 0;
@@ -1257,7 +1300,8 @@
   /* 감독 특기 수치 (없으면 0) */
   function mfx(k) { return mgrFx[k] || 0; }
   function anyAtkBuff() {
-    return buffOf('atk') > 0 || buffOf('through') > 0 || buffOf('tiki') > 0 || buffOf('longshot') > 0;
+    return buffOf('atk') > 0 || buffOf('through') > 0 || buffOf('tiki') > 0 || buffOf('longshot') > 0 ||
+      buffOf('false9') > 0 || buffOf('target') > 0 || buffOf('counter') > 0;
   }
 
   function setupDeck(deck) {
@@ -1365,9 +1409,10 @@
       p = players[i];
       if (p.side !== 'home' || isGK(p)) { continue; }
       g = groupOf(p);
-      want = (fx === 'atk' || fx === 'setpiece' || fx === 'through' || fx === 'longshot') ? 'FW'
-        : (fx === 'press' || fx === 'tempo' || fx === 'build' || fx === 'tiki' || fx === 'roar' || fx === 'offside') ? 'MF'
-        : (fx === 'def' || fx === 'trigger') ? 'MF' : null;
+      want = (fx === 'atk' || fx === 'setpiece' || fx === 'through' || fx === 'longshot' ||
+        fx === 'false9' || fx === 'target' || fx === 'counter' || fx === 'jokersub') ? 'FW'
+        : (fx === 'press' || fx === 'tempo' || fx === 'build' || fx === 'tiki' || fx === 'roar' || fx === 'offside' || fx === 'invert') ? 'MF'
+        : (fx === 'def' || fx === 'trigger' || fx === 'parkbus') ? 'DF' : null;
       score = DS.ratingOf(p.player) + (want === g ? 24 : 0);
       if (score > bv) { bv = score; best = p; }
     }
@@ -1489,6 +1534,13 @@
     if (fx === 'tiki' && ace) { bubble(ace, '👟 원투패스!', '#8ff0b6'); }
     if (fx === 'press' && ace) { bubble(ace, '🛡️ 압박!', '#ff9f8a'); }
     if (fx === 'atk' && ace) { bubble(ace, '🏃 하프스페이스!', '#c3a6ff'); }
+    /* v39 — 신규 6종 연출 */
+    if (fx === 'false9' && ace) { bubble(ace, '🎭 가짜 9번!', '#ffb0a0'); }
+    if (fx === 'invert' && ace) { bubble(ace, '🔁 인버티드!', '#9fdfe8'); }
+    if (fx === 'counter') { bubble(ace || (ball.carrier && ball.carrier.side === 'home' ? ball.carrier : null) || players[0], '⚡ 역습 준비!', '#ffc07a'); }
+    if (fx === 'target' && ace) { bubble(ace, '💪 포스트!', '#e5c07a'); }
+    if (fx === 'parkbus' && ace) { bubble(ace, '🚌 잠근다!', '#9fc4e8'); }
+    if (fx === 'jokersub' && ace) { bubble(ace, '🃏 조커 투입!', '#ffd98a'); }
 
     if (cfg.onCard) { cfg.onCard(def.key, ace ? ace.name : ''); }
     say('🎴 ' + def.name + ' 발동! ' + def.desc, 'tactic');
@@ -1713,6 +1765,8 @@
     /* v29 — 약측 폭·전환 패스·세트피스·전술 상성 계측기 */
     v29t = blankV29();
     v35t = blankV35();
+    v39t = blankV39();
+    subLog = [];
     matchupEvalT = 0;
     spLayout = null;
     /* v21 — 정체 타이머·보간 계수·계측기 초기화 */
@@ -1881,6 +1935,12 @@
         sub: '후반 시작 · ' + teamShort(s2) + ' 킥오프',
         dur: 1.1
       });
+      /* v39 — 하프타임에 바꾼 선수를 후반 시작과 함께 다시 알린다 (패널에 가려 보지 못했을 수 있다) */
+      if (subLog.length) {
+        var lastSub = subLog[subLog.length - 1];
+        banner('🔄 SUBSTITUTION', 'OUT ' + lastSub.out + ' ↔ IN ' + lastSub.inn + (lastSub.pos ? ' · ' + lastSub.pos : ''), 'sub');
+        subFx(lastSub, lastSub.p);
+      }
       if (!quiet) { say('후반전 시작! 다시 공을 굴립니다.', 'big'); }
       return;
     }
@@ -2018,7 +2078,8 @@
     }
     return {
       onPitch: onPitch, bench: bench, subsLeft: M.subsLeft, subsMax: MAX_SUBS,
-      minute: minute(), score: M.homeScore + ' : ' + M.awayScore, halftime: M.paused
+      minute: minute(), score: M.homeScore + ' : ' + M.awayScore, halftime: M.paused,
+      subs: subLog.map(function (s2) { return { min: s2.min, out: s2.out, inn: s2.inn, pos: s2.pos }; })
     };
   };
 
@@ -2065,9 +2126,59 @@
     return {
       minute: minute(), score: [M.homeScore, M.awayScore],
       subsLeft: M.subsLeft, subsMax: MAX_SUBS,
+      subs: subLog.map(function (s2) { return { min: s2.min, out: s2.out, inn: s2.inn, pos: s2.pos }; }),
       onPitch: onPitch, bench: bench, halftime: !!M.halftime
     };
   };
+
+  /* ── v39 — 교체 인/아웃 연출 ──
+     유저 제보: 경기 중·하프타임 교체가 피치에서 조용히 바뀌어 바꿔진 줄 몰랐다.
+     이제 (①) 중계 배너 ② 컷인 카드 ③ 나가는 선수 자리의 파동·들어오는 선수의 링/말풍선
+     ④ 교체 기록(subLog — 하프타임 패널에도 표시)을 남긴다. */
+  var subLog = [];
+  function subCutin(info) {
+    var host = document.getElementById('m-cutin');
+    if (!host) { return; }
+    var mySeq = ++cutinSeq;
+    cutinHold = 1.25;
+    host.innerHTML =
+      '<div class="cutin scutin" style="--cc:#4aa8e0">' +
+      '<div class="cutin-lines"></div>' +
+      '<div class="cutin-art"><span class="sub-badge">' +
+      '<svg viewBox="0 0 120 120" width="100%" height="100%" aria-hidden="true">' +
+      '<path d="M30 40h48l-12-12" fill="none" stroke="#9fe8ff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M90 80H42l12 12" fill="none" stroke="#4aa8e0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="30" cy="40" r="9" fill="#eaf6ff"/><circle cx="90" cy="80" r="9" fill="#eaf6ff"/>' +
+      '</svg></span></div>' +
+      '<div class="cutin-body">' +
+      '<div class="cutin-tag">SUBSTITUTION · ' + info.min + "'</div>" +
+      '<div class="cutin-name"><em class="so">OUT</em> ' + info.out + '</div>' +
+      '<div class="cutin-en">IN — ' + info.inn + (info.pos ? ' · ' + info.pos : '') + '</div>' +
+      '<div class="cutin-live"><i></i>새 선수가 피치로 들어섭니다</div>' +
+      '</div></div>';
+    host.classList.add('on');
+    global.setTimeout(function () {
+      if (mySeq !== cutinSeq) { return; }
+      hideCutin();
+    }, 1900);
+  }
+  function subFx(info, newP) {
+    /* 나가는 선수 자리에서 사라지는 파동 */
+    spawnPart({ kind: 'wave', x: info.x, y: info.y, t0: 0.55, size: 8, color: 'rgba(160,214,255,.9)', a0: 0.8, flat: 0.45 });
+    fxSparks(info.x, info.y, 8, '#9fd8ff', 7);
+    if (!newP) { return; }
+    fxRing(newP, '#4aa8e0', 1.8);
+    fxSparks(newP.x, newP.y, 12, '#bfe8ff', 9);
+    newP.glow = Math.max(newP.glow || 0, 2.2);
+    newP.skillT = Math.max(newP.skillT || 0, 1.6);
+    setPose(newP, 'run', 0.45);
+    bubbleUnique(newP, '🔄 IN!', '#9fe8ff', 1.8);
+  }
+  function subAnnounce(info, newP) {
+    banner('🔄 SUBSTITUTION', 'OUT ' + info.out + ' ↔ IN ' + info.inn + (info.pos ? ' · ' + info.pos : ''), 'sub');
+    subFx(info, newP);
+    say(U.josa(info.out, '이/가') + ' 나가고 ' + U.josa(info.inn, '이/가') + ' 들어옵니다. (' + info.min + "' 교체)", 'tactic');
+  }
 
   M.substitute = function (inId, outId) {
     if (!M.running || M.subsLeft <= 0) { return false; }
@@ -2103,6 +2214,15 @@
     }
     charge(2);
     say('🔁 교체! ' + short(outP.name) + ' 나가고 ' + short(inB.player.name) + ' 투입됩니다. (' + minute() + "')", 'tactic');
+    /* v39 — 교체 연출 (인/아웃이 눈에 띄게) */
+    var subInfo = {
+      out: short(outP.name), inn: short(inB.player.name), pos: outP.pos,
+      min: minute(), x: outP.x, y: outP.y, p: newP
+    };
+    subLog.push(subInfo);
+    if (subLog.length > 8) { subLog.shift(); }
+    subAnnounce(subInfo, newP);
+    if (!M.halftime) { subCutin(subInfo); }
     return true;
   };
 
@@ -3007,6 +3127,8 @@
     var trap = (side === 'home' && buffOf('offside') > 0);
     var preTrapDepth = depth;                                   /* 트랩 전 깊이 */
     if (trap) { depth = clamp(depth + 9, 14, 54); }
+    /* v39 — 파이브백 잠그기: 블록을 내려 박스를 밀집시킨다 */
+    if (side === 'home' && buffOf('parkbus') > 0) { depth = clamp(depth - 11, 6, 56); }
     var lineY = ownY + dir * depth;
     /* 공이 우리 진영이면 DF 라인은 '공과 골문 사이'로 (트랩 중에는 일자 하이 라인을 그대로 둔다)
        v20 ① — 다만 지시한 라인 높이만큼은 공보다 앞/뒤로 설 수 있다. 그래야 '올리기/내리기'가
@@ -3199,6 +3321,8 @@
       var drain = (0.60 + (p.moving ? 0.21 : 0)) * (1.22 - toughS * 0.038) * (96 / MATCH_SECONDS);
       if (isGK(p)) { drain *= 0.55; }
       if (p.side === 'home' && buffOf('press') > 0) { drain *= 1.10; }
+      /* v39 — 슈퍼 조커: 후반 교체 자원의 탄력으로 체력 소모가 줄어든다 */
+      if (p.side === 'home' && buffOf('jokersub') > 0) { drain *= (minute() >= 60 ? 0.84 : 0.92); }
       /* v38 — 헌신형·시너지는 체력 소모가 적다 */
       drain *= (1 - lockVal(p, 'stamina') - synOf(p.side, 'dev') * 0.6);
       p.stam = clamp(p.stam - drain * dt, 3, 100);
@@ -3375,6 +3499,13 @@
     trans.t = TRANS_SECONDS;
     trans.t0 = TRANS_SECONDS;
     trans.kind = STYLE_TRANS[styleKeyOf(toP.side)] || 'normal';
+    /* v39 — 하이프레스 역습: 탈취 즉시 세로 전환으로 고정한다 */
+    if (toP.side === 'home' && buffOf('counter') > 0) {
+      trans.kind = 'vertical';
+      trans.t = Math.max(trans.t, TRANS_SECONDS * 1.2);
+      trans.t0 = trans.t;
+      v39t.counterWin = (v39t.counterWin || 0) + 1;
+    }
     v19t.trans[toP.side] += 1;
     if (prog < 0.5 && sty.longBallAfterWin > 0 && chance(sty.longBallAfterWin)) {
       tele.longwin[toP.side] += 1;
@@ -3643,6 +3774,7 @@
     var tiki = buffOf('tiki') > 0;
     var through = buffOf('through') > 0;
     var sty = styleOf(p.side);
+    var dist = Math.abs(p.y - attackGoalY(p.side));   /* v39 — 골문까지 거리(공격 3분의 1 판단) */
     /* v29 ① — 측면에서 압박을 받는 볼 소유자는 반대편 넓게 열린 동료를 먼저 본다.
        수비가 공 쪽으로 몰리면 약측은 반드시 비어 있고, 그 한 번의 전환이 가장 값싼 탈압박이다. */
     var oppNear = nearestOpponent(p, 16);
@@ -3742,6 +3874,22 @@
       }
       /* v20 ② — 인버티드 윙어를 향한 패스는 안쪽 발 앞 슈팅 각으로 */
       if (isInverted(q) && (play.stage === 'wide' || play.stage === 'final')) { score += 5; }
+      /* v39 — 공격 3분의 1에서는 옆·뒤로 돌리는 패스보다 전진·박스 침투를 먼저 본다
+         (v39 — 수비가 없는 오픈 찬스에서도 공을 뒤로 뺴는 흐름을 끊는다) */
+      if (dist < 24) {
+        if (fwd < -2) { score -= 26; }
+        else if (fwd > 0) { score += 7 + Math.min(10, fwd * 0.7); }
+        if (isGK(q)) { score -= 70; }
+        if (isFwdGroup(q) && progressOf(p.side, q.y) > 0.86) { score += 8; }
+        /* v39 카드 — 가짜 9번(2선 침투 연결) · 타겟맨(몸으로 지켜 주는 대상) */
+        if (p.side === 'home' && buffOf('false9') > 0 && (isFwdGroup(q) || q.pos === 'AM') && fwd > 2) { score += 12; }
+        if (p.side === 'home' && buffOf('target') > 0 && (q.pos === 'ST' || q.pos === 'CF')) { score += 10; }
+      }
+      /* v39 카드 — 인버티드 풀백: 중원 짧은 패스 연결과 수적 우위를 살린다 */
+      if (p.side === 'home' && buffOf('invert') > 0) {
+        if (d < 20 && isMidGroup(q)) { score += 9; }
+        if (d < 14) { score += 4; }
+      }
       /* v20 ① — 공격 루트 지시: 고른 레인의 동료에게 가중치, 반대쪽은 감점 */
       if (p.side === 'home' && touch.focus !== 'balance') {
         var fdel = Math.abs(q.x - TOUCH_FOCUS_X[touch.focus]);
@@ -3783,6 +3931,9 @@
     err *= (1 - lockVal(p, 'err'));
     /* 감독 패스율 업·조직력 업: 패스 오차를 줄인다 */
     if (p.side === 'home') { err *= (1 - clamp(mfx('pass') * 0.05 + mfx('org') * 0.015, 0, 0.55)); }
+    /* v39 — 전력차: 강팀 패스는 정확해지고 약팀은 흔들린다 (OVR +20 = 오차 ×0.70 / ×1.43) */
+    var gE = gapOf(p.side), aE = Math.abs(gE);
+    err *= clamp(1 - (gE >= 0 ? 1 : -1) * (0.008 * aE + 0.0012 * aE * aE), 0.62, 1.45);
     if (type === 'through') {
       tx = clamp(q.x + (q.baseX < 50 ? 2 : -2) + range(-err, err), q.zone.xMin, q.zone.xMax);
       ty = clamp(q.y + dir * 11, q.zone.yMin, q.zone.yMax);
@@ -3931,6 +4082,45 @@
     return kickPass(rv, p, 'wall');
   }
 
+  /* v39 — 개인기 돌파(1:1 제치기). 유저 제보: "개인기 돌파가 거의 없음".
+     decide() 3) 패스 분기(pressure < 6 || chance(0.72))가 거의 항상 이겨 드리블이 나오지 못했다.
+     이제 공격수·윙어·AM 이 수비 한 명과 마주치면 스피드·테크닉·창의 성향으로 확률을 재고,
+     성공하면 수비를 스턴시킨 뒤 공을 앞으로 밀어낸다(스파크·링·말풍선). */
+  function dribbleSkill(p) {
+    var st = (p.player && p.player.stats) || {};
+    var spd = clamp((st.spd || 45) / 100, 0.2, 1);
+    var tek = clamp((p.player && p.player.t ? p.player.t : 5) / 10, 0.1, 1);
+    var bonus = 0;
+    if (lockKeyOf(p) === 'crea') { bonus += 0.07; }
+    if (p.player && p.player.skill === '결정력') { bonus += 0.03; }
+    if (p.dribbleX != null) { bonus += 0.02; }
+    return clamp(0.20 + spd * 0.34 + tek * 0.26 + bonus, 0.14, 0.80);
+  }
+  function beatMan(p, def) {
+    var dir = goalDir(p.side);
+    var side = def ? (p.x >= def.x ? 1 : -1) : (chance(0.5) ? 1 : -1);
+    var burst = 1 + clamp(((p.player.stats || {}).spd || 45) / 130, 0, 0.6);
+    p.dribbleX = clamp(p.x + side * range(7, 13) * burst, 4, 96);
+    p.dribbleY = clamp(p.y + dir * range(10, 17), 3, 117);
+    p.dribbleT = 0.85;
+    p.kind = 'dribble';
+    p.skillT = Math.max(p.skillT || 0, 1.3);
+    if (def) {
+      def.stun = Math.max(def.stun || 0, 0.45);
+      setPose(def, 'tackle', 0.35);
+      if (def.mark === p) { def.mark = null; }
+    }
+    fxSparks(p.x, p.y, 9, '#ffe28a', 8);
+    fxRing(p, '#ffe28a', 1.2);
+    fxDust(p, 3, 1.1);
+    bubble(p, '⚡ 개인기 돌파!', '#ffe28a', 1.4);
+    say(U.josa(short(p.name), '이/가') + ' ' + pick([
+      '개인기로 한 명을 제칩니다!', '발재간으로 수비를 뚫습니다!', '페인트 후 가속, 수비가 흔들립니다!'
+    ]), 'normal');
+    v39t.solo = (v39t.solo || 0) + 1;
+    v39t.soloBy[p.side] = (v39t.soloBy[p.side] || 0) + 1;
+  }
+
   function dribble(p) {
     /* v18 ① — GK는 절대 드리블하지 않는다 (안전장치: 다른 경로로 불려도 막힌다) */
     if (isGK(p)) { v18t.gkDribble += 1; return; }
@@ -3947,6 +4137,9 @@
   /* 압박을 받을 때 안전한 백패스/원터치 옵션 */
   function backPass(p) {
     var dir = goalDir(p.side), best = null, bv = -1, i, q, d, back, open, v;
+    /* v39 — 공격 3분의 1(골문 24 앞)에서는 백패스를 아예 하지 않는다.
+       오픈 찬스에서도 공을 뒤로 돌려슴 유저 제보의 직접 원인이다. */
+    if (Math.abs(p.y - attackGoalY(p.side)) < 24) { v39t.atkThirdBlocked += 1; return false; }
     /* v21 ② — 자기 진영에 오래 묶여 있으면 백패스를 잠근다 (CB·DM·GK 사이 돌리기 방지) */
     var stall = (ownHalfSide === p.side) ? ownHalfT : 0;
     if (stall > 2.6) { v21t.backPassBlocked += 1; return false; }
@@ -4108,12 +4301,30 @@
     var pressure = opp.player ? opp.dist : 40;
     var tac = effTactic(p.side);
     var sty = styleOf(p.side);
+    /* v39 — 공격 3분의 1과 오픈 찬스. 유저 제보: 최전방이 수비 없는 오픈 찬스에서도
+       백패스/원터치로 공을 돌려슴 ("슈팅을 안 하고 뒤로 뺴는" 현상).
+       dist < 24 = 골문 24단위 앞(공격 3분의 1), pressure 는 가까운 수비수까지의 거리다. */
+    var inAtkThird = dist < 24;
+    var openChance = dist < 22 && Math.abs(p.x - 50) < 22 && pressure > 2.5;
+    if (openChance) { v39t.openChance[p.side] += 1; }
+    v39t.zone[p.side][bandOf(dist)] += 1;
+    /* v39 — 전력차 체감: 크게 열세인 팀은 압박을 받으면 전개를 이어 가지 못하고 걷어낸다.
+       (OVR +20 이면 점유율·패스 전개에서 확실히 밀린다. 강팀에는 걸지 않는다) */
+    var gapNow = gapOf(p.side);
+    if (gapNow < -12 && pressure < 9 && chance(clamp((-gapNow - 12) * 0.05, 0, 0.34))) {
+      var cyC = attackGoalY(p.side);
+      ball.x = p.x; ball.y = p.y;
+      kickBall(p, clamp(p.x + range(-26, 26), 8, 92), cyC - goalDir(p.side) * range(34, 58), 56, 'pass', null, 1);
+      if (bubbleUnique(p, '🥾 걷어낸다!', '#ffd98a', 1.0)) { v39t.weakClear = (v39t.weakClear || 0) + 1; }
+      actionTimer = 0.5;
+      return;
+    }
     /* v20 ② — 윙어의 롤·주발: 인버티드는 안으로 접어 슛, 전통 윙어는 폭을 지켜 크로스 */
     var invW = isInverted(p);
     var tradW = isTraditionalWinger(p);
     /* v21 ② — 이 팀이 자기 진영에서 공을 돌린 시간 */
     var stallNow = (ownHalfSide === p.side) ? ownHalfT : 0;
-    var shootRange = 22 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
+    var shootRange = 28 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
     if (p.side === 'home' && buffOf('atk') > 0) { shootRange += 2; }
     if (invW) { shootRange += 5; }                       /* 하프스페이스에서 바로 때릴 수 있다 */
 
@@ -4123,29 +4334,56 @@
          (예전에는 근접 압박(pressure<2.2)이면 0.45배로 깎여 찬스가 패스로 샜다) */
       var inBox = dist < 11.5;
       /* v25c (B1) — 슈팅 빈도 소폭 상향: 박스 안 0.72→0.86, 근거리 0.46→0.56, 중거리 0.24→0.30 */
-      var pShot = inBox ? 0.95 : (dist < 18 ? 0.66 : 0.34);
+      /* v39 — 슈팅 빈도 상향: 박스 안 0.95 · 근거리 0.85 · 18~24 0.55 (찬스를 패스로 흘리지 않는다) */
+      var pShot = inBox ? 1.0 : (dist < 18 ? 0.85 : (dist < 24 ? 0.55 : 0.42));
       pShot *= sty.shootBias;
+      /* v39 — 전력차가 확실히 드러나게: OVR 1당 1.8% (OVR +20 = +36%, 하한 0.6/상한 1.5) */
+      (function () {
+        var gS = gapOf(p.side), aS = Math.abs(gS);
+        pShot *= clamp(1 + (gS >= 0 ? 1 : -1) * (0.008 * aS + 0.0009 * aS * aS), 0.6, 1.5);
+      })();
       /* v38 — 라커룸 성향: 승부욕형은 더 과감하게 때리고, 같은 성향 시너지도 슈팅을 민다 */
       pShot *= (1 + lockVal(p, 'shoot') + synOf(p.side, 'fight'));
       if (pressure < 2.2 && !inBox && dist > 15) { pShot *= 0.7; }
       if (inBox && pressure > 3) { pShot += 0.10; }        /* 골문 앞에서 마크가 비었을 때 */
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
       if (invW && dist < 21) { pShot += 0.10; }           /* 컷인 후 강한 발 슈팅 */
+      /* v39 — 오픈 찬스는 주저 없이 때린다 (박스 안 1.0 · 근거리 0.92).
+         1.5) 원터치·백패스로 새던 찬스를 구조적으로 막는 핵심 분기다. */
+      if (p.side === 'home' && buffOf('false9') > 0 && dist < 26) { pShot += 0.06; }
+      if (p.side === 'home' && buffOf('target') > 0 && (p.pos === 'ST' || p.pos === 'CF') && pressure < 5) { pShot += 0.08; }
+      if (openChance) { pShot = Math.max(pShot, inBox ? 1.0 : 0.92); }
       if (chance(pShot)) {
         if (inBox) { v21t.boxShots += 1; }
         if (inBox || pressure > 3.5) { v21t.clearShots += 1; }
+        if (openChance) { v39t.openShots[p.side] += 1; }
+        v39t.act[p.side].shot += 1;
         shoot(p, dist);
         return;
       }
     }
-    /* 1.2) v19 ① — 전환 창: 역습·직선 팀은 탈취 직후 한 번 더 세로로 찌른다 */
-    if (trans.side === p.side && trans.kind === 'vertical' && progressOf(p.side, p.y) > 0.28 && chance(0.4)) {
+    /* 1.2) v19 ① — 전환 창: 역습·직선 팀은 탈취 직후 한 번 더 세로로 찌른다
+       v39 — 하이프레스 역습 카드는 전환 종류와 상관없이 이 창을 연다 */
+    if (trans.side === p.side && (trans.kind === 'vertical' || (p.side === 'home' && buffOf('counter') > 0)) &&
+        progressOf(p.side, p.y) > 0.28 && chance(p.side === 'home' && buffOf('counter') > 0 ? 0.55 : 0.4)) {
       if (transitionThrough(p)) { actionTimer = 0.16; return; }
     }
+    /* 1.4) v39 — 개인기 돌파: 공격수·윙어·AM 이 수비 한 명과 마주치면 과감하게 제친다.
+       (패스로만 공을 돌리던 흐름에 1:1 돌파를 섞어 슈팅·크로스 찬스를 연다) */
+    var soloPos = isFwdGroup(p) || isWingerPos(p) || p.pos === 'AM' || p.pos === 'CF';
+    if (soloPos && progressOf(p.side, p.y) > 0.30 && pressure > 1.3 && pressure < 14) {
+      v39t.soloTry = (v39t.soloTry || 0) + 1;
+      /* 붙어 있으면(5.2 이내) 정면 승부, 조금 떨어져 있으면(5.2~14) 파고들어 제치기 */
+      var soloChance = dribbleSkill(p) * (pressure < 5.2 ? 1 : 0.72);
+      if (buffOf('counter') > 0 && trans.side === p.side) { soloChance += 0.10; }
+      if (chance(soloChance)) { beatMan(p, opp.player); actionTimer = 0.2; return; }
+    }
+
     /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다
-       v21 ② — 자기 진영 정체 중에는 이 안전 패스도 막는다 */
-    if (stallNow < 2.4 && pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
-      if (backPass(p)) { actionTimer = 0.14; return; }
+       v21 ② — 자기 진영 정체 중에는 이 안전 패스도 막는다
+       v39 — 공격 3분의 1(dist<24)에서는 백패스로 찬스를 흘리지 않는다. */
+    if (!inAtkThird && stallNow < 2.4 && pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
+      if (backPass(p)) { v39t.act[p.side].back += 1; actionTimer = 0.14; return; }
     }
 
     /* 1.8) v35 — 중앙이 붐비면 폭으로: 대각선·횡 전환 패스로 반대편 윙어를 살린다.
@@ -4156,6 +4394,7 @@
       if (wOut && chance(clamp(0.55 + ctacWing() * 0.14 + (lockKeyOf(p) === 'crea' ? 0.05 : 0), 0.3, 0.82))) {
         var farSide = Math.abs(wOut.x - p.x) > 24;
         if (kickPass(p, wOut, farSide ? 'switchLong' : 'progressive')) {
+          v39t.act[p.side].wide += 1;
           v35t.diagonal += 1; v35t.switchPass[p.side] += 1;
           bubble(p, farSide ? '↔ 사이드 전환!' : '↗ 측면 전개', '#c8f169', 1.2);
           actionTimer = 0.18;
@@ -4202,9 +4441,10 @@
     }
     /* 3) 패스 */
     if (pressure < 6 || chance(0.72)) {
-      if (passBall(p)) { return; }
+      if (passBall(p)) { v39t.act[p.side].pass += 1; return; }
     }
     /* 4) 드리블 */
+    v39t.act[p.side].drib += 1;
     dribble(p);
   }
   /* v19 ④ — 슛 카운트·xG 누적을 한 곳으로 (일반 슛·세트피스 헤더·PK 모두) */
@@ -4212,13 +4452,14 @@
     if (side === 'home') { goalStats.homeShots++; homeXg += xg; }
     else { goalStats.awayShots++; awayXg += xg; }
   }
-
   function shoot(p, dist) {
     var gy = attackGoalY(p.side);
     var longshot = dist > 19 || (p.side === 'home' && buffOf('longshot') > 0);
-    var acc = 0.50 + p.player.stats.atk / 520 + ((p.side === 'home' ? formFactor : formFactorAway) - 1) * 0.9;
-    /* v33 — 팀 전력차가 결정력에 그대로 드러나게 (OVR 1당 0.5%p) */
-    acc += gapOf(p.side) * 0.005;
+    var acc = 0.50 + p.player.stats.atk / 520 + ((p.side === 'home' ? formFactor : formFactorAway) - 1) * 0.9;    /* v33 — 팀 전력차가 결정력에 그대로 드러나게 (OVR 1당 0.5%p) */
+    (function () {
+      var gA = gapOf(p.side), aA = Math.abs(gA);
+      acc += (gA >= 0 ? 1 : -1) * (0.005 * aA + 0.0004 * aA * aA);
+    })();
     var qk = qualityK(p.side);
     /* v20 ② — 주발: 강발 쪽에서 치면 파워, 반대쪽에서는 감아차기(정확·약간 느림) */
     var fs = footSideOf(p);
@@ -4233,8 +4474,12 @@
     acc -= dist * 0.005;
     /* v25c (B1) — 박스 안 결정력: 가까운 슛은 골문으로 향할 확률을 조금 더 준다 */
     if (dist < 11.5) { acc += 0.05; }
-    var onTarget = chance(clamp(acc, 0.2, 0.86));
-    var xg = clamp(0.62 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.52) * qk;
+    /* v39 — 득점 상향: 경기당 0.96골 · 0:0 48.6%을 1.9~2.5골 · 0:0 15% 이하로 끌어올린다.
+       (슛 자체도 늘었지만 마무리가 너무 무뎌 xG 대비 실제 득점이 모자랐다) */
+    acc += V39_ACC;
+    if (p.side === 'home' && buffOf('jokersub') > 0 && minute() >= 60) { acc += 0.05; }
+    var onTarget = chance(clamp(acc, 0.2, 0.9));
+    var xg = clamp(0.62 * Math.exp(-dist / 11) + p.player.stats.atk / 2600, 0.02, 0.52) * qk * V39_XG;
     if (dist < 11.5) { xg += 0.075; }
     if (fit === 'strong') { xg += 0.015; }
     else if (fit === 'curl') { xg += 0.005; }
@@ -4242,9 +4487,12 @@
     if (p.side === 'home' && buffOf('atk') > 0) { xg += 0.05 * cardK(p.side); }
     if (p.side === 'home' && buffOf('longshot') > 0 && dist > 19) { xg += 0.035 * cardK(p.side); }
     if (p.side === 'away' && buffOf('def') > 0) { xg -= 0.045; }
+    /* v39 — 파이브백 잠그기: 홈 골문 앞 결정력을 떨어뜨린다 */
+    if (p.side === 'away' && buffOf('parkbus') > 0) { xg -= 0.06; }
     if (p.side === 'home') { xg += mfx('shoot') * 0.004 + mfx('atk') * 0.002; }
     else { xg -= mfx('def') * 0.005 + mfx('press') * 0.001; }
     if (!onTarget) { xg *= 0.12; }
+    xg *= finishBase(p.side);
     var isGoal = chance(clamp(xg, 0.01, 0.66));
     var tx = onTarget ? clamp(50 + range(-8, 8) + (fit === 'curl' ? (fs === 'R' ? 4.5 : -4.5) : 0), 38, 62) : (chance(0.5) ? range(28, 42) : range(58, 72));
     var travel = Math.hypot(tx - p.x, gy - p.y);
@@ -4262,6 +4510,7 @@
     };
     M.phase = 'shot';
     countShot(p.side, xg);
+    v39t.shotDist[p.side][bandOf(dist)] += 1;
     if (p.side === 'home') { charge(1.8); }
     setPose(p, 'kick', 0.38);
     fxRing(p, longshot ? '#ffb066' : '#ffe28a', 0.95);
@@ -6373,16 +6622,20 @@
       d = CARD_LIST[i];
       if ((buffs[d.fx] || 0) <= 0) { continue; }
       if (p.side !== 'home') { continue; }
-      if (d.fx === 'def' || d.fx === 'offside') {
+      if (d.fx === 'def' || d.fx === 'offside' || d.fx === 'parkbus') {
         if (isDefGroup(p)) { return d; }
         continue;
       }
-      if (d.fx === 'press' || d.fx === 'trigger') {
+      if (d.fx === 'press' || d.fx === 'trigger' || d.fx === 'counter') {
         if (!isGK(p) && (isMidGroup(p) || isFwdGroup(p))) { return d; }
         continue;
       }
-      if (d.fx === 'atk' || d.fx === 'through' || d.fx === 'longshot') {
+      if (d.fx === 'atk' || d.fx === 'through' || d.fx === 'longshot' || d.fx === 'false9' || d.fx === 'target') {
         if (isFwdGroup(p) || isWingerPos(p) || p.pos === 'AM') { return d; }
+        continue;
+      }
+      if (d.fx === 'invert') {
+        if (p.pos === 'LB' || p.pos === 'RB' || p.pos === 'LWB' || p.pos === 'RWB' || isMidGroup(p)) { return d; }
         continue;
       }
       if (isGK(p)) { continue; }
@@ -6747,13 +7000,15 @@
       shown[d.fx] = 1;
       v25t.overlays++;
       if (d.fx === 'press' || d.fx === 'trigger') { ovPress(d, a); }
-      else if (d.fx === 'offside') { ovOffside(d, a); }
-      else if (d.fx === 'atk' || d.fx === 'through') { ovRuns(d, a); }
-      else if (d.fx === 'tiki' || d.fx === 'build') { ovTriangle(d, a); }
+      else if (d.fx === 'counter') { ovPress(d, a); }
+      else if (d.fx === 'offside' || d.fx === 'parkbus') { ovOffside(d, a); }
+      else if (d.fx === 'atk' || d.fx === 'through' || d.fx === 'false9' || d.fx === 'target') { ovRuns(d, a); }
+      else if (d.fx === 'tiki' || d.fx === 'build' || d.fx === 'invert') { ovTriangle(d, a); }
       else if (d.fx === 'longshot') { ovLongshot(d, a); }
       else if (d.fx === 'def') { ovIsolate(d, a); }
-      else if (d.fx === 'tempo' || d.fx === 'roar') { ovWave(d, a); }
+      else if (d.fx === 'tempo' || d.fx === 'roar' || d.fx === 'jokersub') { ovWave(d, a); }
       else if (d.fx === 'setpiece') { ovSetpiece(d, a); }
+      else { ovRuns(d, a); }
     }
   }
 
@@ -7063,7 +7318,7 @@
     for (i = 0; i < list.length && i < 3; i++) {
       p = list[i];
       inward = p.x < 50 ? 1 : -1;
-      depth = d.fx === 'through' ? 15 : 8.5;
+      depth = d.fx === 'through' ? 15 : (d.fx === 'false9' || d.fx === 'counter' ? 12 : 8.5);
       g1 = scr(p.x, p.y);
       g2 = scr(clamp(p.x + inward * (d.fx === 'through' ? 5.5 : 4.2), 4, 96), clamp(p.y - depth, 3, 117));
       arrowTo(g1.x, g1.y, g2.x, g2.y, hexA(col, 0.88 * a), 1.7, 5.6, d.fx === 'through' ? [6, 4] : null);
@@ -9091,6 +9346,25 @@
       counts: { n: players.length, recounts: recountN, faceDupes: faceDupes, locks: (function () {
         var o = [], i2, q2; for (i2 = 0; i2 < players.length; i2++) { q2 = players[i2]; o.push(q2.side + ':' + (q2.player && q2.player.lock) + ':' + (q2.player && q2.player.pic)); } return o;
       })() }
+    };
+  };
+
+  /* v39 — 검증용: 오픈 찬스 슈팅·공격 3분의 1 백패스 차단·카드 발동 계측 */
+  M.v39 = function () {
+    var cards = {}, k;
+    for (k in cardHitCount) { if (cardHitCount.hasOwnProperty(k)) { cards[k] = cardHitCount[k]; } }
+    return {
+      openChance: { home: v39t.openChance.home, away: v39t.openChance.away },
+      openShots: { home: v39t.openShots.home, away: v39t.openShots.away },
+      zone: v39t.zone, shotDist: v39t.shotDist, act: v39t.act,
+      atkThirdBackBlocked: v39t.atkThirdBlocked,
+      counterWin: v39t.counterWin || 0,
+      solo: v39t.solo || 0, soloBy: v39t.soloBy || {}, soloTry: v39t.soloTry || 0,
+      finish: { acc: V39_ACC, xg: V39_XG },
+      cards: cards,
+      cardTotal: DS.CARDS ? DS.CARDS.length : 0,
+      activeBuffs: (function () { var o = [], b2; for (b2 in buffs) { if (buffs.hasOwnProperty(b2) && buffs[b2] > 0) { o.push(b2 + ':' + Math.round(buffs[b2])); } } return o; })(),
+      overlays: v25t.overlays
     };
   };
 

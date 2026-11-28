@@ -802,7 +802,26 @@
       desc: '박스 밖에서도 과감하게 때린다. 슈팅 사거리·정확도가 크게 올라간다.', fx: 'longshot' },
     { key: 'roar',     name: '라커룸 일갈',      en: 'TEAM TALK',   tag: '템포', icon: 'shout',
       cost: 20, dur: 12, color: '#c8a83a',
-      desc: '벤치의 일갈로 전 선수가 달아오른다. 즉시 모멘텀 회복 + 전원 스피드 상승.', fx: 'roar' }
+      desc: '벤치의 일갈로 전 선수가 달아오른다. 즉시 모멘텀 회복 + 전원 스피드 상승.', fx: 'roar' },
+    /* ── v39 — 전술 카드 6종 추가 (총 18종) ── */
+    { key: 'false9',   name: '가짜 9번',        en: 'FALSE 9',     tag: '공격', icon: 'run',
+      cost: 30, dur: 20, color: '#d1553f',
+      desc: '최전방이 내려와 연계하고 2선이 그 자리로 침투한다. 슈팅 시도·스루패스 크게 상승.', fx: 'false9' },
+    { key: 'invert',   name: '인버티드 풀백',   en: 'INVERTED FB', tag: '전개', icon: 'pass',
+      cost: 24, dur: 24, color: '#2f8f9e',
+      desc: '풀백이 중원으로 접어 들어와 수적 우위를 만든다. 점유율·짧은 패스 연결 상승.', fx: 'invert' },
+    { key: 'counter',  name: '하이프레스 역습', en: 'COUNTER',     tag: '압박', icon: 'zap',
+      cost: 32, dur: 18, color: '#e07f2f',
+      desc: '탈취한 순간 곧바로 세로로 찌른다. 되찾은 볼이 최전방 뒤공간으로 빠르게 향한다.', fx: 'counter' },
+    { key: 'target',   name: '타겟맨 포스트',   en: 'TARGET MAN',  tag: '공격', icon: 'target',
+      cost: 26, dur: 22, color: '#a8762f',
+      desc: '최전방이 볼을 등지고 지켜 세컨볼을 만든다. 크로스·헤더 결정력 상승.', fx: 'target' },
+    { key: 'parkbus',  name: '파이브백 잠그기', en: 'PARK THE BUS', tag: '수비', icon: 'shield',
+      cost: 28, dur: 26, color: '#3a6f9e',
+      desc: '수비 라인을 다섯 장으로 내려 박스를 잠근다. 리드 지키기·상대 결정력 하락.', fx: 'parkbus' },
+    { key: 'jokersub', name: '슈퍼 조커',       en: 'SUPER SUB',   tag: '템포', icon: 'shout',
+      cost: 22, dur: 20, color: '#b98a2f',
+      desc: '후반 투입된 조커가 체력과 결정력을 끌어올린다. 후반 슈팅 정확도·체력 소모 개선.', fx: 'jokersub' }
   ];
   DS.CARDS = CARDS;
   DS.cardOf = function (key) {
@@ -811,6 +830,16 @@
     return null;
   };
   DS.DEFAULT_DECK = ['gegen', 'halfspace', 'isolate', 'build', 'tikitaka', 'longshot'];
+  /* v39 — 덱 편성 모달의 빠른 묶음 (18종을 6개 묶음으로 나눠 한눈에 보여 준다) */
+  /* v39 — 덱 목록에서 새 카드에 NEW 배지를 붙인다 */
+  DS.NEW_CARDS = ['false9', 'invert', 'counter', 'target', 'parkbus', 'jokersub'];
+  DS.CARD_GROUPS = [
+    { key: 'attack', name: '공격', keys: ['halfspace', 'linebreak', 'longshot', 'false9', 'target'] },
+    { key: 'press',  name: '압박', keys: ['gegen', 'trigger', 'counter'] },
+    { key: 'defense', name: '수비', keys: ['isolate', 'offside', 'parkbus'] },
+    { key: 'build',  name: '전개', keys: ['build', 'tikitaka', 'invert'] },
+    { key: 'tempo',  name: '템포·세트피스', keys: ['joker', 'roar', 'setpiece', 'jokersub'] }
+  ];
 
   /* ─────────────────────────  v22 — 전술 카드 고유 전략 일러스트  ─────────────────────────
      선수 얼굴 대신 카드마다 다른 전술보드 도트 일러스트(SVG)를 그린다.
@@ -930,6 +959,50 @@
         tArrow('longshot', 60, 56, 60, 14, 2.6) + tBall(60, 56) +
         '<circle cx="60" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/>' +
         '<path d="M54 12h12M60 6v12" stroke="currentColor" stroke-width="1.2" opacity=".8"/>';
+    },
+    /* v39 가짜 9번 — 최전방이 내려와 연계하고 2선이 그 자리로 파고든다 */
+    false9: function () {
+      return tDot(60, 24, '#e9f4dd', 3.6) + tDot(60, 44) +
+        tPath('M60 26v16', 1.6, '3 3') +
+        tArrow('false9', 60, 26, 44, 52, 2) + tArrow('false9', 60, 26, 76, 52, 2) +
+        '<path d="M40 58l8-6M44 62l8-4M76 58l-8-6M80 62l-8-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+        tDot(44, 54, '#e9f4dd', 2.6) + tDot(76, 54, '#e9f4dd', 2.6) + tBall(60, 24);
+    },
+    /* 인버티드 풀백 — 풀백이 중원으로 접어 삼각형을 만든다 */
+    invert: function () {
+      return tPath('M16 62Q34 46 48 44', 2) + tPath('M104 62Q86 46 72 44', 2) +
+        tArrow('invert', 20, 60, 46, 45, 1.8) + tArrow('invert', 100, 60, 74, 45, 1.8) +
+        tDot(20, 62, '#e9f4dd') + tDot(100, 62, '#e9f4dd') + tDot(48, 44) + tDot(72, 44) + tDot(60, 30) +
+        tPath('M48 44L72 44L60 30Z', 1.4, '3 3') + tBall(60, 30);
+    },
+    /* 하이프레스 역습 — 탈취 후 최전방 뒤공간으로 한 번에 */
+    counter: function () {
+      return tDot(34, 56) + tDot(52, 44) + tDot(74, 26) +
+        tArrow('counter', 34, 56, 50, 46, 2) + tArrow('counter', 52, 44, 72, 28, 2.2) +
+        tBall(34, 56) +
+        '<path d="M56 62l-10 10M56 62l10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+        '<circle cx="74" cy="26" r="4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 2"/>';
+    },
+    /* 타겟맨 포스트 — 최전방이 볼을 지키고 2선이 세컨볼을 줍는다 */
+    target: function () {
+      return tDot(60, 26, '#e9f4dd', 4) + tBall(66, 20) +
+        '<circle cx="60" cy="26" r="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 3"/>' +
+        tPath('M60 34v14', 1.6) + tArrow('target', 44, 58, 54, 44, 1.8) + tArrow('target', 84, 58, 68, 44, 1.8) +
+        tDot(42, 60, '#e9f4dd', 2.8) + tDot(86, 60, '#e9f4dd', 2.8);
+    },
+    /* 파이브백 잠그기 — 다섯 장 수비 라인이 박스를 잠근다 */
+    parkbus: function () {
+      return '<rect x="30" y="10" width="60" height="26" rx="4" fill="currentColor" opacity=".18"/>' +
+        '<path d="M26 40h68" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/>' +
+        tDot(30, 40) + tDot(45, 40) + tDot(60, 40) + tDot(75, 40) + tDot(90, 40) +
+        tPath('M42 52v14M60 50v16M78 52v14', 1.4, '3 3') + tDot(60, 68, '#e9f4dd');
+    },
+    /* 슈퍼 조커 — 교체 투입된 조커가 후반을 뒤집는다 */
+    jokersub: function () {
+      return '<path d="M58 14l-14 24h11l-5 20 19-26H58l7-18z" fill="currentColor" opacity=".92"/>' +
+        tArrow('jokersub', 84, 60, 66, 40, 2) + tArrow('jokersub', 34, 62, 46, 44, 2) +
+        tDot(84, 62, '#e9f4dd', 2.8) + tDot(32, 64, '#e9f4dd', 2.8) +
+        '<path d="M14 20h14M14 28h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>';
     },
     /* 라커룸 일갈 — 벤치의 외침이 전원을 달구다 */
     roar: function () {
@@ -1699,15 +1772,25 @@
       .replace(/\{traitdesc\}/g, tr.desc);
   }
 
+  /* v39 — 유효 능력치: 정수 기본기 + 소수 성장잔량(fs/ft/fp).
+     능력치 1점이 OVR 2.5~7.2를 옮기기 때문에, 정수 단위만으로는 성장이 '한 단계씩' 톱니다.
+     그래서 훈련·레벨이 주는 성장을 소수로 모아 두고, 1점이 차면 그때 기본기가 오른다. */
+  function effStat(p, key) {
+    if (!p) { return 1; }
+    var f = p['f' + key];
+    return clamp((p[key] || 1) + (typeof f === 'number' && isFinite(f) ? f : 0), 1, 10);
+  }
+  DS.effStat = effStat;
   function statSheet(p) {
     var w = POS[p.pos].w;
-    var spd = clamp(Math.round(26 + p.s * 6.4 + p.t * 0.8), 20, 99);
-    var atk = clamp(Math.round(24 + p.t * (5.4 + w.t * 2) + p.p * 1.8), 20, 99);
-    var def = clamp(Math.round(24 + p.p * (5.2 + w.p * 2) + p.s * 1.4), 20, 99);
+    var s0 = effStat(p, 's'), t0 = effStat(p, 't'), p0 = effStat(p, 'p');
+    var spd = clamp(Math.round(26 + s0 * 6.4 + t0 * 0.8), 20, 99);
+    var atk = clamp(Math.round(24 + t0 * (5.4 + w.t * 2) + p0 * 1.8), 20, 99);
+    var def = clamp(Math.round(24 + p0 * (5.2 + w.p * 2) + s0 * 1.4), 20, 99);
     if (p.pos === 'GK') {
-      def = clamp(Math.round(30 + p.p * 4.4 + p.t * 2.6), 20, 99);
-      atk = clamp(Math.round(16 + p.t * 2.0), 20, 60);
-      spd = clamp(Math.round(24 + p.s * 4.0), 20, 80);
+      def = clamp(Math.round(30 + p0 * 4.4 + t0 * 2.6), 20, 99);
+      atk = clamp(Math.round(16 + t0 * 2.0), 20, 60);
+      spd = clamp(Math.round(24 + s0 * 4.0), 20, 80);
     }
     return { spd: spd, atk: atk, def: def };
   }
@@ -1718,9 +1801,39 @@
     var v = p && typeof p.pot === 'number' ? p.pot : 99;
     return clamp(v, 20, 99);
   }
+  /* v39 — 등급별 잠재 구간. 유저 제보: "잠재력 상한이 이상함, 은인데 70을 못넘김".
+     v33까지는 등급과 잠재를 따로 굴려(이적시장 영입 시 rating+6 → 은 62가 잠재 68)
+     등급과 잠재가 어긋났다. 이제 등급별 구간을 정해 두고 **생성·영입·세이브 보정 모두** 맞춘다.
+       동 68~78 · 은 75~84 · 금 82~88 · 레전드 88~94
+     유소년(v26c 70~92) 구간은 이 범위 안에 그대로 들어온다(동 70~78 · 은 79~84 · 금 85~88 · 전설 89~92). */
+  var POT_RANGE = { dong: [68, 78], eun: [75, 84], geum: [82, 88], legend: [88, 94] };
+  DS.POT_RANGE = POT_RANGE;
+  function potRangeOf(p) { return (p && POT_RANGE[p.rarity]) || POT_RANGE.dong; }
+  function potFloorFor(p) { return potRangeOf(p)[0]; }
+  DS.potRangeOf = potRangeOf;
+  DS.potFloorFor = potFloorFor;
+  /* 새로 잠재를 잡을 때: 등급 구간 안에서, 지금 OVR보다는 낮지 않게
+     (상한이 현재 OVR 밑에 걸려 'OVR 75인데 68에서 멈춤' 같은 모순이 생기지 않게) */
+  DS.fitPot = function (p, want) {
+    if (!p) { return POT_RANGE.dong[0]; }
+    var r = potRangeOf(p);
+    var base = typeof want === 'number' ? want : (typeof p.pot === 'number' ? p.pot : r[0]);
+    var lo = Math.max(r[0], rawRating(p));
+    p.pot = clamp(Math.max(lo, Math.min(base, r[1])), 20, 99);
+    return p.pot;
+  };
+  /* 옛 세이브 정리 — 잠재가 등급 하한보다 낮으면 하한까지 올린다
+     (이미 상한을 넘긴 선수의 표시는 상세창에서 '잠재 상한 적용 중' 으로 설명한다) */
+  DS.normalizePot = function (p) {
+    if (!p) { return false; }
+    var floor = potFloorFor(p), cur = typeof p.pot === 'number' ? p.pot : null;
+    if (cur === null) { return false; }
+    if (cur < floor && rawRating(p) < floor) { p.pot = floor; return true; }
+    return false;
+  };
   function rawRating(p) {
     var w = POS[p.pos].w;
-    var v = p.s * w.s + p.t * w.t + p.p * w.p;
+    var v = effStat(p, 's') * w.s + effStat(p, 't') * w.t + effStat(p, 'p') * w.p;
     var lv = p.level || 0;
     var raw = 22 + v * 7.2 + lv * 1.1 + (RARITY[p.rarity].stars - 2) * 1.2;
     return clamp(Math.round(raw), 20, 99);
@@ -1841,7 +1954,8 @@
       p.rarity = 'dong';
       st = INITIAL_STATS[i] || [5, 5, 5];
       p.s = st[0]; p.t = st[1]; p.p = st[2];
-      p.pot = Math.min(78, ratingOf(p) + 10);
+      /* v39 — 잠재 하한 70 보장 (초기 동 등급이 OVR 62~68에서 금방 막히지 않게) */
+      DS.fitPot(p, Math.min(78, ratingOf(p) + 10));
       if (i === 9) {
         p.name = '차도훈'; p.trait = 'clutch'; p.nickname = '마지막 한 방';
       }
@@ -1873,23 +1987,47 @@
     n = n || 1;
     var pot = potOf(p), applied = 0, before;
     while (applied < n) {
-      if ((p[key] || 1) >= 10 || rawRating(p) >= pot) { break; }
-      before = p[key];
+      if (effStat(p, key) >= 9.999 || rawRating(p) >= pot) { break; }
+      before = p[key] || 1;
       p[key] = clamp(before + 1, 1, 10);
       if (rawRating(p) > pot) { p[key] = before; break; }
       applied++;
     }
     /* v38 — 누적 성장 이력(상세창 표시용). 옛 세이브는 0에서 시작한다. */
-    if (applied) { p.dev = (p.dev || 0) + applied; }
+    if (applied) { p.dev = Math.round(((p.dev || 0) + applied) * 10) / 10; }
+    p.stats = statSheet(p);
+    return applied;
+  };
+  /* v39 — 소수 성장. 능력치 1점이 OVR 2.5~7.2를 옮기므로, 레벨·특훈의 성장을
+     잔량(fs/ft/fp)으로 모았다가 1점이 차면 기본기를 올린다. 상한(pot)에 닿으면 잔량도 멈춘다. */
+  DS.LEVEL_GAIN = 0.08;        /* 1군 레벨당 성장 잔량 (약 OVR +0.6) */
+  DS.RESERVE_LEVEL_GAIN = 0.20;/* 2군·유소년 레벨당 (2시즌에 74~78에 닿는 곡선) */
+  DS.TRAIN_GAIN_K = 0.06;      /* 특훈 메뉴 1점당 잔량 (메뉴 2개 = 0.12) */
+  DS.growSoft = function (p, key, amt) {
+    if (!p || !key || !(amt > 0)) { return 0; }
+    var pot = potOf(p);
+    if (rawRating(p) >= pot) { return 0; }
+    var fk = 'f' + key;
+    var f0 = (typeof p[fk] === 'number' && isFinite(p[fk])) ? p[fk] : 0;
+    var i0 = p[key] || 1, applied = 0;
+    p[fk] = f0 + amt;
+    while (p[fk] >= 1 && p[key] < 10) { p[key] = p[key] + 1; p[fk] -= 1; applied++; }
+    if (p[key] >= 10) { p[fk] = Math.min(p[fk], 0.999); }
+    if (rawRating(p) > pot) { p[fk] = f0; p[key] = i0; return 0; }
+    p.dev = Math.round(((p.dev || 0) + amt) * 100) / 100;
     p.stats = statSheet(p);
     return applied;
   };
   /* v33 — 이미 상한을 넘은 세이브(ovr > pot)를 표시·성장 기준에서 정리한다. */
   DS.atPotCap = function (p) { return !!p && rawRating(p) >= potOf(p); };
-  /* v38 — 상세창 잠재력 게이지: 지금 OVR이 잠재 상한의 몇 %인지 */
+  /* v38 — 상세창 잠재력 게이지: 지금 OVR이 잠재 상한의 몇 %인지
+     v39 — applied(=실제 경기 적용 OVR = ratingOf)와 over(기초 성장치가 상한을 넘은 옛 세이브)를 함께 돌려준다. */
   DS.potPct = function (p) {
-    var raw = rawRating(p), pot = potOf(p);
-    return { raw: raw, pot: pot, gap: Math.max(0, pot - raw), pct: pot <= 0 ? 100 : clamp(Math.round(raw / pot * 100), 0, 100) };
+    var raw = rawRating(p), pot = potOf(p), applied = Math.min(raw, pot);
+    return {
+      raw: raw, pot: pot, applied: applied, over: Math.max(0, raw - pot),
+      gap: Math.max(0, pot - raw), pct: pot <= 0 ? 100 : clamp(Math.round(applied / pot * 100), 0, 100)
+    };
   };
   DS.starsOf = starsOf;
   DS.statSheet = statSheet;
@@ -1900,8 +2038,10 @@
   DS.resetNames = function () { USED = {}; };
 
   /* ─────────────────────────  v21 — 경기 EXP · 이적시장 · 유소년 아카데미  ───────────────────────── */
-  /* 레벨업에 필요한 EXP. 레벨이 오를수록 선형으로 늘어나 성장이 느려진다. */
-  DS.expToNext = function (level) { return 520 + (level || 0) * 420; };
+  /* 레벨업에 필요한 EXP. 레벨이 오를수록 선형으로 늘어나 성장이 느려진다.
+     v39 — 성장 속도 완화: 520+420L → 780+620L (약 1.5배). 한 시즌 안에 잠재 상한까지
+        달려 버리던 페이스를 늦추고, 유소년(×2.2 · 2군)은 2시즌에 74~78에 닿게 맞춘다. */
+  DS.expToNext = function (level) { return 1020 + (level || 0) * 780; };
 
   /* ─────────────────────────  v23 — 나이 곡선 · 유소년/감독 성장 가중  ─────────────────────────
      FM처럼 나이 구간에 따라 성장 속도가 달라지고, 32세부터는 시즌마다 피지컬이 빠진다. */
@@ -1924,7 +2064,18 @@
 
   /* 유소년(아카데미·승격 후에도 유지) EXP 가중 */
   DS.YOUTH_EXP_MULT = 2.2;
+  /* v39 — 유소년 EXP 배율(×2.2 · 감독 youthMult)은 '21세까지'만. 22세부터는 일반 선수와 같다.
+     (유저 확정: "유망주도 21세까지") */
+  DS.YOUTH_AGE_MAX = 21;
   DS.isYouthOrigin = function (p) { return !!(p && (p.originYouth || p.youth)); };
+  DS.youthBonusOn = function (p) {
+    return DS.isYouthOrigin(p) && (typeof p.age !== 'number' || p.age <= DS.YOUTH_AGE_MAX);
+  };
+  DS.youthBonusText = function (p) {
+    if (!DS.isYouthOrigin(p)) { return ''; }
+    return DS.youthBonusOn(p) ? '유소년 ×' + DS.YOUTH_EXP_MULT + ' (21세까지)'
+      : '유소년 배율 종료 (22세~)';
+  };
 
   function weightedKey(keys, adj) {
     var tot = 0, i, r;
@@ -1960,12 +2111,14 @@
       return true;
     }
     if (mode === 'reserve') {
-      if (chance(0.70 * head)) { bump(best); }
-      if (chance(0.38 * head)) { bump(weightedKey(keys, adj)); }
+      /* 유소년·2군 — 2시즌에 OVR 74~78 (v23 합의 목표) */
+      DS.growSoft(p, best, DS.RESERVE_LEVEL_GAIN * (0.65 + 0.35 * head));
+      if (chance(0.45)) { DS.growSoft(p, weightedKey(keys, adj), DS.RESERVE_LEVEL_GAIN * 0.45); }
       if (chance(0.20)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
     } else {
-      bump(best);
-      if (chance(0.4)) { o = weightedKey(keys, adj); bump(o); }
+      /* v39 — 레벨당 성장을 소수 잔량으로 (약 OVR +0.6).
+         예전엔 레벨 1회에 능력치 1.4점(OVR +8~10)이 붙어 두세 레벨이면 상한을 찍었다. */
+      DS.growSoft(p, best, DS.LEVEL_GAIN * (0.7 + 0.3 * head));
       if (chance(0.22)) { v = p.set && p.set.cap; if (typeof v === 'number') { p.set.cap = clamp(v + 1, 1, 10); } }
     }
     p.stats = statSheet(p);
@@ -1975,7 +2128,8 @@
   DS.matchExpGain = function (p, o) {
     o = o || {};
     var g = DS.growthOf(o.mgr), stage = DS.ageStage(p && p.age);
-    var youth = DS.isYouthOrigin(p);
+    /* v39 — 21세까지만 유소년 배율. 22세부터 youthMult = 1 (경기 EXP는 일반 선수와 동일) */
+    var youth = DS.youthBonusOn(p);
     var base = typeof o.base === 'number' ? o.base : 70;
     var rating = typeof o.rating === 'number' ? o.rating : 6;
     var goals = o.goals || 0, assists = o.assists || 0;
@@ -1999,7 +2153,7 @@
     var ups = 0, guard = 0;
     p.exp = (p.exp || 0) + Math.round(exp);
     p.expTotal = (p.expTotal || 0) + Math.round(exp);
-    if (typeof p.pot !== 'number') { p.pot = Math.min(95, Math.max(60, ratingOf(p) + 8)); }
+    if (typeof p.pot !== 'number') { DS.fitPot(p, Math.min(95, Math.max(60, ratingOf(p) + 8))); }
     var pot = potOf(p), need;
     while (p.exp >= (need = DS.expToNext(p.level || 0)) && guard < 8) {
       /* v33 — 잠재력 상한. 레벨도 OVR에 반영되므로 상한에 닿으면 레벨업을 멈춘다
@@ -2014,6 +2168,19 @@
       ups++; guard++;
     }
     return ups;
+  };
+
+  /* v39 — 정수 능력치를 소수로 부분 적용 (콤보·시설 보너스용). */
+  DS.applyGain = function (p, key, n) {
+    return DS.growSoft(p, key, n);
+  };
+  /* v39 — 특훈은 '레벨 +1' 대신 훈련 EXP를 준다.
+     예전에는 doTrain() 한 번에 레벨이 하나씩 올라, 경기 EXP와 상관없이 돈만 있으면
+     한 시즌 안에 잠재 상한을 찍었다. 지금은 다음 레벨 요구치의 45%를 훈련 EXP로 준다. */
+  DS.TRAIN_EXP_SHARE = 0.35;
+  DS.trainExpGain = function (p) {
+    var lv = (p && p.level) || 0;
+    return Math.max(80, Math.round(DS.expToNext(lv) * DS.TRAIN_EXP_SHARE));
   };
 
   /* ── v23 — 2군 경기 시뮬레이션 (리그 라운드마다 1회) ──
@@ -2153,6 +2320,8 @@
         p.stats = statSheet(p);
       }
       fee = Math.round(DS.marketValue(p) * (0.92 + R() * 0.34) / 50) * 50;
+      /* v39 — 매물도 잠재를 달고 나온다 (나이 어릴수록 여유가 크다 · 등급별 하한 적용) */
+      DS.fitPot(p, DS.ratingOf(p) + (age <= 21 ? 12 : (age <= 24 ? 9 : (age <= 28 ? 6 : 3))));
       from = teams[Math.floor(R() * teams.length)];
       /* v23 — 매물도 포지션·등급에 맞는 롤을 달고 나온다 */
       if (!p.role) { p.role = DS.pickRoleFor(p); }

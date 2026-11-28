@@ -77,13 +77,28 @@
 
   /* ═════════════════  상태  ═════════════════ */
   /* v22 — 리그 표. 1부·2부 각 20팀이고, 우리 구단은 소속 리그 표에만 들어간다. */
-  function makeTable(division, withMe) {
+  /* v39 — seed: 0라운드(0경기) 순위표의 기준값. 직전 시즌 최종 순위를 넣어 두면
+     '14위로 끝난 팀이 새 시즌 1위로 보이는' 일이 없다(같은 리그 잔류 = 1~20,
+     다른 리그에서 올라온 승격·강등 팀 = 100+직전 순위로 맨 아래). */
+  function makeTable(division, withMe, seeds) {
     var rows = [], list = divTeams(division), i;
-    if (withMe) { rows.push({ id: 'me', name: '꼬마일레븐 FC', short: '꼬마', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 }); }
+    seeds = seeds || {};
+    if (withMe) {
+      rows.push({ id: 'me', name: '꼬마일레븐 FC', short: '꼬마', p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0, seed: seeds.me || 0 });
+    }
     for (i = 0; i < list.length; i++) {
-      rows.push({ id: list[i].id, name: list[i].name, short: list[i].short, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 });
+      rows.push({ id: list[i].id, name: list[i].name, short: list[i].short, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0, seed: seeds[list[i].id] || 0 });
     }
     return rows;
+  }
+  /* v39 — 0라운드 정렬: 직전 시즌 순위(seed) → 모르면 팀 전력 → 이름 */
+  function seedOrder(a, b) {
+    var sa = a.seed || 0, sb = b.seed || 0;
+    if (sa > 0 && sb > 0 && sa !== sb) { return sa - sb; }
+    if ((sa > 0) !== (sb > 0)) { return sa > 0 ? -1 : 1; }
+    var pa = rowStrengthNever(a), pb = rowStrengthNever(b);
+    if (pb !== pa) { return pb - pa; }
+    return a.name < b.name ? -1 : 1;
   }
 
   /* ═════════════════  리그 대진표 (v22: 20팀 · 38라운드 더블 라운드 로빈) ═════════════════
@@ -171,10 +186,13 @@
       if (db !== da) { return db - da; }
       if (b.gf !== a.gf) { return b.gf - a.gf; }
     } else {
-      var sa = rowStrength(a), sb = rowStrength(b);
-      if (sb !== sa) { return sb - sa; }
+      /* v39 — 0경기(시즌 시작)에는 직전 시즌 순위(seed)를 먼저 본다 */
+      return seedOrder(a, b);
     }
     return a.name < b.name ? -1 : 1;
+  }
+  function rowStrengthNever(r) {
+    try { return rowStrength(r); } catch (e) { return 0; }
   }
   function sortRows(rows) {
     var pre = true, i;
@@ -415,7 +433,7 @@
         np.role = null;
         np.tenure = 1;
         np.academy = true;
-        np.pot = Math.min(74, DS.ratingOf(np) + 10);
+        np.pot = DS.fitPot(np, Math.min(78, DS.ratingOf(np) + 10));
         for (ak in np.apt) {
           if (np.apt.hasOwnProperty(ak)) { np.apt[ak] = clamp(Math.round(np.apt[ak] * 0.6), 2, 7); }
         }
@@ -554,14 +572,26 @@
       if (!d.form || !d.form.length) { d.form = []; }
       if (!d.form.length && d.totals && d.totals.matches > 0 && d.tut.done === false) { d.tut.done = true; }
       var i2;
+      var potFixed = 0;
       for (i2 = 0; i2 < d.squad.length; i2++) {
         var sq0 = d.squad[i2];
         if (typeof sq0.exp !== 'number') { sq0.exp = 0; }
         if (typeof sq0.expTotal !== 'number') { sq0.expTotal = sq0.exp || 0; }
         if (typeof sq0.dev !== 'number') { sq0.dev = 0; }
+        /* v39 — 소수 성장 잔량 필드 (옛 세이브 0 보상) */
+        if (typeof sq0.fs !== 'number' || !isFinite(sq0.fs)) { sq0.fs = 0; }
+        if (typeof sq0.ft !== 'number' || !isFinite(sq0.ft)) { sq0.ft = 0; }
+        if (typeof sq0.fp !== 'number' || !isFinite(sq0.fp)) { sq0.fp = 0; }
         if (typeof sq0.level !== 'number') { sq0.level = 0; }
-        if (typeof sq0.pot !== 'number') { sq0.pot = Math.min(95, Math.max(60, DS.ratingOf(sq0) + 8)); }
+        if (typeof sq0.pot !== 'number') { DS.fitPot(sq0, Math.min(95, Math.max(60, DS.ratingOf(sq0) + 8))); }
+        else if (DS.normalizePot(sq0)) { potFixed = (potFixed || 0) + 1; }
         if (!sq0.lock || !DS.LOCK_FX[sq0.lock]) { sq0.lock = DS.LOCKER[i2 % 4].key; }
+      }
+      /* v39 — 잠재 하한(등급별 70/74/80/86)보다 낮던 옛 세이브 선수를 정리한다 */
+      if (potFixed) {
+        d.potFixed39 = potFixed;
+        if (!d.log) { d.log = []; }
+        d.log.push('v39 잠재 하한 보정 — ' + potFixed + '명');
       }
       if (d.youth && d.youth.intake) {
         for (i2 = 0; i2 < d.youth.intake.length; i2++) {
@@ -1119,6 +1149,7 @@
       nextHTML + deckHTML +
       '<div class="card">' +
       '<div class="card-head"><b>' + divName(view) + ' 리그 순위</b>' + divTabs + '</div>' +
+      ((function () { for (var q = 0; q < vrows.length; q++) { if (vrows[q].p > 0) { return ''; } } return '<div class="tiny muted tbl-note">0R — 직전 시즌 최종 순위 기준 (승격·강등 팀은 맨 아래)</div>'; })()) +
       '<table class="tbl"><thead><tr><th>#</th><th style="text-align:left">구단</th><th>경기</th><th>득실</th><th>승점</th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div class="zlegend">' + legendInner + '</div>' +
       '<div class="tiny muted" style="margin-top:3px">' + (view === S.division ? '우리 리그' : '관전용 · ' + divName(view) + ' 다른 리그') + ' · ' + totalTeams + '팀 · ' + roundInfo().total + '라운드 · ' + roundLabel() + '</div>' +
@@ -1479,7 +1510,7 @@
     /* v28 — 유망주는 '한 시즌 3명 고정'.
        시즌이 바뀔 때(또는 첫 초기화)만 20세 초과 졸업 처리 뒤 3명까지 채우고,
        같은 시즌 안에서는 매각·승격으로 빈자리가 생겨도 절대 다시 채우지 않는다(무한 매각 파밍 방지). */
-    if (y.season !== S.season) {
+    if (typeof y.season !== 'number' || y.season !== S.season) {
       var keep = [], k;
       for (k = 0; k < y.intake.length; k++) {
         if ((y.intake[k].age || 16) <= 20) { keep.push(y.intake[k]); }
@@ -1537,7 +1568,7 @@
     var w = DS.POS[pos].w;
     var keys = ['s', 't', 'p'], best = 's', i;
     for (i = 1; i < keys.length; i++) { if ((w[keys[i]] || 0) > (w[best] || 0)) { best = keys[i]; } }
-    if (chance(0.7)) { DS.growAttr(p, best, 1); }
+    if (chance(0.7)) { DS.growSoft(p, best, 0.34); }
     if (chance(0.35)) { p.set.cap = clamp((p.set.cap || 1) + 1, 1, 10); }
     p.exp = (p.exp || 0) + Math.round(120 * DS.trainMultOf(p));
     if (p.exp >= DS.expToNext(p.level || 0) && !DS.atPotCap(p)) {
@@ -1561,7 +1592,7 @@
     p.youth = false;
     /* v23 — 유소년 출신 표식을 남긴다. 1군에서도 경기 EXP ×2.2를 계속 받는다. */
     p.originYouth = true;
-    p.pot = p.pot || Math.min(95, Math.max(60, DS.ratingOf(p) + 10));
+    p.pot = DS.fitPot(p, p.pot || Math.min(95, Math.max(60, DS.ratingOf(p) + 10)));
     S.squad.push(p);
     EXTRA[p.id] = p;
     S.dex.players[p.name] = 1;
@@ -1751,7 +1782,7 @@
         (DS.youthPotTier ? ' (' + DS.youthPotTier(sel.pot || 70).name + ')' : '') + '</div>' +
         '<div class="tiny" style="margin-top:2px"><span class="age-badge" style="color:' + stage.color + ';border-color:' + stage.color + '55">' + stage.name + '</span>' +
         '<span class="age-badge youth">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</span>' +
-        '<span class="tiny muted">2군 1경기 +' + Math.round(140 * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외</span></div>';
+        '<span class="tiny muted">2군 1경기 +' + Math.round(140 * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외 · 유소년 배율은 21세까지</span></div>';
     }
     var cost = sel ? youthCost(sel) : 0;
     var inRes = sel ? (ensureReserve().ids.indexOf(sel.id) >= 0) : false;
@@ -1759,7 +1790,8 @@
     return '<div class="card">' +
       '<div class="card-head"><b>유소년 아카데미</b><span class="meta">U-18 · ' + y.intake.length + '/' + YOUTH_SIZE + '명 · 시즌 ' + S.season + '</span></div>' +
       '<div class="youth-grid">' + cards + '</div>' +
-      '<div class="tiny muted" style="margin-top:3px">한 시즌 3명 고정 · 매각·승격한 자리는 다음 시즌에만 충원됩니다.</div>' +
+      '<div class="tiny muted" style="margin-top:3px">한 시즌 3명 고정 · 매각·승격한 자리는 다음 시즌 시작에 ' + YOUTH_SIZE + '명까지 보충됩니다.' +
+      (y.intake.length < YOUTH_SIZE ? ' (지금 ' + y.intake.length + '명 — 다음 시즌에 ' + (YOUTH_SIZE - y.intake.length) + '명 충원 예정)' : '') + '</div>' +
       '<div class="youth-coach"><span class="tiny muted" style="flex:0 0 auto">포지션 목표</span><div class="pcwrap">' + posChips + '</div></div>' +
       aptLine +
       '<div class="row" style="gap:4px;margin-top:5px;flex-wrap:wrap">' +
@@ -1959,6 +1991,7 @@
       if (i === 0 && guaranteed) { rarity = 'legend'; }
       var p = DS.makePlayer({ rarity: rarity });
       if (i === 0 && guaranteed) { p.guaranteed = true; }
+      DS.fitPot(p, Math.min(95, DS.ratingOf(p) + 10));
       p.pic = DS.nextFreePic(taken, p.pos);
       taken.push(p);
       S.scoutCandidates.push(p);
@@ -2040,7 +2073,7 @@
     t.listings = t.listings.filter(function (x) { return x.id !== id; });
     if (!p) { return; }
     p.exp = p.exp || 0;
-    p.pot = p.pot || Math.min(95, Math.max(60, DS.ratingOf(p) + 6));
+    p.pot = DS.fitPot(p, p.pot || Math.min(95, Math.max(60, DS.ratingOf(p) + 6)));
     S.squad.push(p);
     EXTRA[p.id] = p;
     S.dex.players[p.name] = 1;
@@ -2385,7 +2418,7 @@
     if (!cmp || cmp.id === p.id) { return ''; }
     var a = DS.potPct(p), b = DS.potPct(cmp);
     var rows = '';
-    rows += '<div class="cmp-row"><span>OVR(실제)</span><b>' + a.raw + '</b><b>' + b.raw + '</b>' + deltaChip(a.raw, b.raw) + '</div>';
+    rows += '<div class="cmp-row"><span>현재 OVR</span><b>' + a.applied + '</b><b>' + b.applied + '</b>' + deltaChip(a.applied, b.applied) + '</div>';
     rows += '<div class="cmp-row"><span>잠재 상한</span><b>' + a.pot + '</b><b>' + b.pot + '</b>' + deltaChip(a.pot, b.pot) + '</div>';
     rows += '<div class="cmp-row"><span>스피드</span><b>' + p.stats.spd + '</b><b>' + cmp.stats.spd + '</b>' + deltaChip(p.stats.spd, cmp.stats.spd) + '</div>';
     rows += '<div class="cmp-row"><span>공격</span><b>' + p.stats.atk + '</b><b>' + cmp.stats.atk + '</b>' + deltaChip(p.stats.atk, cmp.stats.atk) + '</div>';
@@ -2402,10 +2435,15 @@
   }
   function potGaugeHTML(p) {
     var g = DS.potPct(p), capped = DS.atPotCap(p);
-    return '<div class="potg' + (capped ? ' capped' : '') + '">' +
-      '<div class="pg-top"><span>OVR(실제) <b>' + g.raw + '</b></span><span>잠재 상한 <b>' + g.pot + '</b></span>' +
+    /* v39 — 게이지의 '현재 OVR'은 실제 경기 적용 OVR(DS.ratingOf)로 통일한다.
+       옛 세이브 중 기초 성장치(rawRating)가 잠재보다 큰 선수는 그 차이를 보조 문구로 설명한다. */
+    var over = g.over > 0;
+    return '<div class="potg' + (capped ? ' capped' : '') + (over ? ' over' : '') + '">' +
+      '<div class="pg-top"><span>현재 OVR <b>' + g.applied + '</b></span><span>잠재 상한 <b>' + g.pot + '</b></span>' +
       (capped ? '<em class="pot-badge">잠재력 한계 도달</em>' : '<em class="pot-gap">+' + g.gap + ' 여유</em>') + '</div>' +
       '<div class="pg-bar"><i style="width:' + g.pct + '%"></i></div>' +
+      (over ? '<div class="pg-over">잠재 상한(' + g.pot + ') 적용 중 · 기초 성장치 ' + g.raw +
+        ' — 경기 OVR은 상한 ' + g.pot + '으로 계산되어 ' + g.applied + '입니다</div>' : '') +
       '<div class="pg-foot">' + (capped
         ? '상한에 닿았습니다 — 경기 EXP로는 능력치가 더 오르지 않고, 롤 진화·훈련 콤보 특기만 남습니다'
         : '잠재력까지 ' + g.gap + ' 남았습니다 — 출전·특훈으로 채우세요') + '</div></div>';
@@ -2418,7 +2456,12 @@
         '<span class="num">' + v + '</span></div>';
     }
     return '<div class="st3">' + row('스피드', s.spd, '#4aa8e0') + row('공격', s.atk, '#e2553f') + row('수비', s.def, '#2f8f62') + '</div>' +
-      '<div class="tiny muted">기본기 — 스피드 ' + p.s + '/10 · 테크닉 ' + p.t + '/10 · 파워 ' + p.p + '/10 · 포지션 가중치가 위 3종에 반영됩니다</div>';
+      '<div class="tiny muted">기본기 — 스피드 ' + fmtStat(p, 's') + '/10 · 테크닉 ' + fmtStat(p, 't') + '/10 · 파워 ' + fmtStat(p, 'p') + '/10 · 포지션 가중치가 위 3종에 반영됩니다</div>';
+  }
+  /* v39 — 기본기는 정수 + 소수 성장잔량을 함께 보여 준다 (7.4/10 처럼) */
+  function fmtStat(p, key) {
+    var v = DS.effStat ? DS.effStat(p, key) : (p[key] || 1);
+    return Math.abs(v - Math.round(v)) < 0.05 ? String(Math.round(v)) : v.toFixed(1);
   }
   function growthHTML(p) {
     var need = DS.expToNext(p.level || 0), exp = Math.max(0, Math.min(p.exp || 0, need));
@@ -2428,7 +2471,8 @@
       '<div class="gr-row"><span>레벨</span><b>Lv.' + (p.level || 0) + '</b><em>' + st.name + ' ×' + st.expMult + '</em></div>' +
       '<div class="gr-row"><span>경기 EXP</span><b>' + exp + ' / ' + need + '</b><em>누적 ' + (p.expTotal || 0) + '</em></div>' +
       '<div class="gr-bar"><i style="width:' + pct + '%"></i></div>' +
-      '<div class="gr-row"><span>누적 성장</span><b>+' + (p.dev || 0) + ' 포인트</b><em>훈련 성장 ×' + tm.toFixed(2) + '</em></div>' +
+      '<div class="gr-row"><span>누적 성장</span><b>+' + (Math.round((p.dev || 0) * 10) / 10) + ' 포인트</b><em>훈련 성장 ×' + tm.toFixed(2) + '</em></div>' +
+      (DS.youthBonusText && DS.youthBonusText(p) ? '<div class="gr-row"><span>유소년 배율</span><b>' + DS.youthBonusText(p) + '</b><em>' + (DS.youthBonusOn(p) ? '경기 EXP ×' + DS.YOUTH_EXP_MULT : '일반 선수와 동일') + '</em></div>' : '') +
       '<div class="gr-row"><span>통산 기록</span><b>' + (p.apps || 0) + '경기 · ' + (p.goals || 0) + '골 · ' + (p.assists || 0) + '도움</b></div>' +
       '</div>';
   }
@@ -2598,7 +2642,8 @@
       cards += '<button class="deckrow' + (on ? ' on' : '') + '" data-act="deckpick" data-k="' + d.key + '">' +
         '<span class="dr-art" style="--cc:' + d.color + '">' + DS.tacticArtHTML(d.key) +
         '<em style="color:' + d.color + '">' + d.tag + '</em></span>' +
-        '<span class="dtxt"><b>' + d.name + ' <em>M ' + d.cost + '</em></b><span>' + d.desc + '</span></span>' +
+        '<span class="dtxt"><b>' + d.name + ' <em>M ' + d.cost + '</em>' +
+        (DS.NEW_CARDS && DS.NEW_CARDS.indexOf(d.key) >= 0 ? ' <i class="newtag">NEW</i>' : '') + '</b><span>' + d.desc + '</span></span>' +
         '<span class="dstate' + (on ? ' on' : '') + '">' + (on ? '편성' : '추가') + '</span></button>';
     }
     setSheet('전술 카드 덱 · ' + deckDraft.length + '/6',
@@ -2906,7 +2951,7 @@
       var e = list[i], pct = Math.max(2, Math.min(100, Math.round(e.expLeft / Math.max(1, e.need) * 100)));
       rows += '<div class="ex-row' + (e.levels ? ' up' : '') + '">' +
         '<span class="ex-nm">' + esc(e.name) + '<em>' + e.pos + '</em>' +
-        (e.youth ? '<span class="ex-tag yth">유망주 ×' + (e.youthMult || 2.2) + '</span>' : '') +
+        (e.youth ? '<span class="ex-tag yth">유소년 ×' + (e.youthMult || 2.2) + ' · 21세까지</span>' : '') +
         (e.stage && e.stage !== 'mature' ? '<span class="ex-tag ' + e.stage + '">' + e.stageName + '</span>' : '') +
         '</span>' +
         '<span class="ex-bar"><i style="width:' + pct + '%"></i></span>' +
@@ -3926,17 +3971,24 @@
     return out;
   }
 
-  /* v27 — 시즌 상금 표를 한 곳에 모은다(결산 화면과 지급이 같은 값을 쓰게) */
+  /* v27 — 시즌 상금 표를 한 곳에 모은다(결산 화면과 지급이 같은 값을 쓰게)
+     v39 — 유저 제보: "시즌 보상이 너무 낮음". 경기당 수입(2부 700~1,400 · 38라운드 누적 3만~5만)에
+     비해 시즌 상금 1,000~5,200은 체감이 없었다. 순위별로 완만하게 내려가는 표로 크게 올린다.
+       1부 1위 35,000(우승 보너스 +9,000 포함) ~ 20위 3,800
+       2부 1위 14,000 ~ 20위 2,000 */
   function seasonPrize(div, rank) {
-    if (div === 1) { return rank === 1 ? 5200 : (rank === 2 ? 3600 : (rank === 3 ? 2400 : 1400)); }
-    return rank === 1 ? 3600 : (rank === 2 ? 2400 : (rank === 3 ? 1600 : 1000));
+    var r = Math.min(20, Math.max(1, rank || 20));
+    var top = div === 1 ? 26000 : 14000, low = div === 1 ? 3800 : 2000;
+    var v = top + (low - top) * ((r - 1) / 19);
+    if (div === 1 && r === 1) { v += 9000; }
+    return Math.round(v / 100) * 100;
   }
 
   function newSeason() {
     var rv = ensureSeasonReview();
     var rank = ourRank();
     var prize = seasonPrize(S.division, rank);
-    var promoBonus = rv && rv.outcome === '승격' ? 2500 : 0;
+    var promoBonus = rv && rv.outcome === '승격' ? 6000 : 0;   /* v39 — 승격 보너스 2,500 → 6,000 */
     var me = tableRow('me');
     S.career.push({
       season: S.season, division: S.division, rank: rank, outcome: rv ? rv.outcome : '',
@@ -3954,6 +4006,23 @@
       }
       if (rv.nextDivision && rv.nextDivision !== S.division) { S.division = rv.nextDivision; }
     }
+    /* v39 — 새 시즌 0R 순위표의 기준값: 직전 시즌 최종 순위.
+       (유저 제보: 14위로 마무리했는데 다음 시즌 0R에 1위로 보였다 — 0경기 동률에서
+        정렬 기준이 없어 'me'가 표 맨 앞에 남아 있었다) */
+    sortRows(S.table); sortRows(S.otherTable);
+    var rankOldOur = {}, rankOldOther = {}, i3;
+    for (i3 = 0; i3 < S.table.length; i3++) { rankOldOur[S.table[i3].id] = i3 + 1; }
+    for (i3 = 0; i3 < S.otherTable.length; i3++) { rankOldOther[S.otherTable[i3].id] = i3 + 1; }
+    var oldDiv = rv ? rv.division : S.division;
+    function seedsFor(nd) {
+      var inc = (nd === oldDiv) ? rankOldOur : rankOldOther;
+      var nw = (nd === oldDiv) ? rankOldOther : rankOldOur;
+      var out = {}, k;
+      for (k in inc) { if (inc.hasOwnProperty(k)) { out[k] = inc[k]; } }
+      for (k in nw) { if (nw.hasOwnProperty(k) && !out.hasOwnProperty(k)) { out[k] = 100 + nw[k]; } }
+      return out;
+    }
+    var seedsOur = seedsFor(S.division), seedsOther = seedsFor(3 - S.division);
     /* v23 — 승격·강등 뒤에도 우리 리그 19 AI + me · 반대 리그 20 AI 정원을 맞춘다 */
     normalizeDivs(S);
     S.season++;
@@ -3961,13 +4030,22 @@
     S.round = 0;
     S.seasonReview = null;
     S.divView = S.division;
-    S.table = makeTable(S.division, true);
+    S.table = makeTable(S.division, true, seedsOur);
     S.fixtures = makeFixtures(S.division, true);
-    S.otherTable = makeTable(3 - S.division, false);
+    S.otherTable = makeTable(3 - S.division, false, seedsOther);
     S.otherFixtures = makeFixtures(3 - S.division, false);
     S.challengeLeft = 1;
     S.smatchTickets = 3;
     S.smatchStreak = 0;
+    /* v39 — 새 시즌 유소년 아카데미 3명 보충을 명시적으로 보장한다.
+       (유저 제보: 유망주를 1군에 올린 뒤 다음 시즌에도 3명이 안 보임)
+       클럽 탭을 열지 않아도 시즌 전환 시점에 채워지고, 교체 내역을 로그에 남긴다. */
+    var yBefore = (S.youth && S.youth.intake) ? S.youth.intake.length : 0;
+    ensureYouth();
+    var yAfter = (S.youth && S.youth.intake) ? S.youth.intake.length : 0;
+    if (yAfter > yBefore) {
+      S.log.push('S' + S.season + ' 유소년 아카데미 보충 — ' + (yAfter - yBefore) + '명 (총 ' + yAfter + '/' + YOUTH_SIZE + '명)');
+    }
     /* v23 — 시즌이 바뀌면 전원이 한 살을 먹는다 (32세 이상은 피지컬 하락) */
     var aged = ageSeason();
     S.fans += 120;
@@ -4512,6 +4590,10 @@
     ov.innerHTML = '<div class="sub-panel">' +
       '<div class="sub-head"><b>선수 교체</b><span>남은 교체 ' + st.subsLeft + '/' + (st.subsMax || 5) + '회 · 최대 5회 · 벤치 ' + st.bench.length + '명' + (halftime ? ' · 하프타임' : '') + '</span></div>' +
       '<div class="sub-min">현재 ' + st.minute + '분 · 스코어 ' + st.score + '</div>' +
+      /* v39 — 지금까지의 교체 기록 (인/아웃이 패널에서도 보인다) */
+      ((st.subs && st.subs.length) ? '<div class="sub-log">' + st.subs.map(function (s2) {
+        return '<b>🔄 ' + s2.min + "' " + esc(s2.out) + ' → ' + esc(s2.inn) + (s2.pos ? ' · ' + s2.pos : '') + '</b>';
+      }).join('') + '</div>' : '') +
       '<div class="sub-mood">라커룸 ' + (function () { var m = DS.teamMood(S.morale, S.form); return '<b style="color:' + m.color + '">' + m.label + ' ' + m.score + '</b> · 결정력 ×' + m.mult.toFixed(3) + ' · 시너지 ' + (lockSynText() || '없음'); })() + '</div>' +
       '<div class="sub-cols"><div><div class="sub-title">OUT · 선발</div><div class="sub-list">' + outHTML + '</div></div>' +
       '<div><div class="sub-title">IN · 벤치</div><div class="sub-list">' + inHTML + '</div></div></div>' +
@@ -4793,7 +4875,10 @@
     /* v33 — 잠재력 상한: 이미 OVR=잠재력이면 레벨·능력치가 더 오르지 않는다.
        (콤보 특훈·세트피스 기술은 능력치와 별개라 그대로 익힌다) */
     var cap0 = DS.atPotCap(p);
-    if (!cap0) { p.level++; }
+    /* v39 — 특훈은 레벨 +1을 주지 않는다. 다음 레벨 요구치의 45%를 훈련 EXP로 주고
+       레벨은 EXP 누적(addExp)으로만 오른다. */
+    var trainExp = cap0 ? 0 : DS.trainExpGain(p);
+    var trainUps = trainExp ? DS.addExp(p, trainExp, mgr(), 'first') : 0;
     var gain = { s: 0, t: 0, p: 0, cap: 0, fk: 0, ck: 0 }, i, m, k;
     for (i = 0; i < 2; i++) {
       m = DS.trainMenuOf(trainSel.menus[i]);
@@ -4818,9 +4903,11 @@
       gain[bestK] += 1; tmHit = true;
     }
     var applied = 0;
-    applied += DS.growAttr(p, 's', gain.s);
-    applied += DS.growAttr(p, 't', gain.t);
-    applied += DS.growAttr(p, 'p', gain.p);
+    /* v39 — 특훈 능력치도 소수 배율(0.45)로 부분 적용 — 한 번의 특훈에 OVR이 7~14씩 뛰디 않게 */
+    var tk = DS.TRAIN_GAIN_K;
+    applied += DS.applyGain(p, 's', gain.s * tk);
+    applied += DS.applyGain(p, 't', gain.t * tk);
+    applied += DS.applyGain(p, 'p', gain.p * tk);
     p.set.cap = clamp(p.set.cap + gain.cap, 1, 10);
     p.set.fk = clamp(p.set.fk + gain.fk, 1, 10);
     p.set.ck = clamp(p.set.ck + gain.ck, 1, 10);
@@ -4829,7 +4916,9 @@
     save();
     renderAll();
     var capped = cap0 || DS.atPotCap(p);
-    toast((combo ? '특훈 콤보 ' + combo.name + ' · ' + p.name + ' 각성' : p.name + ' 특훈 완료 (Lv.' + p.level + ')') +
+    toast((combo ? '특훈 콤보 ' + combo.name + ' · ' + p.name + ' 각성' :
+        p.name + ' 특훈 완료 (Lv.' + (p.level || 0) + (trainUps ? ' · +' + trainUps + '레벨' : '') + ')') +
+      ' · 훈련 EXP +' + trainExp +
       ' · 성향 보정 ×' + tm.toFixed(2) + (tmHit ? ' (추가 성장)' : '') +
       (capped ? ' · 잠재력 한계(OVR ' + DS.ratingOf(p) + '/' + p.pot + ') — 능력치는 더 오르지 않습니다' : ''));
   }
@@ -5595,6 +5684,9 @@
     roundInfo: roundInfo,
     ensureMarket: ensureMarket,
     ensureYouth: ensureYouth,
+    /* v39 — 유소년 승격/매각 흐름 검증용 */
+    youthPromote: doYouthPromote,
+    youthList: function () { return (S.youth && S.youth.intake) ? S.youth.intake.slice() : []; },
     /* v23 — 2군 리그 · 나이 곡선 검증용 */
     ensureReserve: ensureReserve,
     reserveList: reserveList,

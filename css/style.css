@@ -2500,6 +2500,10 @@ body.rot { overflow: hidden; }
 .potg.capped .pg-bar i { background: linear-gradient(90deg, #e8a33a, #c0432f); }
 .pg-foot { font-size: 8.5px; font-weight: 700; color: #6b7a52; line-height: 1.4; }
 .potg.capped .pg-foot { color: #98601f; }
+/* v39 — 잠재 상한이 기초 성장치보다 낮은 옛 세이브: 왜 상한값이 적용되는지 밝힌다 */
+.potg.over { background: #f2eef7; border-color: #c9bce0; }
+.pg-over { margin: 3px 0 2px; padding: 3px 6px; border-radius: 7px; background: rgba(96,64,160,.10);
+  font-size: 8.5px; font-weight: 800; color: #5b3f96; line-height: 1.35; }
 /* 세부 능력치 3종 */
 .st3 { background: #f6f3e6; border-radius: 10px; padding: 5px 8px; }
 .st3-row { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
@@ -2598,3 +2602,24 @@ body.rot { overflow: hidden; }
 /* v38 — 하프타임 교체창 라커룸 분위기 줄 */
 .sub-mood { font-size: 9.5px; font-weight: 700; color: rgba(233,244,221,.72); margin: -2px 0 5px; }
 .sub-mood b { font-weight: 900; }
+
+/* ── v39 — 교체 인/아웃 컷인 · 중계 배너 ── */
+.cutin.scutin { background: linear-gradient(96deg, rgba(10,34,52,.96) 0%, rgba(12,48,74,.92) 46%, rgba(8,26,40,.86) 100%); }
+.cutin.scutin .cutin-name { font-size: 24px; }
+.cutin.scutin .cutin-name em.so {
+  font-style: normal; font-size: 11px; font-weight: 900; letter-spacing: 1px;
+  padding: 2px 6px; margin-right: 6px; border-radius: 6px;
+  background: rgba(226,85,63,.9); color: #fff5ee; vertical-align: middle;
+}
+.cutin.scutin .cutin-tag { color: #9fe8ff; filter: none; }
+.cutin.scutin .cutin-live { background: rgba(74,168,224,.16); border-color: rgba(74,168,224,.45); color: #cfeaff; }
+.cutin.scutin .cutin-live i { background: #9fe8ff; box-shadow: 0 0 8px #9fe8ff; }
+#m-banner.sub .gb-text { font-size: 22px; color: #eaf6ff; text-shadow: 0 0 18px rgba(74,168,224,.9), 0 3px 12px rgba(0,0,0,.7); }
+#m-banner.sub .gb-sub { color: #bfe8ff; }
+.sub-log { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.sub-log b { font-size: 8.5px; font-weight: 900; padding: 2px 6px; border-radius: 7px;
+  background: rgba(74,168,224,.14); border: 1px solid rgba(74,168,224,.38); color: #1f5a80; }
+.cutin.scutin .sub-badge { display: block; width: 78%; height: 78%; align-self: center; margin-bottom: 6%; filter: drop-shadow(0 8px 18px rgba(74,168,224,.55)); opacity: .96; }
+.tbl-note { margin: 0 0 3px; font-style: normal; }
+.deckrow .newtag { font-style: normal; font-size: 7.5px; font-weight: 900; letter-spacing: .6px;
+  padding: 1px 4px; border-radius: 5px; background: #e2553f; color: #fff6f2; vertical-align: 1px; }

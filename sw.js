@@ -1,11 +1,11 @@
-/*! 꼬마일레븐 FC v38b — 원형 초상화 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v38b-20261128';
+/*! 꼬마일레븐 FC v39 — 전술 카드 18종·오픈 찬스 슈팅·성장 페이스 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v39-20261128';
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=38&b=38', './js/data.js?v=38&b=38', './js/pvp.js?v=38&b=38', './js/match.js?v=38&b=38', './js/bgm.js?v=38&b=38', './js/game.js?v=38&b=38',
+        './css/style.css?v=39&b=39', './js/data.js?v=39&b=39', './js/pvp.js?v=39&b=39', './js/match.js?v=39&b=39', './js/bgm.js?v=39&b=39', './js/game.js?v=39&b=39',
         './assets/hero-banner.jpg'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
