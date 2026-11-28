@@ -65,7 +65,7 @@
   var QV = global.DS.Q;
   var PX = global.DS.PIXEL;
   var CAM_D_BASE = 112, CAM_D_CHANCE = 96, CAM_D_GOAL = 100, CAM_D_FULL = 215;   /* v32b — 중계뷰 1.35× 줌인(128/110/116 → 94/81/85) */
-  var PLAYER_K = 1.16;                                      /* 치비 전신 스프라이트 크기 배율 */
+  var PLAYER_K = 0.84;                                      /* 치비 전신 스프라이트 크기 배율 — v36b: 1.16 → 0.84 (약 0.72배) */
   var camMode = 'broadcast';                                /* v30 — 'broadcast' | 'full' */
   var slowmo = { t: 0, t0: 0, k: 1 };                       /* v30 — 골 순간 짧은 슬로우 모션 */
   var goalCutinPend = 0, goalCutinWho = null;               /* v30 — 골 임팩트 뒤 GOAL 컷인 지연 */
@@ -6446,7 +6446,7 @@
         vx: -p.facing * range(1.4, 4.2) * sp + range(-1.2, 1.2),
         vy: range(-2.4, 2.4) * sp, vz: range(0.4, 1.9) * sp,
         g: 9, drag: 2.6, t0: 0.34 + Math.random() * 0.24,
-        size: 0.9 + Math.random() * 0.9, color: 'rgba(206,222,182,0.9)', a0: 0.62
+        size: (0.9 + Math.random() * 0.9) * 0.78, color: 'rgba(206,222,182,0.9)', a0: 0.62
       });
     }
   }
@@ -7670,11 +7670,21 @@
       var pu = 0;
       if (pose === 'dive') { pu = clamp(1 - p.diveT / Math.max(0.01, p.diveD || 0.7), 0, 1); }
       else if (p.pose === pose && (p.poseD || 0) > 0) { pu = clamp(1 - p.poseT / p.poseD, 0, 1); }
+      /* v36b — 이동 방향 가속에 따른 미세한 몸 기울기(달리기·드리블만, 좌우 이동 위주)
+         발밑 축으로 3~4° 내로만 기운다. 위·아래로만 뛸 땐 기울이지 않는다. */
+      var lean = 0;
+      if (pose === 'run' || pose === 'dribble') {
+        var gv = p.gaitV || 0;
+        var ax = Math.abs(dxs), ay = Math.abs(dys);
+        if (gv > 2.4 && ax > ay * 0.55) {
+          lean = face * Math.min(0.075, gv * 0.0056) * (ax / (ax + ay + 0.001));
+        }
+      }
       /* 발밑 접지 그림자 — 픽셀 감성 하드 엣지 */
       PX.shadow(ctx, gx + slideX * 0.5, gy + Math.max(0.3, gs * 0.4), bw * 0.44, Math.max(1.6, bw * 0.17), air);
       PX.draw(ctx, {
         x: gx + slideX, y: gy - lift, dir: p.dirView || 'down', pose: pose, u: pu,
-        gait: p.gait || 0, t: t, look: p._look, sc: psc, face: face
+        gait: p.gait || 0, t: t, look: p._look, sc: psc, face: face, tilt: lean
       });
     }
 

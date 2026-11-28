@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""v36b 정식 검증 — 844×390 공식전 90분 완주 · 844×360 · 390×844 회전 안내 · fps · 오류.
+
+사용법: python3 scripts/v36b_full.py [OUT_DIR]
+"""
+import asyncio
+import json
+import os
+import sys
+
+from playwright.async_api import async_playwright
+
+LIBS = os.path.expanduser('~/.libs-chromium')
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'preview', 'v36b')
+PORT = 8126
+URL = 'http://127.0.0.1:%d/index.html?v=36&b=35' % PORT
+
+STATE = """(() => {
+  const M = DS.Match, md = document.getElementById('modal');
+  let clock = 0, phase = '', scor = [0, 0], paused = false, half = false;
+  try { clock = M.clock; phase = M.phase; scor = [M.homeScore, M.awayScore]; paused = M.paused; half = !!M.halftime; } catch (e) {}
+  const ov = document.getElementById('m-overlay');
+  const modal = ((md && md.innerHTML) ? md.innerHTML.length : 0) + ((ov && ov.innerHTML) ? ov.innerHTML.length : 0);
+  const advstart = !!(document.querySelector('[data-act="advstart"]'));
+  const hasBtn = !!(document.querySelector('[data-act="advstart"]') || (md && md.querySelector && md.querySelector('button')));
+  return JSON.stringify({ clock: Math.round(clock * 10) / 10, phase: phase, score: scor, paused: paused, half: half,
+    modal: modal, advstart: advstart, hasBtn: hasBtn,
+    errs: (window.__DS_ERRS || []).length,
+    screen: (document.querySelector('.screen.on') || {}).id || '' });
+})()"""
+
+
+async def run_page(b, W, H, tag, done_check=True):
+    pg = await b.new_page(viewport={'width': W, 'height': H}, device_scale_factor=2)
+    logs = []
+    pg.on('console', lambda m: logs.append('%s: %s' % (m.type, m.text)) if m.type in ('error', 'warning') else None)
+    pg.on('pageerror', lambda e: logs.append('PAGEERROR: %s' % e))
+    pg.on('response', lambda r: logs.append('HTTP %s: %s' % (r.status, r.url)) if r.status >= 400 else None)
+    await pg.goto(URL, wait_until='networkidle')
+    await pg.wait_for_timeout(1200)
+    if W < H:
+        vis = await pg.evaluate("(() => { const r = document.getElementById('rotate'); return r ? getComputedStyle(r).display + '/' + getComputedStyle(r).opacity : 'none'; })()")
+        print(tag, 'rotate overlay', vis)
+        await pg.screenshot(path=os.path.join(OUT, 'v36b-rotate-%s.png' % tag))
+        await pg.close()
+        return
+    await pg.evaluate("DS.game.act('kickoff')")
+    await pg.wait_for_timeout(2600)
+    await pg.evaluate('DS.Match.setSpeed(3)')
+    st = {}
+    half_done = False
+    result_shot = False
+    for i in range(900):
+        await pg.wait_for_timeout(400)
+        try:
+            st = json.loads(await pg.evaluate(STATE))
+        except Exception:
+            continue
+        if (st.get('advstart') or (st.get('half') and st.get('modal'))) and not half_done:
+            half_done = True
+            await pg.screenshot(path=os.path.join(OUT, 'v36b-half-%s.png' % tag))
+            sel = '[data-act="advstart"]' if st.get('advstart') else '[data-act="subclose"]'
+            try:
+                await pg.click(sel)
+            except Exception as e:
+                print(tag, 'half click fail', sel, e)
+            print(tag, 'halftime ->', sel, 'at', st.get('clock'))
+            continue
+        if st.get('modal') and st.get('screen') != 'screen-match' and not result_shot and st.get('clock', 0) > 88:
+            pass
+        if st.get('phase') == 'ended' or st.get('clock', 0) >= 91:
+            await pg.wait_for_timeout(1200)
+            st = json.loads(await pg.evaluate(STATE))
+            if not result_shot:
+                await pg.screenshot(path=os.path.join(OUT, 'v36b-result-%s.png' % tag))
+                result_shot = True
+            break
+        if i % 25 == 0:
+            print(tag, 't', st.get('clock'), st.get('phase'), st.get('screen'), 'modal', st.get('modal'))
+        if st.get('modal') and st.get('clock', 0) < 45:
+            try:
+                await pg.click('#modal button')
+            except Exception:
+                pass
+    print(tag, 'final', st)
+    fps = await pg.evaluate("""(async () => {
+      let n = 0, t0 = performance.now();
+      await new Promise(res => { function tick(){ n++; if (performance.now()-t0 < 2000) requestAnimationFrame(tick); else res(); } requestAnimationFrame(tick); });
+      return Math.round(n / ((performance.now()-t0)/1000) * 10) / 10;
+    })()""")
+    print(tag, 'fps', fps)
+    print(tag, 'errs', await pg.evaluate('JSON.stringify(window.__DS_ERRS)'))
+    print(tag, 'logs', logs[:10])
+    # 결과서 닫고 홈 상태
+    try:
+        await pg.click('#modal button')
+    except Exception:
+        pass
+    await pg.wait_for_timeout(700)
+    await pg.screenshot(path=os.path.join(OUT, 'v36b-after-%s.png' % tag))
+    await pg.close()
+
+
+async def main():
+    os.makedirs(OUT, exist_ok=True)
+    srv = await asyncio.create_subprocess_shell('python3 -m http.server %d' % PORT, cwd=ROOT,
+                                                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+    await asyncio.sleep(1.2)
+    env = dict(os.environ)
+    env['LD_LIBRARY_PATH'] = LIBS + ':' + env.get('LD_LIBRARY_PATH', '')
+    try:
+        async with async_playwright() as p:
+            b = await p.chromium.launch(env=env, args=['--no-sandbox'])
+            want = sys.argv[2] if len(sys.argv) > 2 else 'all'
+            if want in ('all', '844x390'):
+                await run_page(b, 844, 390, '844x390')
+            if want in ('all', '844x360'):
+                await run_page(b, 844, 360, '844x360')
+            if want in ('all', '390x844'):
+                await run_page(b, 390, 844, '390x844')
+            await b.close()
+    finally:
+        srv.kill()
+
+asyncio.run(main())

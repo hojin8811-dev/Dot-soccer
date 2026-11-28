@@ -1,15 +1,18 @@
-/*! 꼬마일레븐 FC v36 — 고퀄 스프라이트 시트 엔진 (pixel_player.js)
+/*! 꼬마일레븐 FC v36b — 고퀄 스프라이트 시트 엔진 (pixel_player.js)
 
-    v35의 코드 래스터 도트(Grid) 대신, 사용자가 뽑아온 카이로소프트 화풍 4x4 시트 4장에서
+    v35의 코드 래스터 도트(Grid) 대신, 사용자가 뽑아온 카이로소프트 화풍 시트에서
     정밀 추출한 아틀라스를 그대로 찍는다.
 
-    · assets/sprites/players_home.png  — 필드 선수 12종(홈 레드) · 12행 × 4프레임
-    · assets/sprites/players_away.png  — 같은 12종(원정 로열블루) · 12행 × 4프레임
-    · assets/sprites/gk_ref.png        — 초록 GK · 노랑 GK · 주심 · 감독 · 4행 × 4프레임
-      (프레임 슬롯 = run1 · run2 · kick · 개성(태클/뒷모습/앞모습/세리머니 · GK dive · 주심 휘슬 · 감독 지시))
+    · assets/sprites/players_home.png  — 필드 선수 12종(홈 레드) · 12행 × 6열
+    · assets/sprites/players_away.png  — 같은 12종(원정 로열블루) · 12행 × 6열
+    · assets/sprites/gk_ref.png        — 초록 GK · 노랑 GK · 주심 · 감독 · 4행 × 4열
+
+    필드 선수 6열 = run0 · run1 · run2 · run3 · kick · 개성(태클/뒷모습/앞모습/세리머니)
+      v36b부터 달리기는 새 4프레임 달리기 시트에서 뽑은 run0~run3를 걸음 위상(p.gait)에
+      1:1로 물려 순환한다(포니테일·머리띠는 4열이 못 써서 run3 = run1 핑퐁).
 
     아틀라스 생성: scripts/sprite_extract.py (배경 투명화·부속 공 제거·원정 블루 변환·정규화)
-    셀은 142×126, 스프라이트는 셀 안에서 머리중심 x=71 · 발바닥 y=123 에 고정돼 있다.
+    셀은 102×91, 스프라이트는 셀 안에서 머리중심 x=51 · 발바닥 y=89 에 고정돼 있다.
     → 매 프레임 그 점만 월드 좌표에 맞추면 12종 전부 같은 발밑선에서 뛴다.
 */
 (function (global) {
@@ -18,8 +21,9 @@
   var DS = global.DS = global.DS || {};
 
   /* ─────────────────────────  아틀라스 정의  ───────────────────────── */
-  var CELL_W = 142, CELL_H = 126, CX = 71, FEET = 123;
-  var SPR_H = 116;                       /* 셀 안 실제 스프라이트 높이(px) */
+  var CELL_W = 102, CELL_H = 91, CX = 51, FEET = 89;
+  var SPR_H = 84;                        /* 셀 안 실제 스프라이트 높이(px) */
+  var COL_RUN = 0, COL_KICK = 4, COL_EXTRA = 5;   /* 필드 선수 열 */
   var SHEETS = {
     home: 'assets/sprites/players_home.png',
     away: 'assets/sprites/players_away.png',
@@ -185,6 +189,13 @@
   }
 
   /* ─────────────────────────  프레임 선택  ───────────────────────── */
+  /* v36b — 달리기 4프레임을 걸음 위상에 1:1로 묶는다.
+     gait는 한 걸음(위상 π)마다 잔디 먼지가 터지도록 적분되므로(+1칸 위상 이동),
+     디딤 순간이 정확히 run1·run3 프레임과 겹진다. */
+  function runCol(gait) {
+    return (Math.floor((gait || 0) / (Math.PI / 2)) + 1) & 3;
+  }
+
   function frameCol(look, pose, dir, s) {
     if (look.key === 'ref') {
       if (pose === 'run' || pose === 'dribble') { return (Math.floor((s.gait || 0) / 2.4) & 1) ? 2 : 1; }
@@ -201,19 +212,17 @@
       if (pose === 'run' || pose === 'dribble' || pose === 'jump') { return 1; }
       return 0;
     }
-    /* 필드 선수 */
+    /* 필드 선수 — run0~run3 · kick · 개성 */
     var ex = look.extra;
     if (pose === 'dive') { return 2; }
-    if (pose === 'tackle') { return ex === 'tackle' ? 3 : 2; }
-    if (pose === 'celebrate') { return ex === 'celebrate' ? 3 : 0; }
-    if (pose === 'kick' || pose === 'pass') { return 2; }
-    if (pose === 'jump') { return 0; }
-    if (dir === 'up' && ex === 'up') { return 3; }
-    if (dir === 'down' && ex === 'down') { return 3; }
-    if (pose === 'run' || pose === 'dribble') {
-      return (Math.floor((s.gait || 0) / (Math.PI / 2)) & 1) ? 1 : 0;
-    }
-    return 0;
+    if (pose === 'tackle') { return ex === 'tackle' ? COL_EXTRA : COL_KICK; }
+    if (pose === 'celebrate') { return ex === 'celebrate' ? COL_EXTRA : COL_RUN; }
+    if (pose === 'kick' || pose === 'pass') { return COL_KICK; }
+    if (pose === 'jump') { return COL_RUN + 1; }
+    if (dir === 'up' && ex === 'up') { return COL_EXTRA; }
+    if (dir === 'down' && ex === 'down') { return COL_EXTRA; }
+    if (pose === 'run' || pose === 'dribble') { return runCol(s.gait); }
+    return COL_RUN;
   }
 
   /* ─────────────────────────  그리기  ───────────────────────── */
@@ -256,7 +265,20 @@
     var face = (s.face || 1);
     /* 위·아래(뒷모습/앞모습) 프레임은 좌우 반전하지 않는다 */
     if (look.key === 'ref' || look.key === 'coach') { face = 1; }
-    if (face < 0) {
+    /* v36b — 이동 가속에 따른 미세한 몸 기울기(화면 기준 라디안, 발밑 축 회전) */
+    var tilt = s.tilt || 0;
+    if (tilt) {
+      ctx.save();
+      ctx.translate(s.x, y + FEET * sc);
+      ctx.rotate(tilt);
+      if (face < 0) {
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, sx, sy, CELL_W, CELL_H, -CX * sc, -FEET * sc, w, h);
+      } else {
+        ctx.drawImage(img, sx, sy, CELL_W, CELL_H, -CX * sc, -FEET * sc, w, h);
+      }
+      ctx.restore();
+    } else if (face < 0) {
       ctx.save();
       ctx.translate(Math.round(s.x), 0);
       ctx.scale(-1, 1);
