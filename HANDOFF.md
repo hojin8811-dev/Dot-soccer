@@ -375,8 +375,10 @@ v39c 확인값 (2026-11-28, 로컬 Playwright Chromium 844×390 · `?v=39&b=41`)
 | 90분 완주 (844×390) | **완주** — clock 90 · `phase ended` · running false · **fps 60.2~60.4** |
 | 세로 390×844 | `#rotate` `display:flex` · opacity 1 |
 | 오류 | `window.__DS_ERRS` **0** · pageerror **0** (콘솔 404는 sparse 체크아웃의 `icons/` 1건) |
+| **라이브** (`?v=39&b=41`, 844×390) | 자산 `js/match.js?v=39&b=41`·`game.js` **200**(md5 로컬과 일치, push 후 **~50초** 반영) · `sw.js` 캐시 **`dot-soccer-v39c-20261128`** · 카드 18종 · 성장 상수 그대로(`expToNext(0)` 4700 · `LEVEL_GAIN` 0.38) · **90분 완주**(clock 90 · `ended` · 1:0) · **fps 60.3** · 전력 대조 `teamPower 61` / `awayPower 57.3` / `M.v33().gap 61 / 57.2 / +3.8` · 세로 회전 안내 정상 · **오류 0 · 콘솔 0 · HTTP 4xx 0** |
+| 라이브 배포 | `35d6461`(코드) · `a1b8b59`(문서·하네스·스샷) → `main` 푸시, md5 일치 폴링 5회(~50초) |
 
-스크린샷: `preview/v39c/` — `v39c-result-844x390.png` · `v39c-rotate-390x844.png`
+스크린샷: `preview/v39c/` — `v39c-live-result-844x390.png` · `v39c-live-rotate-390x844.png` ·  — `v39c-result-844x390.png` · `v39c-rotate-390x844.png`
 스크린샷: `preview/v39b/` — `v39b-result-844x390.png` · `v39b-detail-growth-844x390.png` · `v39b-train-844x390.png` · `v39b-live-result-844x390.png` · `v39b-live-detail-844x390.png`
 
 스크린샷: `preview/v39/` — `v39-sub-cutin-844x390.png` · `v39-card-overlay-844x390.png` · `v39-deck-844x390.png` · `v39-potgauge-844x390.png` · `v39-result-844x390.png` · `v39-rotate-390x844.png` · `v39-newseason-0r-844x390.png`
