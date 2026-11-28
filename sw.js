@@ -1,5 +1,5 @@
-/*! 꼬마일레븐 FC v37 — 원형 초상화 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v37-20261128';
+/*! 꼬마일레븐 FC v38 — 원형 초상화 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v38-20261128';
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {

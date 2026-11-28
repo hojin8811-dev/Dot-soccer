@@ -2451,3 +2451,120 @@ body.rot { overflow: hidden; }
   .cr-fix li { font-size: 10.5px; }
   .cr-note { font-size: 9.5px; }
 }
+
+/* ═════════════════ v38 — 선수 상세창 · 커스텀 전술 · 라커룸 분위기 · 코치마크 ═════════════════ */
+/* 선수 상세: 500장 고화질 초상화를 크게 */
+.pd-hero.v38 { padding-right: 6px; }
+.pd-art.v38 { width: 136px; height: 156px; }
+.pd-art.v38 img { max-height: 156px; filter: drop-shadow(0 8px 16px rgba(0,0,0,.55)); }
+/* 잠재력 게이지 (OVR vs pot) */
+.potg { background: #eef6d9; border: 1px solid #cfe3a8; border-radius: 11px; padding: 7px 9px; }
+.potg.capped { background: #fdf0d8; border-color: #e8c07a; }
+.pg-top { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 800; color: #4a6134; }
+.pg-top span b { font-size: 15px; letter-spacing: -.4px; color: #24401a; }
+.pg-top em { margin-left: auto; font-style: normal; font-size: 9px; font-weight: 900; padding: 2px 7px; border-radius: 8px; }
+.pot-badge { background: #b8621f; color: #fff8ea; box-shadow: 0 0 0 2px rgba(184,98,31,.2); }
+.pot-gap { background: rgba(61,107,18,.12); color: #3d6b12; }
+.pg-bar { position: relative; height: 9px; margin: 5px 0 3px; border-radius: 5px; background: rgba(61,107,18,.14); overflow: hidden; }
+.pg-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #8ec63f, #d8c249); }
+.potg.capped .pg-bar i { background: linear-gradient(90deg, #e8a33a, #c0432f); }
+.pg-foot { font-size: 8.5px; font-weight: 700; color: #6b7a52; line-height: 1.4; }
+.potg.capped .pg-foot { color: #98601f; }
+/* 세부 능력치 3종 */
+.st3 { background: #f6f3e6; border-radius: 10px; padding: 5px 8px; }
+.st3-row { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+.st3-row .lb { flex: 0 0 46px; font-size: 9.5px; font-weight: 800; color: #4a5a3a; }
+.st3-row .gauge { flex: 1 1 auto; }
+.st3-row .num { flex: 0 0 22px; text-align: right; font-size: 11px; font-weight: 900; color: #24301c; }
+/* 세트 특기 */
+.set-g { background: #f6f3e6; border-radius: 10px; padding: 6px 8px; }
+.set-row { display: flex; gap: 6px; align-items: baseline; font-size: 9.5px; padding: 1px 0; }
+.set-row span { flex: 0 0 28px; color: #8a917e; font-weight: 800; }
+.set-row b { font-size: 10.5px; color: #24301c; }
+.set-row em { font-style: normal; color: #6b6f5e; }
+.set-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 3px; }
+.set-sk { margin-top: 4px; }
+.set-sk .sk { display: inline-block; padding: 1px 6px; margin: 0 3px 3px 0; border-radius: 7px; background: rgba(200,241,105,.42); color: #3c6414; font-size: 8.5px; font-weight: 800; }
+/* 성장 이력 */
+.growth { background: #f6f3e6; border-radius: 10px; padding: 6px 9px; }
+.gr-row { display: flex; align-items: baseline; gap: 6px; font-size: 9.5px; padding: 1.5px 0; color: #6b6f5e; }
+.gr-row span { flex: 0 0 52px; font-weight: 800; }
+.gr-row b { font-size: 10.5px; color: #24301c; }
+.gr-row em { margin-left: auto; font-style: normal; font-size: 9px; font-weight: 800; color: #4a7a24; }
+.gr-bar { height: 6px; border-radius: 3px; background: rgba(61,107,18,.14); overflow: hidden; margin: 2px 0 3px; }
+.gr-bar i { display: block; height: 100%; background: #8ec63f; }
+/* 이적시장 비교 카드 */
+.cmp-card { background: #10261f; border-radius: 11px; padding: 7px 9px; color: #eaf6dd; }
+.cmp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.cmp-head span { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 90px; }
+.cmp-head img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; object-position: 50% 34%; border: 2px solid rgba(255,255,255,.25); background: #234; }
+.cmp-head em { font-style: normal; font-size: 8.5px; font-weight: 800; text-align: center; }
+.cmp-vs { font-size: 9px; font-weight: 900; color: rgba(233,244,221,.45); }
+.cmp-self img { border-color: #c8f169; }
+.cmp-other img { border-color: #ff9f8a; }
+.cmp-row { display: grid; grid-template-columns: 62px 1fr 1fr 34px; gap: 3px; align-items: center; font-size: 9.5px; padding: 1.5px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.cmp-row span { color: rgba(233,244,221,.55); font-weight: 700; }
+.cmp-row b { font-weight: 900; color: #eaf6dd; text-align: center; }
+.cmp-d { font-style: normal; font-size: 9px; font-weight: 900; text-align: right; padding: 1px 0; border-radius: 5px; }
+.cmp-d.up { color: #0f2b1c; background: #a6d84c; }
+.cmp-d.down { color: #fff2ee; background: #c0432f; }
+.cmp-d.eq { color: rgba(233,244,221,.6); }
+/* 클릭 가능한 카드 */
+.pclick { cursor: pointer; }
+.pclick:hover { filter: brightness(1.04); }
+.pcard-wrap { position: relative; flex: 1 1 0; min-width: 0; display: flex; }
+.pcard-wrap .pcard { flex: 1 1 auto; width: 100%; }
+.pinfo { position: absolute; top: -3px; right: -3px; z-index: 3; width: 15px; height: 15px; border-radius: 50%; border: none; background: #c8f169; color: #16351f; font-size: 9px; font-weight: 900; line-height: 15px; text-align: center; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.yth-wrap { position: relative; display: flex; }
+.yth-wrap .yth { flex: 1 1 auto; width: 100%; }
+.yth-wrap .pinfo { top: -4px; right: -4px; }
+/* 커스텀 전술 지시 */
+.ctac-row { margin-bottom: 5px; }
+.ctac-lb { display: flex; align-items: baseline; gap: 5px; font-size: 9px; color: var(--ink3); font-weight: 800; }
+.ctac-lb b { margin-left: auto; font-size: 9.5px; color: #24401a; }
+.ctac-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; margin-top: 2px; }
+.ctac-seg button { height: 16px; border-radius: 5px; border: 1px solid var(--line); background: #f1efe2; padding: 0; display: flex; align-items: center; justify-content: center; }
+.ctac-seg button i { display: block; width: 70%; height: 4px; border-radius: 2px; background: rgba(20,33,28,.18); }
+.ctac-seg button.on { background: #24401a; border-color: #24401a; }
+.ctac-seg button.on i { background: #c8f169; }
+/* 라커룸 분위기 */
+.mood .md-top { display: flex; align-items: center; gap: 6px; }
+.md-label { font-size: 9.5px; font-weight: 900; padding: 2px 8px; border-radius: 8px; }
+.md-score { font-size: 17px; font-weight: 900; letter-spacing: -.6px; }
+.mood .md-top em { font-style: normal; font-size: 8px; color: var(--ink3); font-weight: 700; }
+.md-form { display: flex; gap: 3px; margin: 4px 0 3px; flex-wrap: wrap; }
+.md-dot { font-style: normal; width: 19px; height: 15px; border-radius: 5px; font-size: 8px; font-weight: 900; display: flex; align-items: center; justify-content: center; color: #fff; }
+.md-dot.w { background: #2f8f62; }
+.md-dot.d { background: #b07d1f; }
+.md-dot.l { background: #c0432f; }
+.md-mult { font-size: 8.5px; font-weight: 700; color: var(--ink3); }
+.md-mult b { color: #3c6414; }
+.syn-fx { margin-top: 3px; line-height: 1.45; }
+/* 첫 공식전 코치마크 */
+.tut { position: absolute; inset: 0; z-index: 90; }
+.tut-hole { position: absolute; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(3,16,13,.78), 0 0 0 3px #c8f169 inset; pointer-events: none; transition: all .18s ease; }
+.tut-card { position: absolute; background: #f7f4e7; border-radius: 13px; padding: 9px 11px 8px; box-shadow: 0 12px 28px rgba(0,0,0,.55); border: 1px solid #d8d2ba; }
+.tut-kicker { display: flex; align-items: center; font-size: 8.5px; font-weight: 900; letter-spacing: .5px; color: #6b7a52; text-transform: uppercase; }
+.tut-kicker b { margin-left: auto; color: #24401a; }
+.tut-title { font-size: 13.5px; font-weight: 900; letter-spacing: -.4px; color: #1d2b17; margin: 3px 0 3px; }
+.tut-body { font-size: 10px; line-height: 1.55; color: #4a5240; min-height: 46px; }
+.tut-foot { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+.tut-dots { display: flex; gap: 3px; margin-right: auto; }
+.tut-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(36,64,26,.2); }
+.tut-dots i.on { background: #3d6b12; transform: scale(1.25); }
+.tut-foot .btn { padding: 0 8px; height: 24px; font-size: 9.5px; border-radius: 7px; }
+/* v38 — 클럽 1군 선수단 명부 */
+.rs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; }
+.rs-row { display: flex; align-items: center; gap: 5px; padding: 2px 4px; border-radius: 8px; background: #f6f3e6; min-width: 0; }
+.rs-row:hover { background: #eef6d9; }
+.rs-ph { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; overflow: hidden; background: #e6e1d1; }
+.rs-ph img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 34%; }
+.rs-nm { flex: 1 1 auto; min-width: 0; font-size: 9.5px; font-weight: 800; color: #24301c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-nm em { font-style: normal; font-size: 8px; font-weight: 700; color: #7a8168; margin-left: 3px; }
+.rs-ov { flex: 0 0 auto; font-size: 10.5px; font-weight: 900; color: #24401a; }
+.rs-pot { flex: 0 0 auto; font-size: 8px; font-weight: 800; color: #7a8168; }
+.rs-cap { color: #b8621f; }
+.rs-lk { flex: 0 0 auto; font-size: 8px; font-weight: 900; }
+/* v38 — 하프타임 교체창 라커룸 분위기 줄 */
+.sub-mood { font-size: 9.5px; font-weight: 700; color: rgba(233,244,221,.72); margin: -2px 0 5px; }
+.sub-mood b { font-weight: 900; }

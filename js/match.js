@@ -131,6 +131,36 @@
   var TOUCH_LINE = { deep: -9, standard: 0, high: 9 };
   var TOUCH_FOCUS_X = { left: 24, center: 50, right: 76 };
   var touch = { mentality: 'balanced', pressing: 'normal', line: 'standard', focus: 'balance' };
+
+  /* ═════════ v38 — 커스텀 전술 지시(라인 높이·압박 강도·측면 비중) + 라커룸 성향 ═════════
+     유저가 마이팀에서 고른 0~100 값을 세이브에 두고, 경기 엔진이 계수로만 받아 쓴다.
+     50 = 표준. v35 양 사이드 AI의 기본 흐름은 그대로 두고 가산 계수만 준다. */
+  var ctac = { line: 50, press: 50, wide: 50 };
+  var lockCount = { home: { fight: 0, crea: 0, dev: 0, calm: 0 }, away: { fight: 0, crea: 0, dev: 0, calm: 0 } };
+  function blankLockCount() { return { fight: 0, crea: 0, dev: 0, calm: 0 }; }
+  function ctacN(k) { var v = ctac ? ctac[k] : 50; return typeof v === 'number' ? clamp(v, 0, 100) : 50; }
+  /* 수비 라인: ±7 (월드 y 단위) · 압박: ±9 (press 지표) · 측면: -1 ~ +1 (가중치) */
+  function ctacLine() { return (ctacN('line') - 50) / 50 * 7; }
+  function ctacPress() { return (ctacN('press') - 50) / 50 * 9; }
+  function ctacWing() { return (ctacN('wide') - 50) / 50; }
+  function lockKeyOf(p) { return (p && p.player && p.player.lock) || ''; }
+  function lockVal(p, k) { var f = DS.LOCK_FX && DS.LOCK_FX[lockKeyOf(p)]; return f && typeof f[k] === 'number' ? f[k] : 0; }
+  /* 같은 성향 3명↑ 3%, 5명↑ 6% — 가산 확률 */
+  function synOf(side, key) {
+    var c = (lockCount[side] || {})[key] || 0;
+    return c >= 5 ? 0.06 : (c >= 3 ? 0.03 : 0);
+  }
+  function recountLocks() {
+    var i, q, k;
+    lockCount = { home: blankLockCount(), away: blankLockCount() };
+    for (i = 0; i < players.length; i++) {
+      q = players[i];
+      k = lockKeyOf(q);
+      if (k && lockCount[q.side] && typeof lockCount[q.side][k] === 'number') { lockCount[q.side][k] += 1; }
+    }
+    recountN++;
+  }
+  var recountN = 0;
   var touchFx = { t: 0, t0: 2.6, label: '', tone: '' };   /* 피치 위 터치라인 콜아웃 */
   var touchCount = 0;
   /* v29 — 전술 상성 피드백 · 세트피스 전용 대형 상태 */
@@ -1027,6 +1057,8 @@
     else if (t === 'defense') { depth -= 12; }
     /* v20 ① — 수비 라인 지시(내리기/표준/올리기)는 홈팀 라인·블록 높이를 직접 민다 */
     if (side === 'home') { depth += TOUCH_LINE[touch.line] || 0; }
+    /* v38 — 유저 커스텀 수비 라인 지시(±7) */
+    if (side === 'home') { depth += ctacLine(); }
     if (side === 'home' && buffOf('offside') > 0 && !noTrap) { depth += 6; }
     if (side === 'home' && buffOf('press') > 0) { depth += 5; }
     if (side === 'home' && buffOf('def') > 0) { depth -= 6; }
@@ -1074,11 +1106,15 @@
     var stl = styleOf(side);
     var press = m.press + stl.press;
     press += shapeOf(side).press;
+    /* v38 — 라커룸 성향: 헌신형이 많을수록, 같은 성향 시너지가 켜질수록 압박이 세진다 */
+    press += ((lockCount[side] || {}).dev || 0) * 1.4 + synOf(side, 'dev') * 100;
     if (side === 'home') {
       if (buffOf('press') > 0) { press += 26; }
       press += mfx('press') * 1.2;
       /* v20 ① — 압박 강도 지시: 트리거 반경과 붙는 인원이 함께 달라진다 */
       press += TOUCH_PRESSURE[touch.pressing] || 0;
+      /* v38 — 유저가 고른 커스텀 압박 지시 */
+      press += ctacPress();
     }
     /* v18 ② — 존 디펜스: 공 소유자에게 붙는 인원은 최대 2명(압박 1 + 커버 1).
        v20 — 홈이 '총공세 + 전방 압박'을 직접 지시했을 때만 3명까지 허용한다. */
@@ -1652,6 +1688,15 @@
     mgrFx = cfg.managerFx || {};
     buildHomeMetrics(cfg.homeFormation);
     formFactor = 0.94 + clamp((cfg.condition || 80) / 900, 0, 0.12);
+    /* v38 — 라커룸 분위기(사기 + 연승·연패)를 결정력에 반영 (사기 66 = 기준선) */
+    formFactor = clamp(formFactor + ((typeof cfg.morale === 'number' ? cfg.morale : 66) - 66) * 0.0015, 0.90, 1.12);
+    /* v38 — 커스텀 전술 지시값과 라커룸 성향 분포 */
+    ctac = {
+      line: (cfg.ctac && typeof cfg.ctac.line === 'number') ? clamp(cfg.ctac.line, 0, 100) : 50,
+      press: (cfg.ctac && typeof cfg.ctac.press === 'number') ? clamp(cfg.ctac.press, 0, 100) : 50,
+      wide: (cfg.ctac && typeof cfg.ctac.wide === 'number') ? clamp(cfg.ctac.wide, 0, 100) : 50
+    };
+    recountLocks();
     spriteCache = {};
     ripples = [];
     /* v25 — 전술 오버레이·파티클·데칼·킥오프 상태 초기화 */
@@ -3115,6 +3160,8 @@
       var drain = (0.60 + (p.moving ? 0.21 : 0)) * (1.22 - toughS * 0.038) * (96 / MATCH_SECONDS);
       if (isGK(p)) { drain *= 0.55; }
       if (p.side === 'home' && buffOf('press') > 0) { drain *= 1.10; }
+      /* v38 — 헌신형·시너지는 체력 소모가 적다 */
+      drain *= (1 - lockVal(p, 'stamina') - synOf(p.side, 'dev') * 0.6);
       p.stam = clamp(p.stam - drain * dt, 3, 100);
     }
   }
@@ -3562,6 +3609,9 @@
     var oppNear = nearestOpponent(p, 16);
     var pressed = oppNear.dist < 7.4;
     var onFlank = p.x < 32 || p.x > 68;
+    /* v38 — 라커룸 성향: 창의형 캐리어는 스루패스·전환을 더 본다 */
+    var lkP = lockKeyOf(p);
+    var creaCarrier = lkP === 'crea';
     /* v35 — 중앙 밀집 감지: 볼 좌우 12단위 안의 상대 수가 많으면 '가운데는 막혔다'로 본다.
        이때는 압박을 받지 않아도 반대편 넓은 동료로 한 번 크게 돌리는 것이 최선이다. */
     var centralCrowd = 0, ci2, cq2;
@@ -3628,6 +3678,17 @@
         if (wOut > 32 && Math.abs(q.x - p.x) > 20) { score += 10 + centralCrowd * 1.6 + open * 0.7; }
         else if (wOut < 12) { score -= 5; }
       }
+      /* v38 — 라커룸 성향: 창의 캐리어는 뒤공간·반대편, 냉정한 동료는 빌드업 안전 패스 */
+      if (creaCarrier && isBehindLine(q) && open > 4) { score += 9; }
+      if (creaCarrier && Math.abs(q.x - p.x) > 24) { score += 4; }
+      if (lockKeyOf(q) === 'crea' && fwd > 2) { score += 3; }
+      if (lockKeyOf(q) === 'calm' && play.stage === 'build') { score += 3; }
+      if (lockKeyOf(q) === 'fight' && play.stage === 'final' && fwd > 0) { score += 2; }
+      /* v38 — 커스텀 측면 비중: 측면 동료에게 주는 패스 가중 */
+      if (p.side === 'home' && ctacWing() !== 0) {
+        var wOf = Math.abs(q.x - 50);
+        score += ctacWing() * (wOf > 30 ? 8 : (wOf < 12 ? -3 : 0));
+      }
       /* v14 감독 전술: 짧은 패스 취향 / 직선 롱볼 / 수비 뒤 스루패스 성향 */
       score += sty.shortBias * (d < 18 ? 12 : (d > 30 ? -12 : 0));
       score += sty.longBias * (d > 28 ? 12 : 0);
@@ -3667,7 +3728,7 @@
     else if (play.stage === 'mid' && best.fwd > 8 && best.open > 8 && chance(0.45)) { type = 'through'; }
     else if (best.fwd > 5) { type = 'progressive'; }
     /* v14 — 크로스 성향이 낮은 감독(티키타카)은 박스 옆에서 올리지 않고 안으로 접어 연결한다 */
-    if (type === 'cross' && !chance(clamp(0.62 * sty.crossBias, 0.12, 0.98))) { type = 'progressive'; }
+    if (type === 'cross' && !chance(clamp(0.62 * sty.crossBias * (1 + lockVal(p, 'cross')), 0.12, 0.98))) { type = 'progressive'; }
     /* v14 — 스루패스 성향이 강한 감독(역습·직선)은 중원에서도 뒤공간을 먼저 본다 */
     if (type === 'progressive' && sty.throughBias > 1.2 && best.open > 5 && chance(clamp((sty.throughBias - 1) * 0.5, 0, 0.6))) { type = 'through'; }
     return kickPass(p, best.q, type);
@@ -3679,6 +3740,8 @@
     var dir = goalDir(p.side);
     var tx, ty, speed;
     var err = buffOf('tiki') > 0 ? 1.2 : (buffOf('build') > 0 ? 2.0 : 3.0);
+    /* v38 — 냉정형은 패스 오차가 작다 */
+    err *= (1 - lockVal(p, 'err'));
     /* 감독 패스율 업·조직력 업: 패스 오차를 줄인다 */
     if (p.side === 'home') { err *= (1 - clamp(mfx('pass') * 0.05 + mfx('org') * 0.015, 0, 0.55)); }
     if (type === 'through') {
@@ -3973,7 +4036,7 @@
       q = players[i];
       if (q === p || q.side !== p.side || q.off || isGK(q)) { continue; }
       wOut = Math.abs(q.x - 50);
-      if (wOut < 29) { continue; }
+      if (wOut < 29 + (p.side === 'home' && ctacWing() < 0 ? 3 : 0)) { continue; }
       d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < 13 || d > 48) { continue; }
       open = nearestOpponent(q, 24).dist;
@@ -3982,6 +4045,10 @@
       if (prog < 0.40 || isOffsidePos(q)) { continue; }
       v = open * 1.1 + prog * 16 + (Math.abs(p.x - 50) < 17 && crowd >= 3 ? 12 : 0)
         + (d > 26 ? 5 : 0) + Math.random() * 3;
+      /* v38 — 커스텀 측면 비중과 창의형 성향이 넓은 동료의 가치를 올린다 */
+      if (p.side === 'home') { v += ctacWing() * 10; }
+      if (lockKeyOf(p) === 'crea') { v += 4; }
+      if (lockKeyOf(q) === 'crea' || lockKeyOf(q) === 'fight') { v += 2; }
       if (v > bv) { bv = v; best = q; }
     }
     return best;
@@ -4019,6 +4086,8 @@
       /* v25c (B1) — 슈팅 빈도 소폭 상향: 박스 안 0.72→0.86, 근거리 0.46→0.56, 중거리 0.24→0.30 */
       var pShot = inBox ? 0.95 : (dist < 18 ? 0.66 : 0.34);
       pShot *= sty.shootBias;
+      /* v38 — 라커룸 성향: 승부욕형은 더 과감하게 때리고, 같은 성향 시너지도 슈팅을 민다 */
+      pShot *= (1 + lockVal(p, 'shoot') + synOf(p.side, 'fight'));
       if (pressure < 2.2 && !inBox && dist > 15) { pShot *= 0.7; }
       if (inBox && pressure > 3) { pShot += 0.10; }        /* 골문 앞에서 마크가 비었을 때 */
       if (p.side === 'home' && (buffOf('atk') > 0 || buffOf('longshot') > 0)) { pShot += 0.12; }
@@ -4045,7 +4114,7 @@
     var stallCent = Math.abs(p.x - 50) < 17;
     if ((stallCent && centerCrowd(p) >= 3) || (p.x < 34 || p.x > 66)) {
       var wOut = wideOutlet(p);
-      if (wOut && chance(0.55)) {
+      if (wOut && chance(clamp(0.55 + ctacWing() * 0.14 + (lockKeyOf(p) === 'crea' ? 0.05 : 0), 0.3, 0.82))) {
         var farSide = Math.abs(wOut.x - p.x) > 24;
         if (kickPass(p, wOut, farSide ? 'switchLong' : 'progressive')) {
           v35t.diagonal += 1; v35t.switchPass[p.side] += 1;
@@ -4681,12 +4750,16 @@
     /* 가까울수록 성공 확률이 높다 (화면 거리 기준) */
     var near = clamp(1.18 - (dpx - dLim * 0.75) / (dLim * 0.75) * 0.80, 0.35, 1.18);
     var defSkill = defender.player.stats.def + 8 + (defender.side === 'home' && buffOf('press') > 0 ? 9 * cardK(defender.side) : 0);
+    /* v38 — 라커룸 성향: 헌신·승부욕·냉정형 수비수의 태클 성공률 */
+    defSkill += lockVal(defender, 'tackle') * 30 + synOf(defender.side, 'dev') * 40;
     if (defender.side === 'home') { defSkill += mfx('def') * 1.2 + mfx('press') * 1.0; }
     var atkSkill = carrier.player.stats.spd * 0.7 + carrier.player.stats.atk * 0.3 + 12;
     /* v33 — 팀 전력차: 압박·탈취 성공률에 그대로 반영 */
     defSkill *= duelK(defender.side);
     atkSkill *= duelK(carrier.side);
     var pT = clamp(0.85 * (defSkill / (defSkill + atkSkill)) * dt * 1.9 * near * 0.30, 0, 0.5);
+    /* v38 — 승부욕·창의형 캐리어는 탈취당하지 않으려는 집념(돌파)이 강하다 */
+    pT *= (1 - lockVal(carrier, 'dribble') * 0.5 - synOf(carrier.side, 'fight') * 0.4);
     if (buffOf('press') > 0 && defender.side === 'home') { pT *= 1 + 0.45 * cardK(defender.side); }
     if (buffOf('tiki') > 0 && carrier.side === 'home') { pT *= 0.75; }
     if (!chance(pT)) { return; }
@@ -8501,6 +8574,7 @@
       /* v29 — 세트피스 대형·전술 상성 QA용 */
       setpiece: play.setpiece ? { type: play.setpiece.type, side: play.setpiece.side, timer: Math.round(play.setpiece.t * 100) / 100 } : null,
       touch: { mentality: touch.mentality, pressing: touch.pressing, line: touch.line, focus: touch.focus },
+      v38: { ctac: ctacState(), lock: { home: lockCount.home, away: lockCount.away }, formFactor: Math.round(formFactor * 1000) / 1000 },
       view: {
         mode: 'landscape', w: W, h: H, sprH: SPR_H, field: field,
         pitchImage: !!(pitchImg && pitchImg.naturalWidth),
@@ -8874,6 +8948,39 @@
     ball.z = clamp(z == null ? 26 : z, 0, 80);
     ball.vz = 0;
     return { z: ball.z, px: depthPx(ball.z) };
+  };
+
+  /* v38 — 마이팀에서 전술 지시를 바꾸면 진행 중인 경기에도 즉시 반영된다 */
+  M.setCustomTactics = function (v) {
+    if (!v) { return ctacState(); }
+    if (typeof v.line === 'number') { ctac.line = clamp(v.line, 0, 100); }
+    if (typeof v.press === 'number') { ctac.press = clamp(v.press, 0, 100); }
+    if (typeof v.wide === 'number') { ctac.wide = clamp(v.wide, 0, 100); }
+    return ctacState();
+  };
+  M.ctacState = ctacState;
+  function ctacState() {
+    return {
+      line: ctacN('line'), press: ctacN('press'), wide: ctacN('wide'),
+      lineOffset: Math.round(ctacLine() * 10) / 10,
+      pressOffset: Math.round(ctacPress() * 10) / 10,
+      wing: Math.round(ctacWing() * 100) / 100,
+      lock: { home: lockCount.home, away: lockCount.away },
+      formFactor: Math.round(formFactor * 1000) / 1000
+    };
+  }
+  /* v38 QA — 커스텀 전술·성향 계수가 실제 엔진에 들어갔는지 확인하는 프로브 */
+  M.v38 = function () {
+    return {
+      ctac: ctacState(),
+      press: { home: Math.round(pressConfig('home').press * 10) / 10, away: Math.round(pressConfig('away').press * 10) / 10 },
+      lineY: { home: Math.round(lineYOf('home') * 10) / 10, away: Math.round(lineYOf('away') * 10) / 10 },
+      syn: { home: { fight: synOf('home', 'fight'), crea: synOf('home', 'crea'), dev: synOf('home', 'dev'), calm: synOf('home', 'calm') } },
+      formFactor: Math.round(formFactor * 1000) / 1000,
+      counts: { n: players.length, recounts: recountN, locks: (function () {
+        var o = [], i2, q2; for (i2 = 0; i2 < players.length; i2++) { q2 = players[i2]; o.push(q2.side + ':' + (q2.player && q2.player.lock) + ':' + (q2.player && q2.player.pic)); } return o;
+      })() }
+    };
   };
 
   DS.Match = M;

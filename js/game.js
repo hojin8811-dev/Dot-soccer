@@ -368,6 +368,10 @@
       dex: { players: {}, emblems: {}, kits: {} },
       /* v21b ⑥ — 초보자 3단계 가이드 진행 상태 (localStorage 세이브에 함께 저장) */
       guide: { done: {}, open: true, hidden: false },
+      /* v38 — 커스텀 전술 지시(0~100, 50=표준) · 첫 공식전 코치마크 · 최근 5경기 흐름 */
+      ctac: { line: 50, press: 50, wide: 50 },
+      tut: { done: false, step: 0, runs: 0 },
+      form: [],
       log: []
     };
     S = st;
@@ -537,12 +541,33 @@
       /* v21b ⑥ — 기존 세이브: 이미 경기를 치른 구단에는 가이드를 접어 둔다 */
       if (!d.guide) { d.guide = { done: {}, open: true, hidden: !!(d.totals && d.totals.matches > 0) }; }
       if (!d.guide.done) { d.guide.done = {}; }
+      /* v38 — 커스텀 전술 · 코치마크 · 최근 경기 흐름. 옛 세이브는 필드가 없으니 기본값으로 보정한다.
+         이미 경기를 치른 구단(또는 가이드를 본 구단)은 튜토리얼을 다시 띄우지 않는다. */
+      if (!d.ctac || typeof d.ctac !== 'object') { d.ctac = { line: 50, press: 50, wide: 50 }; }
+      var ck2;
+      for (ck2 in { line: 1, press: 1, wide: 1 }) {
+        if (typeof d.ctac[ck2] !== 'number' || isNaN(d.ctac[ck2])) { d.ctac[ck2] = 50; }
+        d.ctac[ck2] = Math.max(0, Math.min(100, Math.round(d.ctac[ck2])));
+      }
+      if (!d.tut || typeof d.tut !== 'object') { d.tut = { done: !!(d.totals && d.totals.matches > 0), step: 0, runs: 0 }; }
+      if (typeof d.tut.done !== 'boolean') { d.tut.done = !!(d.totals && d.totals.matches > 0); }
+      if (!d.form || !d.form.length) { d.form = []; }
+      if (!d.form.length && d.totals && d.totals.matches > 0 && d.tut.done === false) { d.tut.done = true; }
       var i2;
       for (i2 = 0; i2 < d.squad.length; i2++) {
         var sq0 = d.squad[i2];
         if (typeof sq0.exp !== 'number') { sq0.exp = 0; }
+        if (typeof sq0.expTotal !== 'number') { sq0.expTotal = sq0.exp || 0; }
+        if (typeof sq0.dev !== 'number') { sq0.dev = 0; }
         if (typeof sq0.level !== 'number') { sq0.level = 0; }
         if (typeof sq0.pot !== 'number') { sq0.pot = Math.min(95, Math.max(60, DS.ratingOf(sq0) + 8)); }
+        if (!sq0.lock || !DS.LOCK_FX[sq0.lock]) { sq0.lock = DS.LOCKER[i2 % 4].key; }
+      }
+      if (d.youth && d.youth.intake) {
+        for (i2 = 0; i2 < d.youth.intake.length; i2++) {
+          if (d.youth.intake[i2] && typeof d.youth.intake[i2].dev !== 'number') { d.youth.intake[i2].dev = 0; }
+          if (d.youth.intake[i2] && !d.youth.intake[i2].lock) { d.youth.intake[i2].lock = DS.LOCKER[i2 % 4].key; }
+        }
       }
       if (typeof d.smatchStreak !== 'number') { d.smatchStreak = 0; }
       if (typeof d.restRound !== 'number') { d.restRound = -1; }
@@ -853,6 +878,83 @@
       rows +
       '<div class="gd-foot"><span>' + (done >= 3 ? '모두 끝냈습니다. 이제 원하는 대로 즐기세요' : '순서대로 하면 첫 승까지 금방입니다') + '</span>' +
       '<button class="gd-hide" data-act="guidehide">다시 보지 않기</button></div></div>';
+  }
+
+  /* ═════════ v38 — 첫 공식전 3분 코치마크 (4단계) ═════════
+     새 게임의 첫 리그 경기에서 한 번만 뜨고, 완료·건너뛰기 모두 S.tut.done 으로 기억된다.
+     #m-overlay 를 재사용하며, 띄우는 동안에는 경기를 일시정지한다. */
+  var TUT_STEPS = [
+    { k: 'flow', sel: '#m-pitch', title: '① 경기 흐름과 지시',
+      body: '우리 팀은 파랑 원형 토큰입니다. 패스·압박은 선수 성향과 전술에 따라 스스로 움직입니다. 오른쪽 [지시 ›]에서 성향·압박·라인·공격 루트를 언제든 바꿀 수 있어요.' },
+    { k: 'card', sel: '#m-hand', title: '② 전술 카드 개입',
+      body: 'MOMENTUM이 차면 손패가 열립니다(경기당 6회). 게겐프레싱·세트피스 같은 카드를 누르면 피치 대형이 바로 바뀝니다.' },
+    { k: 'sub', sel: '.m-acts button[data-act="subs"]', title: '③ 선수 교체',
+      body: '지친 선수·카드 위험은 [선수 교체]로 최대 5명까지 바꿉니다. 하프타임에는 수석코치 추천서가 자동으로 뜹니다.' },
+    { k: 'speed', sel: '#m-speeds', title: '④ 배속과 화면',
+      body: '×1·×2·×3로 빠르게 돌리고, Ⅱ로 멈춥니다. [📺 중계] 버튼은 전술 전체를 보는 전체뷰로 바뀝니다.' }
+  ];
+  function tutState() {
+    if (!S.tut) { S.tut = { done: false, step: 0, runs: 0 }; }
+    if (typeof S.tut.done !== 'boolean') { S.tut.done = false; }
+    return S.tut;
+  }
+  function tutDoneNow() { return !!tutState().done; }
+  function tutClose() {
+    var ov = document.getElementById('m-overlay');
+    if (ov) { ov.classList.remove('on'); ov.innerHTML = ''; }
+    if (S && S.tut) { S.tut.step = 0; }
+  }
+  function tutFinish(resume) {
+    var t = tutState();
+    t.done = true; t.step = 0; t.runs = (t.runs || 0) + 1;
+    save();
+    tutClose();
+    if (resume && DS.Match && DS.Match.running && DS.Match.paused) { DS.Match.resume(true); }
+  }
+  function tutOpen(step) {
+    var ov = document.getElementById('m-overlay');
+    var app = document.getElementById('app');
+    if (!ov || !app) { return; }
+    var t = tutState(), n = TUT_STEPS.length, i;
+    step = clamp(step, 0, n - 1);
+    t.step = step;
+    var s = TUT_STEPS[step], el = document.querySelector(s.sel);
+    var ar = app.getBoundingClientRect(), r, pad = 7;
+    var hl = { x: ar.width * 0.12, y: ar.height * 0.28, w: ar.width * 0.76, h: ar.height * 0.44 };
+    if (el) {
+      r = el.getBoundingClientRect();
+      hl = { x: Math.max(3, r.left - ar.left - pad), y: Math.max(3, r.top - ar.top - pad),
+        w: Math.min(ar.width - 6, r.width + pad * 2), h: Math.min(ar.height - 6, r.height + pad * 2) };
+    }
+    var CW = 300, CH = 168;
+    var bx = clamp(hl.x + hl.w / 2 - CW / 2, 10, Math.max(10, ar.width - CW - 10));
+    var by = (hl.y + hl.h + CH + 14 < ar.height) ? (hl.y + hl.h + 8) : Math.max(8, hl.y - CH - 8);
+    /* 큰 대상(피치 전체)일 땐 카드를 대상 안쪽 아래로 넣어 상단 HUD를 가리지 않는다 */
+    if (hl.h > ar.height * 0.62) { bx = clamp(hl.x + 10, 10, Math.max(10, ar.width - CW - 10)); by = Math.max(8, hl.y + hl.h - CH - 10); }
+    var dots = '';
+    for (i = 0; i < n; i++) { dots += '<i class="' + (i === step ? 'on' : '') + '"></i>'; }
+    ov.innerHTML = '<div class="tut" data-tut="' + step + '">' +
+      '<div class="tut-hole" style="left:' + hl.x.toFixed(1) + 'px;top:' + hl.y.toFixed(1) + 'px;width:' + hl.w.toFixed(1) + 'px;height:' + hl.h.toFixed(1) + 'px"></div>' +
+      '<div class="tut-card" style="left:' + bx.toFixed(1) + 'px;top:' + by.toFixed(1) + 'px;width:' + CW + 'px">' +
+      '<div class="tut-kicker"><span>첫 공식전 가이드</span><b>' + (step + 1) + ' / ' + n + '</b></div>' +
+      '<div class="tut-title">' + s.title + '</div>' +
+      '<div class="tut-body">' + s.body + '</div>' +
+      '<div class="tut-foot"><span class="tut-dots">' + dots + '</span>' +
+      '<button class="btn ghost sm" data-act="tutskip">건너뛰기</button>' +
+      (step > 0 ? '<button class="btn ghost sm" data-act="tutprev">이전</button>' : '') +
+      '<button class="btn primary sm" data-act="tutnext">' + (step === n - 1 ? '시작' : '다음') + '</button>' +
+      '</div></div></div>';
+    ov.classList.add('on');
+  }
+  function tutMaybeStart(kind) {
+    if (kind !== 'league' || tutDoneNow()) { return false; }
+    global.setTimeout(function () {
+      if (!DS.Match || !DS.Match.running || DS.Match.halftime) { return; }
+      if (!document.body.classList.contains('in-match')) { return; }
+      if (DS.Match.pause) { DS.Match.pause(); }
+      tutOpen(0);
+    }, 1300);
+    return true;
   }
 
   function sortTable() {
@@ -1176,12 +1278,13 @@
     for (i = 0; i < BENCH_SIZE; i++) {
       var b = bench[i];
       if (b) {
-        benchHTML += '<button class="pcard ' + (selId === b.id ? 'sel' : '') + (DS.isYouthOrigin(b) ? ' yth' : '') + '" data-act="bench" data-id="' + b.id + '">' +
+        benchHTML += '<div class="pcard-wrap"><button class="pcard ' + (selId === b.id ? 'sel' : '') + (DS.isYouthOrigin(b) ? ' yth' : '') + '" data-act="bench" data-id="' + b.id + '">' +
           '<span class="ph"><img src="' + DS.Art.headSrc(b) + '" alt=""></span>' +
           '<span class="pn">' + esc(shortName(b.name)) + '</span>' +
           '<span class="pm">' + posBadge(b.pos, master ? b.pos : DS.posGroup(b.pos)) + '<span class="ov">' + DS.ratingOf(b) + '</span></span>' +
           (DS.isYouthOrigin(b) ? '<em class="pc-yt">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</em>' : '') +
-          '</button>';
+          '</button>' +
+          '<button class="pinfo" data-act="player" data-id="' + b.id + '" aria-label="' + esc(b.name) + ' 상세">ⓘ</button></div>';
       } else {
         benchHTML += '<div class="pcard" style="opacity:.5"><span class="ph"></span><span class="pn">공석</span><span class="pm tiny">BENCH</span></div>';
       }
@@ -1224,12 +1327,16 @@
       '<div class="sq-card"><div class="card-head"><b>포메이션</b><span class="meta">' + f.tag + '</span></div>' +
       '<div class="fwrap">' + chips + '</div></div>' +
       '<div class="sq-card">' + kpiHTML + '</div>' +
+      '<div class="sq-card sq-ctac"><div class="card-head"><b>커스텀 전술 지시</b><span class="meta">경기 엔진 연동</span></div>' + ctacHTML() + '</div>' +
       '<div class="sq-actions">' +
       '<button class="btn dark sm" data-act="autolineup">자동 배치</button>' +
       '<button class="btn sm" data-act="rolesheet">역할 지정</button>' +
       '<button class="btn primary sm" data-act="evolvelist">롤 진화</button>' +
+      '<button class="btn ghost sm" data-act="tutreplay" title="첫 공식전 코치마크를 다시 봅니다">조작 가이드</button>' +
       '</div>' +
-      '<div class="sq-card sq-syn"><div class="card-head"><b>라커룸 성향</b><span class="meta">3명↑ 시너지</span></div>' + synHTML + '</div>' +
+      '<div class="sq-card sq-syn"><div class="card-head"><b>라커룸 성향</b><span class="meta">3명↑ 시너지</span></div>' + synHTML +
+      '<div class="syn-fx tiny muted">승부욕=슈팅·압박 · 창의=스루패스·전환 · 헌신=압박·태클·체력 · 냉정=패스 오차↓</div></div>' +
+      '<div class="sq-card sq-mood"><div class="card-head"><b>팀 분위기</b><span class="meta">연승·연패</span></div>' + moodHTML() + '</div>' +
       '</aside></div>';
 
     drawPitchBG();
@@ -1432,7 +1539,7 @@
     for (i = 1; i < keys.length; i++) { if ((w[keys[i]] || 0) > (w[best] || 0)) { best = keys[i]; } }
     if (chance(0.7)) { DS.growAttr(p, best, 1); }
     if (chance(0.35)) { p.set.cap = clamp((p.set.cap || 1) + 1, 1, 10); }
-    p.exp = (p.exp || 0) + 120;
+    p.exp = (p.exp || 0) + Math.round(120 * DS.trainMultOf(p));
     if (p.exp >= DS.expToNext(p.level || 0) && !DS.atPotCap(p)) {
       p.exp -= DS.expToNext(p.level || 0);
       p.level = (p.level || 0) + 1;
@@ -1620,12 +1727,13 @@
     for (i = 0; i < y.intake.length; i++) {
       p = y.intake[i];
       var inRv = rv.ids.indexOf(p.id) >= 0;
-      cards += '<button class="yth' + (youthSel.id === p.id ? ' on' : '') + '" data-act="youthpick" data-id="' + p.id + '">' +
+      cards += '<div class="yth-wrap"><button class="yth' + (youthSel.id === p.id ? ' on' : '') + '" data-act="youthpick" data-id="' + p.id + '">' +
         '<span class="ph"><img src="' + DS.Art.headSrc(p) + '" alt=""></span>' +
         '<span class="nm">' + tierDot(p) + ' ' + esc(shortName(p.name)) + (inRv ? '<em class="yth-rv">2군</em>' : '') + '</span>' +
         '<span class="mt">' + posBadge(p.pos) + '<span class="chip">' + p.age + '세</span></span>' +
         '<span class="mt">' + footChip(p) + '<span class="ov">' + DS.ratingOf(p) + '</span></span>' +
-        '<span class="pot">' + youthStars(p) + '</span></button>';
+        '<span class="pot">' + youthStars(p) + '</span></button>' +
+        '<button class="pinfo" data-act="player" data-id="' + p.id + '" aria-label="' + esc(p.name) + ' 상세">ⓘ</button></div>';
     }
     if (!cards) { cards = '<div class="tiny muted yth-none">이번 시즌 유망주 모두 승격/매각 완료 — 다음 시즌에 새 유망주가 입단합니다.</div>'; }
 
@@ -1722,12 +1830,12 @@
       /* v25 — 아직 진화할 수 없는(롤도 없는) 선수는 접어서 목록 길이를 줄인다 */
       if (!canEvo && !r) {
         roleWait++;
-        roleWaitHTML += '<div class="rw-row"><span class="rw-n">' + esc(shortName(st[i].name)) + '</span>' +
+        roleWaitHTML += '<div class="rw-row pclick" data-act="player" data-id="' + st[i].id + '"><span class="rw-n">' + esc(shortName(st[i].name)) + '</span>' +
           '<span class="rw-p">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span>' +
           '<span class="rw-l">Lv.' + needLv + '부터</span></div>';
         continue;
       }
-      roleHTML += '<div class="role-row">' +
+      roleHTML += '<div class="role-row pclick" data-act="player" data-id="' + st[i].id + '">' +
         '<span class="minihead" style="width:30px;height:30px"><img src="' + DS.Art.headSrc(st[i]) + '"></span>' +
         '<div style="flex:1 1 auto;min-width:0"><div class="nm">' + tierDot(st[i]) + ' ' + esc(st[i].name) + ' <span class="tiny muted">' + st[i].pos + ' · Lv.' + (st[i].level || 0) + '</span></div>' +
         '<div class="ds">' + (r ? r.name + ' — ' + r.desc : (canEvo ? '아직 롤 없음 · 진화 가능' : '아직 롤 없음 · Lv.' + needLv + '부터 진화 가능')) + '</div></div>' +
@@ -1764,6 +1872,10 @@
       youthHTML() +
       reserveHTML() +
       ageNoticeHTML() +
+      '<div class="card"><div class="card-head"><b>라커룸 분위기 · 성향</b><span class="meta">사기 · 연승/연패</span></div>' +
+      moodHTML() +
+      '<div class="tiny muted" style="margin-top:4px">선발 11명 성향: ' + lockSynText() + ' — 같은 성향 3명 이상이면 경기 엔진에 시너지가 붙습니다</div></div>' +
+      rosterHTML() +
       '<div class="card">' +
       '<div class="card-head"><span class="dot"></span><b>팀 컨디션 · 회복</b><span class="meta">REST · CONDITION</span></div>' +
       conditionModalHTML(true) + '</div>' +
@@ -2018,7 +2130,7 @@
       if (!p) { continue; }
       EXTRA[p.id] = p;
       var ovr = DS.ratingOf(p), rc = rarityColor(p);
-      cards += '<div class="mkt">' +
+      cards += '<div class="mkt pclick" data-act="player" data-id="' + p.id + '" data-cmp="1" role="button" tabindex="0">' +
         '<span class="art"><img src="' + DS.Art.portraitSrc(p) + '" alt="" draggable="false"></span>' +
         '<div class="mm">' +
         '<div class="nm">' + tierDot(p) + ' ' + esc(p.name) + '<span class="pv">' + ovr + '</span></div>' +
@@ -2231,24 +2343,201 @@
       '<div class="sheet-body">' + body + '</div></div>';
   }
 
-  function playerModal(p) {
+  /* ═════════ v38 — 선수 상세창 (클럽 · 마이팀 · 이적시장 · 유소년 공용) ═════════
+     클럽·마이팀·이적시장·유소년 어디서든 선수를 누르면 이 모달이 뜬다.
+     500장 고화질 초상화 + 세부 능력치 3종(스피드/공격/수비) + 세트 특기 +
+     OVR↔잠재력 게이지(atPotCap 배지) + 성장 이력, 이적시장에서는 동포지션 비교 카드까지. */
+  function bestAtPosition(pos) {
+    var i, best = null, bv = -1, v, q, pool = starters();
+    for (i = 0; i < pool.length; i++) {
+      q = pool[i];
+      if (q.pos !== pos) { continue; }
+      v = DS.ratingOf(q) + 6;
+      if (v > bv) { bv = v; best = q; }
+    }
+    if (!best) {
+      var g = DS.posGroup(pos);
+      for (i = 0; i < pool.length; i++) {
+        q = pool[i];
+        if (DS.posGroup(q.pos) !== g) { continue; }
+        v = DS.ratingOf(q);
+        if (v > bv) { bv = v; best = q; }
+      }
+    }
+    if (!best) {
+      for (i = 0; i < S.squad.length; i++) {
+        q = S.squad[i];
+        if (q.pos !== pos) { continue; }
+        v = DS.ratingOf(q);
+        if (v > bv) { bv = v; best = q; }
+      }
+    }
+    return best;
+  }
+  function deltaChip(mine, theirs, lowBetter) {
+    var d = mine - theirs, txt = (d > 0 ? '+' : '') + d, cls = 'up';
+    if (d === 0) { txt = '±0'; cls = 'eq'; }
+    else if ((d > 0 && lowBetter) || (d < 0 && !lowBetter)) { cls = 'down'; }
+    return '<em class="cmp-d ' + cls + '">' + txt + '</em>';
+  }
+  function compareCardHTML(p) {
+    var cmp = bestAtPosition(p.pos);
+    if (!cmp || cmp.id === p.id) { return ''; }
+    var a = DS.potPct(p), b = DS.potPct(cmp);
+    var rows = '';
+    rows += '<div class="cmp-row"><span>OVR(실제)</span><b>' + a.raw + '</b><b>' + b.raw + '</b>' + deltaChip(a.raw, b.raw) + '</div>';
+    rows += '<div class="cmp-row"><span>잠재 상한</span><b>' + a.pot + '</b><b>' + b.pot + '</b>' + deltaChip(a.pot, b.pot) + '</div>';
+    rows += '<div class="cmp-row"><span>스피드</span><b>' + p.stats.spd + '</b><b>' + cmp.stats.spd + '</b>' + deltaChip(p.stats.spd, cmp.stats.spd) + '</div>';
+    rows += '<div class="cmp-row"><span>공격</span><b>' + p.stats.atk + '</b><b>' + cmp.stats.atk + '</b>' + deltaChip(p.stats.atk, cmp.stats.atk) + '</div>';
+    rows += '<div class="cmp-row"><span>수비</span><b>' + p.stats.def + '</b><b>' + cmp.stats.def + '</b>' + deltaChip(p.stats.def, cmp.stats.def) + '</div>';
+    rows += '<div class="cmp-row"><span>나이</span><b>' + p.age + '</b><b>' + cmp.age + '</b>' + deltaChip(p.age, cmp.age, true) + '</div>';
+    var inLine = S.lineup.indexOf(cmp.id) >= 0;
+    return '<div class="band">COMPARE<span>내 스쿼드 동포지션 최고</span></div>' +
+      '<div class="cmp-card">' +
+      '<div class="cmp-head"><span class="cmp-self"><img src="' + DS.Art.headSrc(p) + '" alt=""><em>이 선수</em></span>' +
+      '<span class="cmp-vs">VS</span>' +
+      '<span class="cmp-other"><img src="' + DS.Art.headSrc(cmp) + '" alt=""><em>' + esc(shortName(cmp.name)) + (inLine ? ' · 주전' : ' · 백업') + '</em></span></div>' +
+      '<div class="cmp-rows">' + rows + '</div>' +
+      '<div class="tiny muted">초록 = 이 선수가 우세 · 빨강 = 내 기존 선수가 우세 (나이는 어린 쪽이 우세)</div></div>';
+  }
+  function potGaugeHTML(p) {
+    var g = DS.potPct(p), capped = DS.atPotCap(p);
+    return '<div class="potg' + (capped ? ' capped' : '') + '">' +
+      '<div class="pg-top"><span>OVR <b>' + g.raw + '</b></span><span>잠재 상한 <b>' + g.pot + '</b></span>' +
+      (capped ? '<em class="pot-badge">잠재력 한계 도달</em>' : '<em class="pot-gap">+' + g.gap + ' 여유</em>') + '</div>' +
+      '<div class="pg-bar"><i style="width:' + g.pct + '%"></i></div>' +
+      '<div class="pg-foot">' + (capped
+        ? '상한에 닿았습니다 — 경기 EXP로는 능력치가 더 오르지 않고, 롤 진화·훈련 콤보 특기만 남습니다'
+        : '잠재력까지 ' + g.gap + ' 남았습니다 — 출전·특훈으로 채우세요') + '</div></div>';
+  }
+  function stat3HTML(p) {
+    var s = p.stats || DS.statSheet(p);
+    function row(lb, v, c) {
+      return '<div class="st3-row"><span class="lb">' + lb + '</span>' +
+        '<span class="gauge" style="--gc:' + c + '"><i style="width:' + clamp(v / 99 * 100, 0, 100) + '%;background:' + c + '"></i></span>' +
+        '<span class="num">' + v + '</span></div>';
+    }
+    return '<div class="st3">' + row('스피드', s.spd, '#4aa8e0') + row('공격', s.atk, '#e2553f') + row('수비', s.def, '#2f8f62') + '</div>' +
+      '<div class="tiny muted">기본기 — 스피드 ' + p.s + '/10 · 테크닉 ' + p.t + '/10 · 파워 ' + p.p + '/10 · 포지션 가중치가 위 3종에 반영됩니다</div>';
+  }
+  function growthHTML(p) {
+    var need = DS.expToNext(p.level || 0), exp = Math.max(0, Math.min(p.exp || 0, need));
+    var pct = need ? clamp(exp / need * 100, 0, 100) : 0;
+    var st = DS.ageStage(p.age), tm = DS.trainMultOf(p);
+    return '<div class="growth">' +
+      '<div class="gr-row"><span>레벨</span><b>Lv.' + (p.level || 0) + '</b><em>' + st.name + ' ×' + st.expMult + '</em></div>' +
+      '<div class="gr-row"><span>경기 EXP</span><b>' + exp + ' / ' + need + '</b><em>누적 ' + (p.expTotal || 0) + '</em></div>' +
+      '<div class="gr-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="gr-row"><span>누적 성장</span><b>+' + (p.dev || 0) + ' 포인트</b><em>훈련 성장 ×' + tm.toFixed(2) + '</em></div>' +
+      '<div class="gr-row"><span>통산 기록</span><b>' + (p.apps || 0) + '경기 · ' + (p.goals || 0) + '골 · ' + (p.assists || 0) + '도움</b></div>' +
+      '</div>';
+  }
+  function setSkillHTML(p) {
+    var tr = DS.traitOf(p.trait), L = DS.lockOf(p.lock), fx = DS.lockFxOf(p.lock), i;
+    var st = p.set || { pk: 1, fk: 1, ck: 1, cap: 1 };
+    var chips = '';
+    if (p.skill) { chips += '<span class="sk">' + esc(p.skill) + '</span>'; }
+    if (p.trained && p.trained.length) {
+      for (i = 0; i < p.trained.length && i < 3; i++) { chips += '<span class="sk">' + esc(p.trained[i]) + '</span>'; }
+    }
+    if (!chips) { chips = '<span class="tiny muted">특훈 콤보로 익히는 특기가 아직 없습니다.</span>'; }
+    return '<div class="set-g">' +
+      '<div class="set-row"><span>특기</span><b>' + tr.name + '</b><em>' + tr.desc + '</em></div>' +
+      '<div class="set-row"><span>성향</span><b style="color:' + L.color + '">' + L.name + '</b><em>' + fx.label + ' · ' + fx.trainLabel + '</em></div>' +
+      '<div class="set-bars">' +
+      statRowV('PK', st.pk, '#b662c9') + statRowV('FK', st.fk, '#4aa8e0') +
+      statRowV('코너킥', st.ck, '#2f8f62') + statRowV('캡틴', st.cap, '#e8a33a') +
+      '</div><div class="set-sk">' + chips + '</div></div>';
+  }
+  function statRowV(lb, v, c) {
+    return '<div class="st3-row"><span class="lb">' + lb + '</span>' +
+      '<span class="gauge"><i style="width:' + clamp(v / 10 * 100, 0, 100) + '%;background:' + c + '"></i></span>' +
+      '<span class="num">' + v + '</span></div>';
+  }
+
+  /* ═════════ v38 — 커스텀 전술 지시 · 라커룸 분위기 UI ═════════ */
+  var CTAC_ROWS = [
+    { k: 'line', name: '수비 라인 높이', short: '라인',
+      opts: ['아주 낮게', '낮게', '표준', '높게', '아주 높게'],
+      note: '내리면 두 줄 블록이 골문을 지키고, 올리면 하프라인을 넘어 압박합니다 (v20 라인 지시와 합산)' },
+    { k: 'press', name: '압박 강도', short: '압박',
+      opts: ['소극', '낮음', '표준', '강함', '전방압박'],
+      note: '볼 소유자에게 붙는 인원과 트리거 반경이 달라집니다' },
+    { k: 'wide', name: '측면 전개 비중', short: '측면',
+      opts: ['중앙 집중', '중앙', '표준', '측면', '폭 최대'],
+      note: 'v35 양 사이드 AI 흐름을 유지한 채 측면/중앙 패스 가중치만 밀어 줍니다' }
+  ];
+  function ctacVal(k) {
+    if (!S.ctac) { S.ctac = { line: 50, press: 50, wide: 50 }; }
+    var v = S.ctac[k];
+    return typeof v === 'number' ? clamp(v, 0, 100) : 50;
+  }
+  function ctacIdx(k) { return Math.round(ctacVal(k) / 25); }
+  function ctacHTML() {
+    var html = '', i, j, r, cur;
+    for (i = 0; i < CTAC_ROWS.length; i++) {
+      r = CTAC_ROWS[i]; cur = ctacIdx(r.k);
+      html += '<div class="ctac-row"><div class="ctac-lb"><span>' + r.name + '</span><b>' + r.opts[cur] + '</b></div>' +
+        '<div class="ctac-seg" data-ctac="' + r.k + '">';
+      for (j = 0; j < 5; j++) {
+        html += '<button class="' + (j === cur ? 'on' : '') + '" data-act="ctac" data-k="' + r.k + '" data-v="' + (j * 25) + '" aria-label="' + r.name + ' ' + r.opts[j] + '">' +
+          '<i></i></button>';
+      }
+      html += '</div></div>';
+    }
+    return html + '<div class="tiny muted" style="margin-top:3px">경기 중에 바꿔도 즉시 반영됩니다 · 세이브에 저장됩니다</div>';
+  }
+  function moodHTML(compact) {
+    var m = DS.teamMood(S.morale, S.form), i, f, dots = '';
+    for (i = 0; i < m.form.length; i++) {
+      f = m.form[i];
+      dots += '<i class="md-dot ' + (f === 'W' ? 'w' : (f === 'D' ? 'd' : 'l')) + '">' + (f === 'W' ? '승' : (f === 'D' ? '무' : '패')) + '</i>';
+    }
+    if (!m.form.length) { dots = '<span class="tiny muted">아직 경기 기록이 없습니다</span>'; }
+    return '<div class="mood">' +
+      '<div class="md-top"><span class="md-label" style="background:' + m.color + '22;color:' + m.color + '">' + m.label + '</span>' +
+      '<b class="md-score" style="color:' + m.color + '">' + m.score + '</b><em>사기 + 최근 흐름</em></div>' +
+      '<div class="md-form">' + dots + '</div>' +
+      (compact ? '' : '<div class="tiny muted" style="margin-top:3px">' + m.desc + '</div>') +
+      '<div class="md-mult">결정력 ×' + m.mult.toFixed(3) + ' · 전술 시너지 <b>' + (lockSynText() || '없음') + '</b></div></div>';
+  }
+  function lockSynText() {
+    var syn = DS.lockSynergy(starters()), out = [], i;
+    for (i = 0; i < syn.length; i++) { out.push(syn[i].name + ' ' + syn[i].count + '인'); }
+    return out.join(' · ');
+  }
+  /* v38 — 클럽 탭 1군 선수단 명부: 어느 화면에서든 선수를 눌러 상세로 들어갈 수 있게 */
+  function rosterHTML() {
+    var list = S.squad.slice().sort(function (a, b) { return DS.ratingOf(b) - DS.ratingOf(a); });
+    var html = '', i, p, L;
+    for (i = 0; i < list.length; i++) {
+      p = list[i]; L = DS.lockOf(p.lock);
+      html += '<div class="rs-row pclick" data-act="player" data-id="' + p.id + '" role="button" tabindex="0">' +
+        '<span class="rs-ph"><img src="' + DS.Art.headSrc(p) + '" alt=""></span>' +
+        '<span class="rs-nm">' + tierDot(p) + ' ' + esc(shortName(p.name)) + '<em>' + p.pos + ' · Lv.' + (p.level || 0) + '</em></span>' +
+        '<span class="rs-ov">' + DS.ratingOf(p) + '</span>' +
+        '<span class="rs-pot">잠재 ' + DS.potOf(p) + (DS.atPotCap(p) ? ' <b class="rs-cap">MAX</b>' : '') + '</span>' +
+        '<span class="rs-lk" style="color:' + L.color + '">' + L.name + '</span></div>';
+    }
+    return '<div class="card"><div class="card-head"><b>1군 선수단 ' + list.length + '명</b><span class="meta">눌러서 상세 · 잠재 · 성향</span></div>' +
+      '<div class="rs-grid">' + html + '</div></div>';
+  }
+
+  function playerModal(p, opts) {
+    if (!p) { return; }
+    opts = opts || {};
     var inSquad = S.squad.indexOf(p) >= 0;
     var rt = DS.ratingOf(p), L = DS.lockOf(p.lock), role = DS.roleOf(p.role);
-    var skills = '';
-    if (p.skill) { skills += '<span class="sk">' + esc(p.skill) + '</span>'; }
-    if (p.trained && p.trained.length) {
-      var i;
-      for (i = 0; i < p.trained.length && i < 3; i++) { skills += '<span class="sk">' + esc(p.trained[i]) + '</span>'; }
-    }
+    var inYouth = !inSquad && (function () { try { return !!youthById(p.id); } catch (e) { return false; } })();
     var body =
-      '<div class="pd-hero">' +
-      '<div class="pd-art"><img src="' + DS.Art.portraitSrc(p) + '" alt=""></div>' +
+      '<div class="pd-hero v38">' +
+      '<div class="pd-art v38"><img src="' + DS.Art.portraitSrc(p) + '" alt="" draggable="false"></div>' +
       '<div class="pd-info">' +
       '<div class="pd-nick">\'' + esc(p.nickname) + '\'</div>' +
       '<div class="pd-name">' + tierDot(p) + ' ' + esc(p.name) + ' <small>' + p.age + '세</small></div>' +
       '<div class="pd-line">' + posBadge(p.pos, p.pos + ' · ' + DS.POS[p.pos].name) +
       footChip(p) +
-      '<span class="chip" style="background:' + L.color + '26;color:' + L.color + '">' + L.name + '</span>' +
+      '<span class="chip" style="background:' + L.color + '26;color:' + L.color + '">성향 ' + L.name + '</span>' +
       (role ? '<span class="chip lime">' + role.name + '</span>' : '') +
       (function () {
         var st = DS.ageStage(p.age);
@@ -2258,21 +2547,30 @@
       '<div class="row" style="align-items:flex-end;gap:8px"><div class="pd-ov">' + rt + '<small>OVR</small></div>' +
       '<div class="tiny" style="color:rgba(233,244,221,.6);padding-bottom:2px">' + DS.RARITY[p.rarity].name + ' · ' + p.tenure + '기수 · Lv.' + (p.level || 0) + '</div></div>' +
       '<div class="pd-rows"><div><span>타입</span>' + esc(p.playType) + '</div><div><span>신장</span>' + p.height + 'cm</div></div>' +
-      '<div class="pd-rows"><div><span>성장 곡선</span>' + DS.ageStage(p.age).age + ' · ' + DS.ageStage(p.age).desc + '</div>' +
-      '<div><span>잠재</span>' + (p.pot || '—') + '</div></div>' +
+      '<div class="pd-rows"><div><span>성장 곡선</span>' + DS.ageStage(p.age).age + '</div>' +
+      '<div><span>잠재</span>' + (p.pot || '—') + '</div><div><span>등번호</span>' + (p.number || '—') + '</div></div>' +
       '</div></div>' +
 
-      '<div class="band">STATUS<span>능력치 · 적성</span></div>' +
+      potGaugeHTML(p) +
+
+      (opts.cmp || opts.market ? compareCardHTML(p) : '') +
+
+      '<div class="band">STATS<span>세부 능력치 3종</span></div>' +
+      stat3HTML(p) +
       aptMap(p) +
-      statRow('스피드', p.s, 's') + statRow('테크닉', p.t, 't') + statRow('파워', p.p, 'p') +
-      statRow('공격', p.stats.atk, 's', 99) + statRow('수비', p.stats.def, 'p', 99) +
+
+      '<div class="band">SET<span>세트 특기 · 세트피스</span></div>' +
+      setSkillHTML(p) +
+
+      '<div class="band">GROWTH<span>성장 이력</span></div>' +
+      growthHTML(p) +
 
       '<div class="band">ROLE<span>현대 롤 · 라커룸 성향</span></div>' +
       '<div class="tiny muted" style="line-height:1.55">' + (role ? '<b>' + role.name + '</b> — ' + role.desc : '아직 롤이 없습니다. Lv.3이 되면 롤을 선택해 진화할 수 있습니다.') +
-      '<br><b style="color:' + L.color + '">' + L.name + '</b> — ' + L.desc + '</div>' +
+      '<br><b style="color:' + L.color + '">' + L.name + '</b> — ' + L.desc + ' <span style="color:#3c6414">(' + DS.lockFxOf(p.lock).label + ')</span></div>' +
 
       '<div class="band">PLAYER STORY<span>' + esc(p.nickname) + '</span></div>' +
-      '<div class="pd-story">' + skills + DS.storyFor(p, S.club.name) + '</div>' +
+      '<div class="pd-story">' + (p.skill ? '<span class="sk">' + esc(p.skill) + '</span>' : '') + DS.storyFor(p, S.club.name) + '</div>' +
 
       (inSquad ?
         '<div class="pd-edit">' +
@@ -2281,9 +2579,10 @@
         '<button class="btn primary" data-act="saveplayer" data-id="' + p.id + '">저장</button></div>' +
         '<button class="btn dark wide" style="margin-top:8px" data-act="evolve" data-id="' + p.id + '"' + (canEvolve(p) ? '' : ' disabled aria-disabled="true"') + '>' +
         (canEvolve(p) ? '롤 진화 · ' + fmt(EVO_COST) : '롤 진화 · Lv.' + evoNeed(p) + '부터') + '</button>'
-        : '<div class="empty-note">스카우트 후보입니다. 영입하면 이름과 등번호를 바꿀 수 있어요.</div>');
+        : (inYouth ? '<div class="empty-note">유소년 아카데미 선수입니다. 코칭으로 키워 1군에 승격할 수 있어요.</div>'
+          : '<div class="empty-note">영입 전 후보 선수입니다. 이적시장에서 영입하면 이름과 등번호를 바꿀 수 있어요.</div>'));
 
-    setSheet('PLAYER DETAIL', body);
+    setSheet('PLAYER DETAIL · ' + esc(p.pos), body, 'v38');
     paintEmblems(document.getElementById('modal'));
   }
 
@@ -3297,6 +3596,12 @@
       managerSync: mgrSync(),
       managerTraits: DS.managerTraitText(mgr()),
       kind: kind,
+      /* v38 — 커스텀 전술 지시 · 라커룸 성향 시너지 · 팀 분위기 */
+      ctac: { line: ctacVal('line'), press: ctacVal('press'), wide: ctacVal('wide') },
+      lockerSyn: DS.lockSynergy(starters()),
+      lockCounts: DS.lockCounts(starters()),
+      morale: DS.teamMood(S.morale, S.form).score,
+      formMult: DS.teamMood(S.morale, S.form).mult,
       onHalftime: function () {
         /* v28 — 하프타임엔 먼저 수석코치 교체 추천서를 띄우고, 교체 횟수가 없으면 기존 교체창으로 */
         var adv = DS.Match && DS.Match.adviceState ? DS.Match.adviceState() : null;
@@ -3308,6 +3613,8 @@
       onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind, venueHome); }
     };
     global.setTimeout(function () { if (DS.Match) { DS.Match.start(cfg); } }, 60);
+    /* v38 — 첫 공식전이면 엔진이 뜬 뒤 코치마크를 연다 (경기는 잠시 멈춘다) */
+    tutMaybeStart(kind);
   }
 
   function finishMatch(res, oppTeam, oppId, kind, venueHome) {
@@ -3334,6 +3641,12 @@
     if (win) { fanGain = Math.round(fanGain * (1 + facValue('fanclub') / 100)); }
     S.fans = Math.max(120, S.fans + fanGain);
     S.morale = clamp(S.morale + (win ? 6 : (draw ? 0 : -5)), 0, 100);
+    /* v38 — 최근 5경기 흐름(연승·연패)을 남긴다. 라커룸 분위기·결정력 보정에 쓰인다. */
+    if (kind !== 'pvp') {
+      if (!S.form) { S.form = []; }
+      S.form.push(win ? 'W' : (draw ? 'D' : 'L'));
+      if (S.form.length > 5) { S.form.shift(); }
+    }
     S.condition = clamp(S.condition - U.irange(6, 10) + facValue('medical'), 12, 100);
     S.money += reward;
     /* v24 — 유저 대전(PvP)은 시즌 기록(전적·득실)에 넣지 않고 별도 PvP 전적에만 남긴다 */
@@ -4199,6 +4512,7 @@
     ov.innerHTML = '<div class="sub-panel">' +
       '<div class="sub-head"><b>선수 교체</b><span>남은 교체 ' + st.subsLeft + '/' + (st.subsMax || 5) + '회 · 최대 5회 · 벤치 ' + st.bench.length + '명' + (halftime ? ' · 하프타임' : '') + '</span></div>' +
       '<div class="sub-min">현재 ' + st.minute + '분 · 스코어 ' + st.score + '</div>' +
+      '<div class="sub-mood">라커룸 ' + (function () { var m = DS.teamMood(S.morale, S.form); return '<b style="color:' + m.color + '">' + m.label + ' ' + m.score + '</b> · 결정력 ×' + m.mult.toFixed(3) + ' · 시너지 ' + (lockSynText() || '없음'); })() + '</div>' +
       '<div class="sub-cols"><div><div class="sub-title">OUT · 선발</div><div class="sub-list">' + outHTML + '</div></div>' +
       '<div><div class="sub-title">IN · 벤치</div><div class="sub-list">' + inHTML + '</div></div></div>' +
       '<div class="sub-btns"><button class="btn ghost" data-act="subclose">' + (halftime ? '그대로 후반' : '닫기') + '</button>' +
@@ -4400,6 +4714,11 @@
     var main = document.getElementById('main');
     if (main) { main.scrollTop = 0; }
     if (tab !== 'match') { document.body.classList.remove('in-match'); }
+    /* v38 — 경기 화면을 떠나면 코치마크 오버레이가 남아 다른 탭을 가리지 않게 정리한다 */
+    if (tab !== 'match') {
+      var ovT = document.getElementById('m-overlay');
+      if (ovT && ovT.querySelector('.tut')) { ovT.classList.remove('on'); ovT.innerHTML = ''; }
+    }
     renderAll();
     /* v21b ⑥ — 마이팀·클럽을 둘러보면 가이드 단계가 완료된다 */
     if (tab === 'squad') { guideMark('team'); }
@@ -4490,6 +4809,14 @@
     }
     var bonus = facValue('training');
     if (bonus > 0 && chance(bonus / 100)) { gain[pick(['s', 't', 'p'])] += 1; }
+    /* v38 — 라커룸 성향·개성에 따른 훈련 효율 (헌신 ×1.25 · 승부욕 ×1.12 · 냉정 ×1.08 · 창의 ×1.06,
+       성실 개성 ×1.10 / 기복 ×0.94). 배율의 소수부만 추가 성장 확률로 바꾼다. */
+    var tm = DS.trainMultOf(p), tmHit = false;
+    if (tm > 1 && chance(tm - 1)) {
+      var wtr = DS.POS[p.pos].w;
+      var bestK = wtr.s >= wtr.t && wtr.s >= wtr.p ? 's' : (wtr.t >= wtr.p ? 't' : 'p');
+      gain[bestK] += 1; tmHit = true;
+    }
     var applied = 0;
     applied += DS.growAttr(p, 's', gain.s);
     applied += DS.growAttr(p, 't', gain.t);
@@ -4503,6 +4830,7 @@
     renderAll();
     var capped = cap0 || DS.atPotCap(p);
     toast((combo ? '특훈 콤보 ' + combo.name + ' · ' + p.name + ' 각성' : p.name + ' 특훈 완료 (Lv.' + p.level + ')') +
+      ' · 성향 보정 ×' + tm.toFixed(2) + (tmHit ? ' (추가 성장)' : '') +
       (capped ? ' · 잠재력 한계(OVR ' + DS.ratingOf(p) + '/' + p.pot + ') — 능력치는 더 오르지 않습니다' : ''));
   }
 
@@ -4612,9 +4940,36 @@
     if (act === 'guideopen') { guideState().open = true; save(); renderHome(); return; }
     if (act === 'guidehide') { var gs = guideState(); gs.hidden = true; gs.open = false; save(); renderHome(); return; }
 
-    if (act === 'player') { id = t.getAttribute('data-id'); var pp = byId(id); if (pp) { playerModal(pp); } return; }
+    if (act === 'player') {
+      id = t.getAttribute('data-id');
+      var pp = byId(id) || youthById(id) || null;
+      if (pp) { playerModal(pp, { market: t.getAttribute('data-cmp') === '1', cmp: t.getAttribute('data-cmp') === '1' }); }
+      return;
+    }
     if (act === 'backup') { id = t.getAttribute('data-id'); if (selId) { swapSlot(id, findBestSlot(id)); return; } var bp = byId(id); if (bp) { playerModal(bp); } return; }
 
+    if (act === 'ctac') {
+      var ck3 = t.getAttribute('data-k'), cv = parseInt(t.getAttribute('data-v'), 10);
+      if (!S.ctac) { S.ctac = { line: 50, press: 50, wide: 50 }; }
+      if ((ck3 === 'line' || ck3 === 'press' || ck3 === 'wide') && !isNaN(cv)) {
+        S.ctac[ck3] = clamp(cv, 0, 100);
+        save();
+        if (DS.Match && DS.Match.setCustomTactics && DS.Match.running) { DS.Match.setCustomTactics(S.ctac); }
+        renderSquad();
+        var rowName = ck3 === 'line' ? '수비 라인' : (ck3 === 'press' ? '압박 강도' : '측면 전개');
+        toast(rowName + ' 지시 저장 · 경기 엔진에 바로 반영');
+      }
+      return;
+    }
+    if (act === 'tutnext') { var ts1 = tutState(); if (ts1.step >= TUT_STEPS.length - 1) { tutFinish(true); toast('가이드 완료 · 경기를 시작합니다'); } else { tutOpen(ts1.step + 1); } return; }
+    if (act === 'tutprev') { tutOpen(tutState().step - 1); return; }
+    if (act === 'tutskip') { tutFinish(true); toast('가이드를 건너뜁니다 · 마이팀에서 다시 볼 수 있어요'); return; }
+    if (act === 'tutreplay') {
+      var tr1 = tutState(); tr1.done = false; tr1.step = 0; save();
+      if (DS.Match && DS.Match.running) { if (DS.Match.pause) { DS.Match.pause(); } tutOpen(0); toast('코치마크를 다시 켰습니다'); }
+      else { toast('다음 공식전에서 코치마크가 다시 나옵니다'); }
+      return;
+    }
     if (act === 'formation') { doFormation(t.getAttribute('data-f')); return; }
 
     if (act === 'mgrmodal') { managerRoom(); return; }

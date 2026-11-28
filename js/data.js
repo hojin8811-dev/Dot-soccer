@@ -683,6 +683,69 @@
     for (i = 0; i < LOCKER.length; i++) { if (LOCKER[i].key === key) { return LOCKER[i]; } }
     return LOCKER[0];
   };
+  /* ── v38 — 성향이 실제 플레이에 미치는 계수표 ──
+     match.js(경기 AI)와 game.js(훈련·분위기 UI)가 같은 표를 읽는다. 값은 모두 '가산 계수'다.
+     shoot/through/cross/press/tackle = 확률 가산, err = 패스 오차 감소율, stamina = 체력 소모 감소율,
+     train = 훈련 성장 배율. */
+  DS.LOCK_FX = {
+    fight: { shoot: 0.10, press: 0.10, tackle: 0.05, stamina: 0,      err: 0,     train: 1.12,
+      label: '슈팅 시도 +10% · 압박 +10%', trainLabel: '훈련 성장 ×1.12' },
+    crea:  { shoot: 0.04, through: 0.16, cross: 0.08, dribble: 0.10, press: 0,  err: 0,     train: 1.06,
+      label: '스루패스 +16% · 전환·크로스 +8%', trainLabel: '훈련 성장 ×1.06' },
+    dev:   { press: 0.14, tackle: 0.10, stamina: 0.12, shoot: 0, through: 0, cross: 0, err: 0, train: 1.25,
+      label: '압박 +14% · 태클 +10% · 체력 −12%', trainLabel: '훈련 성장 ×1.25' },
+    calm:  { err: 0.14, tackle: 0.04, shoot: 0, through: 0, cross: 0, press: 0, stamina: 0.04, train: 1.08,
+      label: '패스 오차 −14% · 실점 억제', trainLabel: '훈련 성장 ×1.08' }
+  };
+  DS.lockFxOf = function (key) {
+    return DS.LOCK_FX[key] || { shoot: 0, press: 0, tackle: 0, stamina: 0, err: 0, train: 1, label: '', trainLabel: '' };
+  };
+  DS.lockCounts = function (list) {
+    var c = { fight: 0, crea: 0, dev: 0, calm: 0 }, i, k;
+    for (i = 0; i < (list || []).length; i++) {
+      k = list[i] && list[i].lock;
+      if (k && typeof c[k] === 'number') { c[k] += 1; }
+    }
+    return c;
+  };
+  /* 훈련 성장 배율 — 성향 + 성실/기복 개성(TRAITS)까지 반영 */
+  DS.trainMultOf = function (p) {
+    var m = DS.lockFxOf(p && p.lock).train || 1;
+    var tr = p && p.trait ? traitOf(p.trait) : null;
+    if (tr) {
+      if (tr.key === 'diligent') { m *= 1.10; }
+      else if (tr.key === 'streaky') { m *= 0.94; }
+      else if (tr.key === 'spirit') { m *= 1.04; }
+    }
+    return Math.round(m * 100) / 100;
+  };
+  /* ── v38 — 라커룸 분위기: 사기 + 최근 연승/연패 흐름 ──
+     form 은 오래된 것 → 최신 순서의 'W'|'D'|'L' 배열. */
+  DS.teamMood = function (morale, form) {
+    var f = (form || []).slice(-5), i, w = 0, d = 0, l = 0, streak = 0, dir = '';
+    for (i = f.length - 1; i >= 0; i--) {
+      if (!dir) { dir = f[i]; streak = 1; }
+      else if (f[i] === dir) { streak += 1; }
+      else { break; }
+    }
+    for (i = 0; i < f.length; i++) {
+      if (f[i] === 'W') { w++; } else if (f[i] === 'D') { d++; } else { l++; }
+    }
+    var delta = 0;
+    if (dir === 'W') { delta = streak >= 3 ? 10 : (streak === 2 ? 6 : 3); }
+    else if (dir === 'L') { delta = streak >= 3 ? -12 : (streak === 2 ? -8 : -4); }
+    var score = clamp(Math.round((typeof morale === 'number' ? morale : 66) + delta), 0, 100);
+    var label = score >= 78 ? '상승세' : (score >= 62 ? '안정' : (score >= 46 ? '보통' : (score >= 34 ? '흔들림' : '위기')));
+    var color = score >= 78 ? '#2f8f62' : (score >= 62 ? '#3f7fb8' : (score >= 46 ? '#b07d1f' : '#c0432f'));
+    var desc = dir === 'W' ? (streak + '연승 — 자신감이 붙어 압박·슈팅이 살아납니다')
+      : (dir === 'L' ? (streak + '연패 — 실점 후 집중력이 떨어집니다. 일갈·휴식으로 사기를 올리세요')
+        : '최근 흐름이 고릅니다. 전술 카드로 템포를 바꿔 보세요');
+    /* 경기 결정력 계수 — 사기 66이 기준선(1.00), ±6% 상한 */
+    var mult = clamp(1 + (score - 66) * 0.0017, 0.94, 1.06);
+    return { score: score, label: label, color: color, desc: desc, delta: delta,
+      streak: streak, dir: dir, win: w, draw: d, loss: l, form: f, mult: Math.round(mult * 1000) / 1000 };
+  };
+
   /* 성향 시너지: 같은 성향 3명 이상이면 발동 */
   DS.lockSynergy = function (list) {
     var cnt = {}, i, k, out = [];
@@ -1816,11 +1879,18 @@
       if (rawRating(p) > pot) { p[key] = before; break; }
       applied++;
     }
+    /* v38 — 누적 성장 이력(상세창 표시용). 옛 세이브는 0에서 시작한다. */
+    if (applied) { p.dev = (p.dev || 0) + applied; }
     p.stats = statSheet(p);
     return applied;
   };
   /* v33 — 이미 상한을 넘은 세이브(ovr > pot)를 표시·성장 기준에서 정리한다. */
   DS.atPotCap = function (p) { return !!p && rawRating(p) >= potOf(p); };
+  /* v38 — 상세창 잠재력 게이지: 지금 OVR이 잠재 상한의 몇 %인지 */
+  DS.potPct = function (p) {
+    var raw = rawRating(p), pot = potOf(p);
+    return { raw: raw, pot: pot, gap: Math.max(0, pot - raw), pct: pot <= 0 ? 100 : clamp(Math.round(raw / pot * 100), 0, 100) };
+  };
   DS.starsOf = starsOf;
   DS.statSheet = statSheet;
   DS.storyFor = storyFor;
@@ -1928,6 +1998,7 @@
     if (!p || !(exp > 0)) { return 0; }
     var ups = 0, guard = 0;
     p.exp = (p.exp || 0) + Math.round(exp);
+    p.expTotal = (p.expTotal || 0) + Math.round(exp);
     if (typeof p.pot !== 'number') { p.pot = Math.min(95, Math.max(60, ratingOf(p) + 8)); }
     var pot = potOf(p), need;
     while (p.exp >= (need = DS.expToNext(p.level || 0)) && guard < 8) {
