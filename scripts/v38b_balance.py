@@ -71,6 +71,7 @@ RUN_JS = r"""
   if (M.running) { M.stop(); }
   M.start(st.cfg);
   const r = M.qaSim();
+  r.tele = M.tele();
   st.games.push(r);
   return r;
 }
@@ -123,6 +124,8 @@ summary = {
     'poss_avg': round(hp, 1),
     'formFactor': gs[0]['formFactor'] if gs else None,
     'scores': [f"{g['home']}:{g['away']}" for g in gs],
+    'aiShifts': [g['aiShifts'] for g in gs],
+    'tele1': gs[0].get('tele') if gs else None,
     'errs': out.get('errs'),
     'canvas': out.get('canvas'),
 }
