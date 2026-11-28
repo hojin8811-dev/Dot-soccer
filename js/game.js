@@ -695,6 +695,29 @@
     return Math.round(base + (chemistry() - 55) / 12 + (fx.org || 0) * 0.35 + (mgrSync() ? 3 : 0));
   }
 
+  /* v39c — 원정 스쿼드의 실제 평균 OVR(표시 strength와 맞춰야 하는 값) */
+  function squadRawAvg(list) {
+    var sum = 0, n = 0, i;
+    for (i = 0; i < list.length; i++) { sum += DS.ratingOf(list[i]); n++; }
+    return n ? sum / n : 0;
+  }
+  /* v39c — '실전 전력'(teamPower와 같은 기준: 적성·정포지션·키포지션·롤).
+     원정 스쿼드를 표시 전력(team.strength)과 같은 잣대로 재기 위한 함수. */
+  function squadPower(list, formationKey) {
+    var f = DS.FORMATIONS[formationKey] || DS.FORMATIONS['4-4-2'], sum = 0, n = 0, i, p, sl, ov, apt;
+    for (i = 0; i < list.length; i++) {
+      sl = f.slots[i]; if (!sl) { continue; }
+      p = list[i];
+      ov = DS.ratingOf(p);
+      apt = (p.apt && p.apt[sl.pos]) || 1;
+      ov += (apt - 5) * 1.3;
+      if (p.pos === sl.pos) { ov += 2; if (sl.k) { ov += 2; } }
+      if (p.role) { ov += 1; }
+      sum += ov; n++;
+    }
+    return n ? sum / n : 0;
+  }
+
   function chemistry() {
     var f = DS.FORMATIONS[S.formation], st = starters(), i, p, apt, sum = 0, n = 0;
     for (i = 0; i < st.length; i++) {
@@ -3314,6 +3337,8 @@
     prep.scout = DS.scoutReport({
       formation: snap.formation, style: snap.style, players: squad, managerName: om.name
     });
+    /* v39c — PvP도 화면 표시 전력으로 비교한다 (스냅샷 power = 그 구단의 표시 전력) */
+    prep.power = (typeof snap.power === 'number' && snap.power > 0) ? snap.power : Math.round(squadRawAvg(squad) * 10) / 10;
     return prep;
   }
   function startPvp(snap) {
@@ -3456,20 +3481,33 @@
 
   /* ═════════════════  경기 ═════════════════ */
   function buildAwaySquad(team, formation) {
+    /* v39c — 표시 전력(team.strength)과 실제 평균 OVR의 괴리 교정.
+       v39b까지는 `sc*1.04` + 반올림 때문에 표기 60인 팀이 실제로는 65~69로 나왔다
+       (유저 제보: "내 80 vs 상대 60인데 이게 맞나?"). 이제 3~4회 보정 루프로
+       실제 평균 DS.ratingOf가 team.strength ±0.6 안에 들어오게 만든다. */
     var f = DS.FORMATIONS[formation] || DS.FORMATIONS['4-4-2'];
-    var out = [], i;
-    for (i = 0; i < f.slots.length; i++) {
-      var p = DS.makePlayer({ pos: f.slots[i].pos, rarity: 'eun' });
-      var target = team.strength + U.irange(-4, 4);
-      var sc = target / Math.max(30, DS.ratingOf(p));
-      p.s = clamp(Math.round(p.s * sc * 1.04), 1, 10);
-      p.t = clamp(Math.round(p.t * sc * 1.04), 1, 10);
-      p.p = clamp(Math.round(p.p * sc * 1.04), 1, 10);
-      p.stats = DS.statSheet(p);
-      out.push(p);
+    var want = team.strength || 60;
+    var best = null, bestErr = 999, sc = 1, pass, out, i, avg, err, p, base, k;
+    for (pass = 0; pass < 6; pass++) {
+      out = [];
+      for (i = 0; i < f.slots.length; i++) {
+        p = DS.makePlayer({ pos: f.slots[i].pos, rarity: 'eun' });
+        base = Math.max(30, DS.ratingOf(p));
+        k = sc * (want + U.irange(-2, 2)) / base;
+        p.s = clamp(Math.round(p.s * k), 1, 10);
+        p.t = clamp(Math.round(p.t * k), 1, 10);
+        p.p = clamp(Math.round(p.p * k), 1, 10);
+        p.stats = DS.statSheet(p);
+        out.push(p);
+      }
+      avg = squadRawAvg(out);
+      err = Math.abs(avg - want);
+      if (err < bestErr) { bestErr = err; best = out; }
+      if (err <= 0.6) { break; }
+      sc = clamp(sc * want / Math.max(1, avg), 0.25, 3.2);
     }
-    DS.assignUniquePics(out);
-    return out;
+    DS.assignUniquePics(best);
+    return best;
   }
 
   /* ── v20 ③ — 상대 준비 · 스카우팅 : 킥오프에 실제로 스폰되는 그 스쿼드/감독을 미리 만든다 ── */
@@ -3520,6 +3558,8 @@
     if (!o) { return null; }
     o.key = key;
     o.squad = buildAwaySquad(o.team, o.formation);
+    /* v39c — 경기 powerGap의 원정 기준값 = 실제 평균 OVR(≈ 표시 strength) */
+    o.power = Math.round(squadRawAvg(o.squad) * 10) / 10;
     o.scout = DS.scoutReport({
       formation: o.formation, style: o.mgr.tacticStyle, players: o.squad, managerName: o.mgr.name
     });
@@ -3562,57 +3602,29 @@
       '</div>';
   }
 
-  function startMatch(kind, opt) {
-    opt = opt || {};
-    /* v17 — 경기 시작 클릭(사용자 제스처)에서 오디오 컨텍스트를 연다 */
-    if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
-    if (kind === 'smatch' && S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
-    if (kind === 'challenge' && S.challengeLeft <= 0) { toast('이번 시즌 챌린지를 모두 소진했습니다.'); return; }
-    /* v24 — 유저 대전(PvP)은 리그·S매치와 분리된 별도 경기: 준비된 상대 프렙을 그대로 쓴다 */
-    var prep;
-    if (kind === 'pvp') {
-      if (!opt.prep) { toast('상대 구단 정보가 없습니다.'); return; }
-      prep = opt.prep;
-    } else {
-      /* v20 ③ — 미리 만든 상대(스카우팅 리포트의 그 스쿼드)를 그대로 쓴다 */
-      prep = prepareOpp(kind, opt);
-      if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
-    }
-    var oppTeam = prep.team, oppId = prep.id, venueHome = prep.venueHome, i;
-
+  /* v39c — 선발 11명의 슬롯 좌표(포메이션 슬롯 ↔ 선수) */
+  function matchLineup() {
     var f = DS.FORMATIONS[S.formation], lineup = [], k, p;
     for (k = 0; k < S.lineup.length; k++) {
       p = byId(S.lineup[k]);
       if (!p) { continue; }
       lineup.push({ player: p, role: f.slots[k].role, pos: f.slots[k].pos, x: f.slots[k].x, y: f.slots[k].y });
     }
-    if (lineup.length < 8) { toast('선발 선수가 부족합니다.'); return; }
-    if (S.condition < COND_GATE) {
-      /* v25 — 조용히 막지 않고, 바로 회복하고 이어갈 수 있게 모달을 연다 */
-      toast('컨디션 ' + S.condition + ' — 회복이 필요합니다. 휴식이나 드링크를 고르세요.');
-      openConditionModal(kind, opt);
-      return;
-    }
-
-    /* v25c (C1) — 이용권은 '실제로 킥오프까지 간' 경기에서만 1장 차감한다.
-       예전에는 컨디션 모달·라인업 부족으로 되돌아가는 경로에서도 먼저 빠져,
-       '이 컨디션으로 킥오프'를 누르면 한 경기에 2장이 사라졌다. */
-    if (kind === 'smatch') { S.smatchTickets--; }
-
-    /* v21b ⑥ — 실제로 킥오프까지 간 경기만 가이드 2단계로 기록 */
-    if (kind === 'league') { guideMark('kickoff'); }
-    save();
-    setTab('match');
-    renderMatchLive(oppTeam, kind);
-
+    return lineup;
+  }
+  /* v39c — 킥오프 설정(cfg)을 한 곳에서 만든다. startMatch 와 QA 훅(qaCfg)이 같은 경로를 쓴다.
+     · homePower: 화면에 보이는 우리 팀 전력(teamPower — 적성·포지션·롤 반영)
+     · awayPower: 원정 스쿼드의 실제 평균 OVR(≈ 표시 strength)
+     이 두 값이 경기 powerGap의 기준이 되어 '화면 80 vs 60'이 실제 경기력 차이로 이어진다. */
+  function buildMatchCfg(prep, kind, lineup) {
     var benchList = benchPlayers().map(function (b) {
       return { player: b, pos: b.pos, rating: DS.ratingOf(b) };
     });
+    var oppTeam = prep.team;
     var awayFormation = prep.formation;
     var oppMgr = prep.mgr;
-    pendingOpp = null;                       /* 이 상대는 소모됐다 — 다음 경기는 새로 뽑는다 */
 
-    var cfg = {
+    return {
       homeName: S.club.name,
       awayName: oppTeam.name,
       homeShort: S.club.name.split(' ')[0],
@@ -3647,6 +3659,9 @@
       lockCounts: DS.lockCounts(starters()),
       morale: DS.teamMood(S.morale, S.form).score,
       formMult: DS.teamMood(S.morale, S.form).mult,
+      /* v39c — 화면 표시 전력과 경기 powerGap의 기준 일치 */
+      homePower: teamPower(),
+      awayPower: (typeof prep.power === 'number' && isFinite(prep.power)) ? prep.power : Math.round(squadRawAvg(prep.squad) * 10) / 10,
       onHalftime: function () {
         /* v28 — 하프타임엔 먼저 수석코치 교체 추천서를 띄우고, 교체 횟수가 없으면 기존 교체창으로 */
         var adv = DS.Match && DS.Match.adviceState ? DS.Match.adviceState() : null;
@@ -3655,8 +3670,49 @@
       },
       onHud: function (st) { updateHud(st); },
       onTouch: function (st) { updateTouchHud(st); },
-      onEnd: function (res) { finishMatch(res, oppTeam, oppId, kind, venueHome); }
+      onEnd: function (res) { finishMatch(res, prep.team, prep.id, kind, prep.venueHome); }
     };
+  }
+
+  function startMatch(kind, opt) {
+    opt = opt || {};
+    /* v17 — 경기 시작 클릭(사용자 제스처)에서 오디오 컨텍스트를 연다 */
+    if (DS.Match && DS.Match.audioUnlock) { DS.Match.audioUnlock(); }
+    if (kind === 'smatch' && S.smatchTickets <= 0) { toast('S매치 이용권이 없습니다.'); return; }
+    if (kind === 'challenge' && S.challengeLeft <= 0) { toast('이번 시즌 챌린지를 모두 소진했습니다.'); return; }
+    /* v24 — 유저 대전(PvP)은 리그·S매치와 분리된 별도 경기: 준비된 상대 프렙을 그대로 쓴다 */
+    var prep;
+    if (kind === 'pvp') {
+      if (!opt.prep) { toast('상대 구단 정보가 없습니다.'); return; }
+      prep = opt.prep;
+    } else {
+      /* v20 ③ — 미리 만든 상대(스카우팅 리포트의 그 스쿼드)를 그대로 쓴다 */
+      prep = prepareOpp(kind, opt);
+      if (!prep) { toast('이번 시즌 일정이 끝났습니다.'); return; }
+    }
+    var oppTeam = prep.team, oppId = prep.id, venueHome = prep.venueHome;
+    var lineup = matchLineup();
+    if (lineup.length < 8) { toast('선발 선수가 부족합니다.'); return; }
+    if (S.condition < COND_GATE) {
+      /* v25 — 조용히 막지 않고, 바로 회복하고 이어갈 수 있게 모달을 연다 */
+      toast('컨디션 ' + S.condition + ' — 회복이 필요합니다. 휴식이나 드링크를 고르세요.');
+      openConditionModal(kind, opt);
+      return;
+    }
+
+    /* v25c (C1) — 이용권은 '실제로 킥오프까지 간' 경기에서만 1장 차감한다.
+       예전에는 컨디션 모달·라인업 부족으로 되돌아가는 경로에서도 먼저 빠져,
+       '이 컨디션으로 킥오프'를 누르면 한 경기에 2장이 사라졌다. */
+    if (kind === 'smatch') { S.smatchTickets--; }
+
+    /* v21b ⑥ — 실제로 킥오프까지 간 경기만 가이드 2단계로 기록 */
+    if (kind === 'league') { guideMark('kickoff'); }
+    save();
+    setTab('match');
+    renderMatchLive(oppTeam, kind);
+
+    pendingOpp = null;                       /* 이 상대는 소모됐다 — 다음 경기는 새로 뽑는다 */
+    var cfg = buildMatchCfg(prep, kind, lineup);
     global.setTimeout(function () { if (DS.Match) { DS.Match.start(cfg); } }, 60);
     /* v38 — 첫 공식전이면 엔진이 뜬 뒤 코치마크를 연다 (경기는 잠시 멈춘다) */
     tutMaybeStart(kind);
@@ -5733,6 +5789,27 @@
     makeTable: makeTable,
     makeFixtures: makeFixtures,
     teamPower: teamPower,
+    /* v39c — 경기 cfg를 실행 없이 돌려주는 QA 훅(검증 하네스 전용).
+       startMatch와 '같은' 경로(buildAwaySquad → buildMatchCfg)를 지나므로
+       화면 표시 전력·상대 strength·실제 powerGap을 한 번에 대조할 수 있다. */
+    qaCfg: function (kind, opt) {
+      opt = opt || {};
+      var prep = opt.prep || prepareOpp(kind || 'league', opt);
+      if (!prep) { return null; }
+      var cfg = buildMatchCfg(prep, kind || 'league', matchLineup());
+      var lu = matchLineup(), mine = [], i;
+      for (i = 0; i < lu.length; i++) { mine.push(lu[i].player); }
+      return {
+        cfg: cfg, teamPower: teamPower(), awayPower: cfg.awayPower,
+        oppStrength: prep.team.strength, oppName: prep.team.short, awayFormation: prep.formation,
+        homeRawAvg: Math.round(squadRawAvg(mine) * 10) / 10,
+        awayRawAvg: Math.round(squadRawAvg(prep.squad) * 10) / 10,
+        awayPowerEff: Math.round(squadPower(prep.squad, prep.formation) * 10) / 10,
+        homePowerEff: Math.round(squadPower(mine, S.formation) * 10) / 10
+      };
+    },
+    squadPower: squadPower,
+    squadRawAvg: squadRawAvg,
     divTeams: divTeams,
     teamDiv: teamDiv,
     /* 리그 한 라운드를 경기 화면 없이 즉시 결산 (QA 시즌 시뮬레이션용) */

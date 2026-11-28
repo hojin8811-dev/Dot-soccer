@@ -1,11 +1,11 @@
-/*! 꼬마일레븐 FC v39b — 유소년 6~7시즌 성장 페이스 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v39b-20261128';
+/*! 꼬마일레븐 FC v39c — 표시 전력·우측 쏠림·백패스·오프사이드 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v39c-20261128';
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=39&b=40', './js/data.js?v=39&b=40', './js/pvp.js?v=39&b=40', './js/match.js?v=39&b=40', './js/bgm.js?v=39&b=40', './js/game.js?v=39&b=40',
+        './css/style.css?v=39&b=41', './js/data.js?v=39&b=41', './js/pvp.js?v=39&b=41', './js/match.js?v=39&b=41', './js/bgm.js?v=39&b=41', './js/game.js?v=39&b=41',
         './assets/hero-banner.jpg'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })

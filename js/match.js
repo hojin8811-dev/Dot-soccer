@@ -204,12 +204,19 @@
      v39 — OVR 1당 3% → 5%, 상한 1.45 → 2.0 (OVR +20이면 xG가 2배). */
   function qualityK(side) {
     var g = gapOf(side), a = Math.abs(g);
-    return clamp(1 + (g >= 0 ? 1 : -1) * (0.018 * a + 0.0015 * a * a), 0.42, 1.75);
+    /* v39c — 큰 격차에서 상위 팀 결정력 상한을 1.75 → 2.0으로 (화면 +20 차이가 실제 다득점으로) */
+    return clamp(1 + (g >= 0 ? 1 : -1) * (0.018 * a + 0.0015 * a * a), 0.42, 2.00);
   }
   /* v39 — 마무리 기준선. 두 팀 전력이 비슷한 경기에서 골이 너무 안 나오던(0.96골·0:0 48%) 문제를
      풀기 위해 기준선을 올리고, 전력차가 벌어지면 qualityK 가 이미 차이를 만들므로 1.0 밀으로 돌아간다.
      (OVR 차 0 → ×1.46 · +10 → ×1.18 · +20 → ×0.90) */
-  function finishBase(side) { return clamp(1.46 - Math.abs(gapOf(side)) * 0.028, 0.85, 1.46); }
+  function finishBase(side) {
+    var g = gapOf(side), a = Math.abs(g);
+    /* v39c — 전력차가 벌어져도 '강한 쪽' 마무리 기준선을 깎지 않는다 (v39는 양 팀을 같이 깎아
+       +20 경기에서도 1점차 접전이 났다). 약한 쪽만 내려간다. */
+    if (g >= 0) { return clamp(1.46 - a * 0.012, 1.06, 1.46); }
+    return clamp(1.46 - a * 0.028, 0.85, 1.46);
+  }
 
   /* ── v15 — 추가시간 · 세트피스 · 오프사이드 계측 ── */
   var addedTime = { first: 0, second: 0 };      /* 45+N · 90+N 의 N */
@@ -366,7 +373,14 @@
       atkThirdBlocked: 0, atkThirdPass: 0, finishK: 1, solo: 0, soloBy: { home: 0, away: 0 },
       zone: { home: [0, 0, 0, 0, 0], away: [0, 0, 0, 0, 0] },
       shotDist: { home: [0, 0, 0, 0, 0], away: [0, 0, 0, 0, 0] },
-      act: { home: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 }, away: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 } }
+      act: { home: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 }, away: { shot: 0, pass: 0, drib: 0, back: 0, wide: 0, cross: 0 } },
+      /* v39c 계측 — 공격 방향 기준 레인(팀별 공격 3분의 1) · 후진 패스 세분화 */
+      atkLaneSide: { home: { l: 0, c: 0, r: 0 }, away: { l: 0, c: 0, r: 0 } },
+      passDir: { home: { fwd: 0, flat: 0, back: 0, backHard: 0, backAtk: 0, backOwn: 0 }, away: { fwd: 0, flat: 0, back: 0, backHard: 0, backAtk: 0, backOwn: 0 } },
+      backPassTry: { home: 0, away: 0 }, backPassOk: { home: 0, away: 0 },
+      offsideChk: 0, offsideBehind: 0, atkHalfBlocked: 0,
+      shotX: { home: { l: 0, c: 0, r: 0 }, away: { l: 0, c: 0, r: 0 } },
+      cb: { home: { n: 0, lane: 0, pull: 0, tx: 0, mark: 0 }, away: { n: 0, lane: 0, pull: 0, tx: 0, mark: 0 } }
     };
   }
   /* v39 계측 — 골문까지 거리 구간 (0-8 / 8-14 / 14-22 / 22-30 / 30+) */
@@ -378,6 +392,10 @@
     return 4;
   }
   var v39t = blankV39();
+  /* v39c — 좌우 균형 지표: 최근 공격 3분의 1에서 공이 어느 쪽에 있었는지의 EMA (−1 왼쪽 … +1 오른쪽).
+     한쪽으로 쏠리면 반대편 넓은 동료를 먼저 보게 해 '우측만 두드리는' 흐름을 끊는다. */
+  var laneEma = { home: 0, away: 0 };
+  function laneBalance(side) { return clamp(laneEma[side] || 0, -1, 1); }
   /* v39 — 마무리 계수 (튜닝 지점). 박스 안 확률·xG에 같은 계수를 건다. */
   var V39_ACC = 0.085;
   var V39_XG = 1.80;
@@ -388,6 +406,11 @@
     v35t.laneTicks.away[laneOf(ball.x)] += 1;
     /* 공격 3분의 1에서의 레인 분포 — '공격이 한가운데로만 오는지'를 보는 지표 */
     if (progressOf('home', ball.y) > 0.62) { v35t.atkLane[laneOf(ball.x)] += 1; }
+    /* v39c — 팀별 공격 3분의 1 레인: 자기 공격 방향 기준(화면 x는 그대로) */
+    var as = ball.carrier ? ball.carrier.side : (play.atkSide || 'home');
+    if (progressOf(as, ball.y) > 0.66) { v39t.atkLaneSide[as][laneOf(ball.x)] += 1; }
+    /* v39c — 좌우 균형 EMA: 공이 오른쪽(x>50)에 있으면 +, 왼쪽이면 − */
+    laneEma[as] = clamp(laneEma[as] * 0.995 + ((ball.x - 50) / 50) * 0.005, -1, 1);
   }
 
   /* ── v29 계측기 — 약측 폭 유지 · 사이드 전환 · 세트피스 대형 · 전술 상성 ── */
@@ -1692,6 +1715,11 @@
       }
       teamOvr.home = n.home ? s.home / n.home : 0;
       teamOvr.away = n.away ? s.away / n.away : 0;
+      /* v39c — 전력 기준 일치: 화면에 보이는 전력(cfg.homePower = teamPower, 적성·포지션·롤 반영)과
+         원정의 표시 전력(상대 팀 strength)을 그대로 경기 powerGap에 쓴다.
+         (v39b까지는 여기서 보너스 없는 raw OVR만 평균 내 '화면 80 vs 60'이 실제로는 70 vs 65로 들어갔다) */
+      if (typeof cfg.homePower === 'number' && isFinite(cfg.homePower)) { teamOvr.home = cfg.homePower; }
+      if (typeof cfg.awayPower === 'number' && isFinite(cfg.awayPower)) { teamOvr.away = cfg.awayPower; }
       powerGap = teamOvr.home - teamOvr.away;
     })();
     /* v25 — 피치 팀 링을 유니폼 색으로 (스코어보드와 통일) */
@@ -1766,6 +1794,7 @@
     v29t = blankV29();
     v35t = blankV35();
     v39t = blankV39();
+    laneEma = { home: 0, away: 0 };              /* v39c — 좌우 균형 EMA 초기화 */
     subLog = [];
     matchupEvalT = 0;
     spLayout = null;
@@ -2566,7 +2595,9 @@
     var sh = shapeOf(carrier.side);
     for (t = 0; t < tries; t++) {
       var defSide = carrier.side === 'home' ? 'away' : 'home';
-      var line = defLineY(defSide);
+      /* v39c — 침투 지점은 '블록 공칭 라인'이 아니라 실제 최후방 수비수(offsideLineY) 기준.
+         공칭 라인과 실제 라인이 3~5 어긋나면 달리는 공격수가 그대로 오프사이드가 됐다. */
+      var line = offsideLineY(defSide);
       best = null; bv = -1;
       for (i = 0; i < players.length; i++) {
         p = players[i];
@@ -2591,7 +2622,7 @@
       var dir = goalDir(best.side);
       best.runTo = {
         x: clamp(best.x + (best.baseX < 50 ? 6 : -6) + range(-4, 4), 6, 94),
-        y: clamp(line - dir * range(3, sh.name === 'attack' ? 10 : 8), 4, 116)
+        y: clamp(line - dir * range(2.2, sh.name === 'attack' ? 7 : 5.5), 4, 116)
       };
       best.runT = sh.name === 'attack' ? 1.9 : 1.5;
       /* v20 ① — 지시한 루트로 침투 방향을 당긴다 */
@@ -2746,7 +2777,7 @@
     }
     var tx = p.x + (50 - p.x) * 0.10 + avoid;
     var ty = p.y + dir * 9;
-    if (Math.abs(p.y - gy) < 18) { tx = p.x + (54 - p.x) * 0.3 + avoid; }
+    if (Math.abs(p.y - gy) < 18) { tx = p.x + (50 - p.x) * 0.3 + avoid; }
     /* v20 ② — 인버티드 윙어는 볼을 몰 때도 터치라인 대신 하프스페이스로 접어 들어온다 */
     if (isInverted(p) && Math.abs(p.x - 50) > 24) {
       tx = p.x + (50 - p.x) * 0.30 + avoid * 0.5;
@@ -2900,7 +2931,7 @@
     if (isFwdGroup(p) && carrierV && (st === 'build' || st === 'mid')) {
       var sLine0 = supportLineY(p.side);
       tx = 50 + (a.x - 50) * 0.75 + Math.sin(simTime * 0.85 + p.baseX * 0.11) * 7;
-      ty = sLine0 - z.dir * 2.0;
+      ty = sLine0 - z.dir * 2.8;                      /* v39c — 라인에 붙지 않고 2.8 뒤에서 대기 */
       if (chance(0.008)) {
         p.runTo = { x: clamp(tx + range(-9, 9), 6, 94), y: clamp(sLine0 - z.dir * range(7, 15), 4, 116) };
         p.runT = 1.6;
@@ -2940,7 +2971,7 @@
       var sLine = supportLineY(p.side);
       var ballBeyond = z.dir < 0 ? (ball.y < sLine) : (ball.y > sLine);
       if (!ballBeyond && p.runT <= 0.15) {
-        var lim = sLine - z.dir * 1.8;
+        var lim = sLine - z.dir * 2.2;                /* v39c — 안전 마진 1.8 → 2.2 */
         if (z.dir < 0) { if (ty < lim) { ty = lim; } }
         else if (ty > lim) { ty = lim; }
       }
@@ -3247,6 +3278,11 @@
     p.tx = clamp(tx, z.xMin, z.xMax);
     p.ty = clamp(ty, 3, WORLD_H - 3);
     p.kind = 'def';
+    /* v39c 계측 — 가운데 CB의 좌우 목표가 어디서 오는가 */
+    if (g === 'DF' && Math.abs(p.baseX - 50) < 4) {
+      var cbd = v39t.cb[p.side];
+      cbd.n += 1; cbd.lane += lane; cbd.pull += pull; cbd.tx += p.tx; if (p.mark) { cbd.mark += 1; }
+    }
   }
 
   function gkTarget(p) {
@@ -3680,7 +3716,8 @@
     if (!q || q.off) { return false; }
     if (progressOf(q.side, q.y) < 0.5) { return false; }
     var line = offsideLineY(q.side === 'home' ? 'away' : 'home');
-    var beyond = q.side === 'home' ? (q.y < line - 0.8) : (q.y > line + 0.8);
+    /* v39c — 후보 필터 마진 0.8 → 1.0 (라인에 붙어 선 동료에게 패스가 새지 않게) */
+    var beyond = q.side === 'home' ? (q.y < line - 1.0) : (q.y > line + 1.0);
     if (!beyond) { return false; }
     return q.side === 'home' ? (q.y < ball.y - 0.4) : (q.y > ball.y + 0.4);
   }
@@ -3794,6 +3831,10 @@
     var switchUrge = (pressed && onFlank && play.stage !== 'build') ||
       (centralCrowd >= 4 && play.stage !== 'build' && (p.x < 42 || p.x > 58 || p.y > 30));
     var best = null, bestScore = -1e9, i, q, d, fwd, open, score;
+    /* v39c — 공격 진영 후진 패스는 '전진 옵션이 하나도 없을 때만' 쓰는 예비 후보로 분리한다 */
+    var atkHalfNow = progressOf(p.side, p.y) > 0.50, bestBack = null, bestBackScore = -1e9, backPick;
+    /* v39c — 후진 패스를 분리하는 구간: 공격 3분의 1(골문 42 앞). 중원까지 묶으면 빌드업이 죽는다 */
+    var backZoneNow = Math.abs(p.y - attackGoalY(p.side)) < 42;
     for (i = 0; i < players.length; i++) {
       q = players[i];
       if (q === p || q.side !== p.side || q.off) { continue; }
@@ -3823,9 +3864,10 @@
          v25c (M3) — 달리는 중(runT)이 아닌데 오프사이드 위치면 아예 후보에서 뺀다.
          후방에서 걷어낸 볼이 라인을 넘어선 최전방에 걸려 우리 오프사이드만 늘었다. */
       if (isOffsidePos(q)) {
-        /* 후방(자기 진영)에서 넘기는 볼이면 아예 후보에서 빼고, 그 밖에는 큰 감점만 */
-        if (!(q.runT > 0.2) && progressOf(p.side, ball.y) < 0.5) { continue; }
-        score -= 46;
+        /* v39c — 라인을 넘어선 동료에게는 원칙적으로 패스하지 않는다(오프사이드 과다 제거).
+           달리는 중인 침투수(runT > 0.35)에게만 큰 감점을 감수하고 노린다 — 그 한 번이 자연스러운 오프사이드가 된다. */
+        if (q.runT > 0.35 && chance(0.5)) { score -= 70; }
+        else { continue; }
       }
       /* 감독 조직력 업: 오프더볼 위치 선정 → 전진 옵션을 먼저 본다(작게) */
       if (p.side === 'home' && mfx('org') > 0) {
@@ -3895,6 +3937,14 @@
         var fdel = Math.abs(q.x - TOUCH_FOCUS_X[touch.focus]);
         score += (fdel < 14 ? 11 : (fdel < 28 ? 4 : -4));
       }
+      /* v39c — 공격 진영에서는 전진·측면 패스에 가산 (후진은 아래 backPick으로 분리) */
+      if (play.stage !== 'build' && atkHalfNow && fwd >= 0) {
+        score += 6 + Math.min(10, fwd * 0.8);
+      }
+      /* v39c — 좌우 균형: 최근 공이 한쪽으로 쏠렸으면 반대편 넓은 동료에게 가중치 */
+      if (play.stage !== 'build' && (p.side !== 'home' || touch.focus === 'balance') && Math.abs(q.x - 50) > 20) {
+        score -= laneBalance(p.side) * ((q.x - 50) / 50) * 24;
+      }
       score += Math.random() * 5;
       /* v21 ② — 자기 진영 정체 중에는 무조건 앞으로: 백패스·CB 돌리기를 감점하고 전진 패스에 힘을 준다 */
       if (ownHalfSide === p.side && ownHalfT > 2.4) {
@@ -3902,9 +3952,31 @@
         if (isGK(q)) { score -= 30; }
         if (fwd < 0) { score -= 14; }
       }
+      /* v39c — 공격 진영 후진 패스(fwd < -1.5)는 후보에서 분리해 두고, 전진 후보가 하나도 없을 때만 쓴다 */
+      backPick = play.stage !== 'build' && backZoneNow && fwd < -1.5;
+      if (backPick) {
+        if (score > bestBackScore) { bestBackScore = score; bestBack = { q: q, d: d, fwd: fwd, open: open }; }
+        continue;
+      }
       if (score > bestScore) { bestScore = score; best = { q: q, d: d, fwd: fwd, open: open }; }
     }
+    if (!best) { best = bestBack; }
     if (!best) { return false; }
+    /* v39c 계측 — 패스 방향(전진/횡/후진) 세분화 */
+    (function () {
+      var pd = v39t.passDir[p.side];
+      if (best.fwd < -2 && Math.abs(p.y - attackGoalY(p.side)) < 30) { pd.backThird = (pd.backThird || 0) + 1; }
+      if (best.fwd < -2 && Math.abs(p.y - attackGoalY(p.side)) < 50) { pd.backMid = (pd.backMid || 0) + 1; }
+      if (best.fwd > 1) { pd.fwd += 1; }
+      else if (best.fwd < -1) {
+        pd.back += 1;
+        if (best.fwd < -2) {
+          pd.backHard += 1;
+          if (progressOf(p.side, p.y) > 0.5) { pd.backAtk += 1; } else { pd.backOwn += 1; }
+        }
+      }
+      else { pd.flat += 1; }
+    })();
     var type = 'short';
     /* v29 ① — 압박 받는 측면 볼은 사이드 전환 롱패스가 우선 후보 */
     var switchPick = switchUrge && best && Math.abs(best.q.x - p.x) > 26 && best.open > 6.5;
@@ -4140,6 +4212,11 @@
     /* v39 — 공격 3분의 1(골문 24 앞)에서는 백패스를 아예 하지 않는다.
        오픈 찬스에서도 공을 뒤로 돌려슴 유저 제보의 직접 원인이다. */
     if (Math.abs(p.y - attackGoalY(p.side)) < 24) { v39t.atkThirdBlocked += 1; return false; }
+    /* v39c — 공격 진영에서는 정면 압박(2.6 이내)을 벗어나는 경우에만 백패스를 허용한다 */
+    if (progressOf(p.side, p.y) > 0.50) {
+      var esc = nearestOpponent(p, 9);
+      if (!(esc.player && esc.dist < 2.6)) { v39t.atkHalfBlocked += 1; return false; }
+    }
     /* v21 ② — 자기 진영에 오래 묶여 있으면 백패스를 잠근다 (CB·DM·GK 사이 돌리기 방지) */
     var stall = (ownHalfSide === p.side) ? ownHalfT : 0;
     if (stall > 2.6) { v21t.backPassBlocked += 1; return false; }
@@ -4279,6 +4356,7 @@
         + (d > 26 ? 5 : 0) + Math.random() * 3;
       /* v38 — 커스텀 측면 비중과 창의형 성향이 넓은 동료의 가치를 올린다 */
       if (p.side === 'home') { v += ctacWing() * 10; }
+      if ((p.side !== 'home' || touch.focus === 'balance')) { v -= laneBalance(p.side) * ((q.x - 50) / 50) * 20; }
       if (lockKeyOf(p) === 'crea') { v += 4; }
       if (lockKeyOf(q) === 'crea' || lockKeyOf(q) === 'fight') { v += 2; }
       if (v > bv) { bv = v; best = q; }
@@ -4325,6 +4403,8 @@
     /* v21 ② — 이 팀이 자기 진영에서 공을 돌린 시간 */
     var stallNow = (ownHalfSide === p.side) ? ownHalfT : 0;
     var shootRange = 28 + (tac === 'attack' ? 4 : 0) + (p.side === 'home' && buffOf('longshot') > 0 ? 12 : 0) + (sty.shootBias - 1) * 14;
+    /* v39c — 전력차가 크면 블록 앞에서도 슛을 연다 */
+    if (gapOf(p.side) >= 12) { shootRange += Math.min(6, (gapOf(p.side) - 12) * 0.5); }
     if (p.side === 'home' && buffOf('atk') > 0) { shootRange += 2; }
     if (invW) { shootRange += 5; }                       /* 하프스페이스에서 바로 때릴 수 있다 */
 
@@ -4340,7 +4420,9 @@
       /* v39 — 전력차가 확실히 드러나게: OVR 1당 1.8% (OVR +20 = +36%, 하한 0.6/상한 1.5) */
       (function () {
         var gS = gapOf(p.side), aS = Math.abs(gS);
-        pShot *= clamp(1 + (gS >= 0 ? 1 : -1) * (0.008 * aS + 0.0009 * aS * aS), 0.6, 1.5);
+        pShot *= clamp(1 + (gS >= 0 ? 1 : -1) * (0.008 * aS + 0.0009 * aS * aS), 0.6, 1.7);
+        /* v39c — 확실히 강한 팀은 블록 앞에서도 과감히 때린다 (찬스 물량) */
+        if (gS >= 12) { pShot += Math.min(0.14, (gS - 12) * 0.012); }
       })();
       /* v38 — 라커룸 성향: 승부욕형은 더 과감하게 때리고, 같은 성향 시너지도 슈팅을 민다 */
       pShot *= (1 + lockVal(p, 'shoot') + synOf(p.side, 'fight'));
@@ -4382,8 +4464,13 @@
     /* 1.5) 원터치 — 압박이 강하면 무작정 뺏기지 않고 가까운 동료에게 넘긴다
        v21 ② — 자기 진영 정체 중에는 이 안전 패스도 막는다
        v39 — 공격 3분의 1(dist<24)에서는 백패스로 찬스를 흘리지 않는다. */
-    if (!inAtkThird && stallNow < 2.4 && pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
-      if (backPass(p)) { v39t.act[p.side].back += 1; actionTimer = 0.14; return; }
+    /* v39c — 공격 진영(진행도 50% 초과)에서는 '정면 압박 탈출'(pressure < 2.4)일 때만 원터치 백패스.
+       (v39는 3분의 1만 막아서 24~50 구간에서 뒤로 돌리는 패스가 계속 터졌다) */
+    var atkHalfBackBlock = progressOf(p.side, p.y) > 0.50 && pressure >= 2.4;
+    if (atkHalfBackBlock) { v39t.atkHalfBlocked += 1; }
+    if (!inAtkThird && !atkHalfBackBlock && stallNow < 2.4 && pressure - (sty.shortBias > 0 ? 0.6 : 0) < 3.4 && chance(0.55 + clamp(sty.shortBias * 0.09, 0, 0.25))) {
+      v39t.backPassTry[p.side] += 1;
+      if (backPass(p)) { v39t.backPassOk[p.side] += 1; v39t.act[p.side].back += 1; actionTimer = 0.14; return; }
     }
 
     /* 1.8) v35 — 중앙이 붐비면 폭으로: 대각선·횡 전환 패스로 반대편 윙어를 살린다.
@@ -4511,6 +4598,7 @@
     M.phase = 'shot';
     countShot(p.side, xg);
     v39t.shotDist[p.side][bandOf(dist)] += 1;
+    v39t.shotX[p.side][laneOf(p.x)] += 1;
     if (p.side === 'home') { charge(1.8); }
     setPose(p, 'kick', 0.38);
     fxRing(p, longshot ? '#ffb066' : '#ffe28a', 0.95);
@@ -8695,6 +8783,7 @@
       out.push({
         side: p.side, pos: p.pos, name: p.name, gk: isGK(p), carrier: ball.carrier === p,
         x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100,
+        bx: Math.round(p.baseX * 100) / 100, by: Math.round(p.baseY * 100) / 100,
         tx: Math.round(p.tx * 100) / 100, ty: Math.round(p.ty * 100) / 100,
         sx: Math.round(g.x * 10) / 10, sy: Math.round(g.y * 10) / 10,
         r: Math.round(Math.max(5.6, SPR_H * g.s * TOKEN_R) * tokenScale() * 10) / 10,
@@ -9357,9 +9446,11 @@
       openChance: { home: v39t.openChance.home, away: v39t.openChance.away },
       openShots: { home: v39t.openShots.home, away: v39t.openShots.away },
       zone: v39t.zone, shotDist: v39t.shotDist, act: v39t.act,
-      atkThirdBackBlocked: v39t.atkThirdBlocked,
+      atkThirdBackBlocked: v39t.atkThirdBlocked, atkHalfBackBlocked: v39t.atkHalfBlocked,
       counterWin: v39t.counterWin || 0,
       solo: v39t.solo || 0, soloBy: v39t.soloBy || {}, soloTry: v39t.soloTry || 0,
+      atkLaneSide: v39t.atkLaneSide, passDir: v39t.passDir, shotX: v39t.shotX, cb: v39t.cb,
+      backPassTry: v39t.backPassTry, backPassOk: v39t.backPassOk,
       finish: { acc: V39_ACC, xg: V39_XG },
       cards: cards,
       cardTotal: DS.CARDS ? DS.CARDS.length : 0,
