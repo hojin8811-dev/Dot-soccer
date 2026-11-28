@@ -55,12 +55,12 @@ async def main():
                 st = __import__('json').loads(await pg.evaluate(STATE))
             except Exception:
                 continue
-            if not got['match'] and st.get('clock', 0) > 3:
+            if not got['match'] and st.get('clock', 0) > 1.5:
                 await pg.screenshot(path=os.path.join(OUT, 'live-match.png'))
                 await pg.screenshot(path=os.path.join(OUT, 'live-closeup.png'),
                                     clip={'x': 170, 'y': 120, 'width': 330, 'height': 170})
                 got['match'] = got['close'] = True
-            if st.get('goal', 0) > 0 or st.get('tackle') or st.get('dive'):
+            if got['match'] and (st.get('goal', 0) > 0 or st.get('tackle') or st.get('dive')):
                 await pg.screenshot(path=os.path.join(OUT, 'live-tackle-or-goal.png'))
                 got['action'] = True
                 break

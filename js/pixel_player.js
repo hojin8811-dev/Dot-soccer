@@ -226,7 +226,18 @@
     var look = s.look;
     if (!look) { return; }
     var img = IMG[look.sheet];
-    if (!img || !img.complete || !img.width) { return; }
+    if (!img || !img.complete || !img.width) {
+      /* 아틀라스를 아직 못 받았을 때(첫 로딩·오프라인) — 유니폼 색 점으로 대체 */
+      var hpx0 = s.sc || 54, kc = (look.kit === 'away') ? '#2f5ce0' : (look.kit === 'gk_home' ? '#3ad07c'
+        : (look.kit === 'gk_away' ? '#ffd93d' : (look.kit === 'ref' || look.kit === 'coach' ? '#2b2b36' : '#e2232e')));
+      ctx.save();
+      ctx.fillStyle = kc;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y - hpx0 * 0.5, Math.max(3, hpx0 * 0.22), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
     var col = frameCol(look, s.pose || 'idle', s.dir || 'down', s);
     var sx = col * CELL_W, sy = look.row * CELL_H;
     var hpx = s.sc || 54;
