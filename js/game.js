@@ -1782,7 +1782,7 @@
         (DS.youthPotTier ? ' (' + DS.youthPotTier(sel.pot || 70).name + ')' : '') + '</div>' +
         '<div class="tiny" style="margin-top:2px"><span class="age-badge" style="color:' + stage.color + ';border-color:' + stage.color + '55">' + stage.name + '</span>' +
         '<span class="age-badge youth">유망주 ×' + DS.YOUTH_EXP_MULT.toFixed(1) + '</span>' +
-        '<span class="tiny muted">2군 1경기 +' + Math.round(140 * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외 · 유소년 배율은 21세까지</span></div>';
+        '<span class="tiny muted">2군 1경기 +' + Math.round((DS.RESERVE_EXP_BASE + 30) * 1.15 * DS.RESERVE_KIND_MULT * DS.YOUTH_EXP_MULT * stage.expMult * (DS.growthOf(mgr()).youthMult || 1)) + ' 내외 · 유소년 배율은 21세까지</span></div>';
     }
     var cost = sel ? youthCost(sel) : 0;
     var inRes = sel ? (ensureReserve().ids.indexOf(sel.id) >= 0) : false;

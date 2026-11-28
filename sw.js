@@ -1,11 +1,11 @@
-/*! 꼬마일레븐 FC v39 — 전술 카드 18종·오픈 찬스 슈팅·성장 페이스 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
-var CACHE = 'dot-soccer-v39-20261128';
+/*! 꼬마일레븐 FC v39b — 유소년 6~7시즌 성장 페이스 축구 구단 경영 RPG 서비스워커 (오프라인 캐시, 네트워크 우선) */
+var CACHE = 'dot-soccer-v39b-20261128';
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
       return c.addAll([
         './', './index.html', './manifest.webmanifest',
-        './css/style.css?v=39&b=39', './js/data.js?v=39&b=39', './js/pvp.js?v=39&b=39', './js/match.js?v=39&b=39', './js/bgm.js?v=39&b=39', './js/game.js?v=39&b=39',
+        './css/style.css?v=39&b=40', './js/data.js?v=39&b=40', './js/pvp.js?v=39&b=40', './js/match.js?v=39&b=40', './js/bgm.js?v=39&b=40', './js/game.js?v=39&b=40',
         './assets/hero-banner.jpg'
       ]).catch(function () {});
     }).then(function () { return self.skipWaiting(); })
