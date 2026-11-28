@@ -161,6 +161,7 @@
     recountN++;
   }
   var recountN = 0;
+  var faceDupes = 0;      /* v38 — 경기 시작 시 원정 얼굴 중복을 몇 명 바꿨는지 */
   var touchFx = { t: 0, t0: 2.6, label: '', tone: '' };   /* 피치 위 터치라인 콜아웃 */
   var touchCount = 0;
   /* v29 — 전술 상성 피드백 · 세트피스 전용 대형 상태 */
@@ -1627,6 +1628,24 @@
     })();
     /* v25 — 피치 팀 링을 유니폼 색으로 (스코어보드와 통일) */
     applyTeamColors();
+    /* v38 — 홈·원정을 합쳤을 때 같은 얼굴(pic)이 겹치면 **원정 선수 얼굴만** 비켜 준다.
+       두 팀 스쿼드는 따로 생성되므로 500장 풀에서 가끔 같은 얼굴이 나온다 → 피치에 쌍둥이가 서고
+       두상 캐시 수가 22보다 줄었다. 원정 얼굴만 다시 고르면 유저 선수 얼굴은 그대로다. */
+    (function dedupeFaces() {
+      var used = {}, all = [], i2, q2, pic2, np2, changed = 0;
+      for (i2 = 0; i2 < players.length; i2++) { all.push(players[i2].player); }
+      for (i2 = 0; i2 < players.length; i2++) {
+        q2 = players[i2];
+        pic2 = (q2.player && q2.player.pic) || 0;
+        if (!used[pic2]) { used[pic2] = 1; continue; }
+        if (q2.side !== 'away' || !q2.player) { continue; }
+        np2 = DS.nextFreePic(all, q2.player.pos);
+        q2.player.pic = np2;
+        used[np2] = 1;
+        changed += 1;
+      }
+      faceDupes = changed;
+    })();
     /* 2.5등신 일러스트 프리로드 — 피치 위 22명 전원 */
     var pi;
     for (pi = 0; pi < players.length; pi++) {
@@ -8977,7 +8996,7 @@
       lineY: { home: Math.round(lineYOf('home') * 10) / 10, away: Math.round(lineYOf('away') * 10) / 10 },
       syn: { home: { fight: synOf('home', 'fight'), crea: synOf('home', 'crea'), dev: synOf('home', 'dev'), calm: synOf('home', 'calm') } },
       formFactor: Math.round(formFactor * 1000) / 1000,
-      counts: { n: players.length, recounts: recountN, locks: (function () {
+      counts: { n: players.length, recounts: recountN, faceDupes: faceDupes, locks: (function () {
         var o = [], i2, q2; for (i2 = 0; i2 < players.length; i2++) { q2 = players[i2]; o.push(q2.side + ':' + (q2.player && q2.player.lock) + ':' + (q2.player && q2.player.pic)); } return o;
       })() }
     };

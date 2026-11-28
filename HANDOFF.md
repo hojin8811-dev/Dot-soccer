@@ -51,6 +51,11 @@
 - 기본 흐름 보존: v35 `centerCrowd/wideOutlet` 로직은 그대로 두고 **가산 계수만** 준다.
 - 옛 세이브: 로드 시 `ctac` 없으면 `{50,50,50}` 보정.
 
+### 2-3b. 곁들여 고친 것 — 홈·원정 얼굴 중복 (`M.start` `dedupeFaces`)
+
+- 두 팀 스쿼드는 따로 생성되므로 500장 풀에서 홈·원정 얼굴이 겹치면 피치 토큰 두상 캐시가 21/22로 줄고 쌍둥이가 섰다.
+- `M.start` 에서 players 를 만든 직후, **원정 선수 얼굴만** `DS.nextFreePic(all, pos)` 로 다시 골라 22명이 22얼굴이 되게 한다(유저 선수 얼굴 불변). `M.v38().counts.faceDupes` 로 몇 명 바꿨는지 확인 가능.
+
 ### 2-4. 첫 공식전 코치마크 — `js/game.js` `TUT_STEPS` / `tutOpen()` / `tutMaybeStart()`
 
 - `startMatch()` 끝에서 `tutMaybeStart(kind)` — **`kind==='league'` 이고 `S.tut.done` 이 false일 때만** 1.3초 뒤 `DS.Match.pause()` 후 `#m-overlay` 에 `.tut` 레이어를 그린다.
@@ -70,7 +75,7 @@
 | 터보 1경기 소요 (qaTurbo + ×3) | **57.7초** |
 | fps | **60.1 ~ 60.4** (844×390) · **59.8** (844×360) |
 | 콘솔/페이지 오류 | `window.__DS_ERRS` **0** · pageerror **0** · HTTP 4xx/5xx **0** · 콘솔 error **0** |
-| 초상화 토큰 | 피치 22명 **`portraitsReady 22 / portraitsTotal 22`** (교체 없이 완주 시) |
+| 초상화 토큰 | 피치 22명 **`portraitsReady 22 / portraitsTotal 22`** — **5회 연속 22/22**(중복 얼굴 정리 `faceDupes` 0~1명) |
 | 상세창 초상화 | `assets/portraits/pNNN.png` **naturalWidth 400** 로드, 404 0 |
 | 세로 회전 안내 (390×844) | `#rotate` `display:flex` / `opacity:1` |
 | 커스텀 전술 엔진 반영 | 라인100→`lineY.home 66.7` / 라인0→**80.7** · 압박100→`press.home 99.8` / 0→**81.8** · `line_changed/press_changed/lineY_changed` 모두 true |
