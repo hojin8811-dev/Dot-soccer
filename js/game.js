@@ -2403,7 +2403,7 @@
   function potGaugeHTML(p) {
     var g = DS.potPct(p), capped = DS.atPotCap(p);
     return '<div class="potg' + (capped ? ' capped' : '') + '">' +
-      '<div class="pg-top"><span>OVR <b>' + g.raw + '</b></span><span>잠재 상한 <b>' + g.pot + '</b></span>' +
+      '<div class="pg-top"><span>OVR(실제) <b>' + g.raw + '</b></span><span>잠재 상한 <b>' + g.pot + '</b></span>' +
       (capped ? '<em class="pot-badge">잠재력 한계 도달</em>' : '<em class="pot-gap">+' + g.gap + ' 여유</em>') + '</div>' +
       '<div class="pg-bar"><i style="width:' + g.pct + '%"></i></div>' +
       '<div class="pg-foot">' + (capped
