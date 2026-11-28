@@ -2485,7 +2485,7 @@
     c.moveTo(pad + pw, Y(43)); c.lineTo(pad + pw, Y(57)); c.stroke();
     /* v25b — 유니폼 색이 아니라 경기 화면과 같은 고정 팔레트(파랑 vs 빨강).
        초록·검정 유니폼 구단을 만나도 xG맵 점이 잔디와 겹치지 않는다. */
-    var TC = (DS.Match && DS.Match.teamColors) || { home: '#ff4b4b', away: '#2f8dff' };
+    var TC = (DS.Match && DS.Match.teamColors) || { home: '#2f8dff', away: '#ff4b4b' };
     var TEAM = { home: TC.home, away: TC.away };
 
     if (mode === 'xg') {

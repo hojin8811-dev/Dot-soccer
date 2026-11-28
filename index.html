@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>꼬마일레븐 FC v36b — 고퀄 스프라이트 축구 구단 경영 RPG</title>
-<meta name="description" content="꼬마일레븐 FC — 100% 오리지널 축구 구단 경영 RPG. v33 대각선 쿼터뷰 경기장에서 치비 선수들이 60fps 관절 애니메이션으로 달리고, 공을 따라가는 중계 카메라와 우하단 미니맵 레이더로 경기를 지켜봅니다. 슛·태클·GK 다이빙 포즈가 실시간으로 전환되고, 터치라인 지시·전술 카드가 피치 위에 그려집니다.">
+<title>꼬마일레븐 FC v37 — 원형 초상화 축구 구단 경영 RPG</title>
+<meta name="description" content="꼬마일레븐 FC — 100% 오리지널 축구 구단 경영 RPG. v37은 v30의 원형 초상화 토큰(500장)으로 돌아왔습니다. 중계뷰 카메라가 공을 따라가고(전체뷰 토글), 22명 전원이 각자 다른 얼굴의 원형 토큰으로 뛰며, 골 순간에는 짧은 슬로우 모션으로 골망이 출렁입니다. v33의 공 물리·밸런스 수정과 v35의 양 사이드 전개 AI는 그대로입니다.">
 <meta name="theme-color" content="#0b332c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="꼬마일레븐 FC">
 <meta name="application-name" content="꼬마일레븐 FC">
-<link rel="manifest" href="manifest.webmanifest?v=36">
-<link rel="icon" href="icons/icon-192.png?v=36">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=36">
-<link rel="stylesheet" href="css/style.css?v=36&b=35">
+<link rel="manifest" href="manifest.webmanifest?v=37">
+<link rel="icon" href="icons/icon-192.png?v=37">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=37">
+<link rel="stylesheet" href="css/style.css?v=37&b=36">
 </head>
 <body>
 <div id="app">
@@ -61,18 +61,16 @@
   </div>
 </div>
 <script>window.__DS_ERRS=[];window.addEventListener('error',function(e){window.__DS_ERRS.push(String((e&&e.message)||(e&&e.error)||'error'));});</script>
-<script src="js/data.js?v=36&b=35"></script>
-<script src="js/quarter.js?v=36&b=35"></script>
-<script src="js/pixel_player.js?v=36&b=35"></script>
-<script src="js/pvp.js?v=36&b=35"></script>
-<script src="js/match.js?v=36&b=35"></script>
-<script src="js/bgm.js?v=36&b=35"></script>
-<script src="js/game.js?v=36&b=35"></script>
+<script src="js/data.js?v=37&b=36"></script>
+<script src="js/pvp.js?v=37&b=36"></script>
+<script src="js/match.js?v=37&b=36"></script>
+<script src="js/bgm.js?v=37&b=36"></script>
+<script src="js/game.js?v=37&b=36"></script>
 <script>
 (function () {
   if (!('serviceWorker' in navigator)) { return; }
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=36&b=35').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=37&b=36').then(function (reg) {
       if (reg && reg.update) { reg.update(); }
     }).catch(function () { /* 오프라인 캐시는 선택 */ });
   });
