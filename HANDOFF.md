@@ -85,6 +85,10 @@
 | 오프사이드 재현 (`M.debugOffside('home')`) | `type indirect` (v33 수정 유지) |
 | v35 사이드 AI 계측 | 레인 **L23.8 / C52.5 / R23.7%** · 전환 패스 24 · 대각 35 · 크로스 3:1 · 컷백 1 · 측면 진입 3:2 |
 | 밸런스 샘플 3경기 | **5골 · 0:0 0회** (2:1, 1:1, 0:1) |
+| **라이브 90분 완주** (`?v=38&b=37`, 844×390) | **완주** — `clock 90`·`matchPhase ended`·`running false`, **fps 60.1**, 토큰 **22/22**, `__DS_ERRS` 0·콘솔 0·404 0 (`preview/v38/v38-live-result.png`) |
+| 라이브 코치마크 | 새 세이브 첫 공식전에서 열림·`paused true` → 4단계 넘겨 `tut.done true` |
+| 라이브 상세창 · 비교 카드 | 초상화 `naturalWidth 400` · 잠재 게이지 표시 · 이적시장 비교 **6행** (`v38-live-detail.png` · `v38-live-market.png`) |
+| 라이브 자산 | `js/match.js?v=38&b=37`·`game.js`·`data.js`·`css/style.css` **200** · `assets/portraits/p01.png`·`p250.png`·`portraits/head/p500.png` **200** · 배포 반영 폴링 10.6초 |
 
 검증 스크립트:
 - `python3 scripts/v38_regress.py [출력폴더] [all|844x390|844x360|390x844]` — **v37 정식 하네스(`v37_full.py`)를 v38용으로 확장**. 새 세이브에서 `S.tut.done=true`(복귀 유저)로 세팅한 뒤 844×390·844×360 90분 완주와 390×844 회전을 확인한다.
@@ -94,7 +98,7 @@
 - `python3 scripts/v38_visual.py [출력폴더]` — aside·상세 하단·비교 카드 캡처
 - (환경 메모) 이 워크스페이스는 `PLAYWRIGHT_BROWSERS_PATH=/workspace/.cache/pw-browsers` + `LD_LIBRARY_PATH=/workspace/.cache/syslibs/usr/lib/x86_64-linux-gnu` 가 필요하다. 로컬 체크아웃은 sparse 라 `icons/` 가 없어 아이콘 404가 찍힌다(라이브에는 있음).
 
-스크린샷: `preview/v38/` — `v38-player-detail-844x390.png` · `v38-market-compare2-844x390.png` · `v38-squad-aside-844x390.png` · `v38-tutorial-1/2/4-844x390.png` · `v38-result-844x390.png` · `v38-rotate-390x844.png` · `v38-club-detail-844x390.png` · `v38-squad-844x390.png` · `v38-oldsave-844x390.png`
+스크린샷: `preview/v38/` — `v38-live-match.png` · `v38-live-tutorial.png` · `v38-live-result.png` · `v38-live-detail.png` · `v38-live-market.png` · `v38-player-detail-844x390.png` · `v38-market-compare2-844x390.png` · `v38-squad-aside-844x390.png` · `v38-tutorial-1/2/4-844x390.png` · `v38-result-844x390.png` · `v38-rotate-390x844.png` · `v38-club-detail-844x390.png` · `v38-squad-844x390.png` · `v38-oldsave-844x390.png`
 
 ---
 
