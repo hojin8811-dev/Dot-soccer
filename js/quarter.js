@@ -264,8 +264,8 @@
         if (p.x < -24 || p.x > W + 24 || p.y < -18 || p.y > H + 18) { continue; }
         s = p.s;
         hd = Math.max(1.7, c.h * PPM * s * 0.50);
-        bw = Math.max(2, Math.round(hd * 0.92));
-        bh = Math.max(2, Math.round(hd * 1.05));
+        bw = Math.max(2, Math.round(hd * 1.12));
+        bh = Math.max(2, Math.round(hd * 0.95));
         bob = c.jump ? Math.sin((t || 0) * 5.2 + c.ph) * hd * 0.42 : Math.sin((t || 0) * 2.0 + c.ph) * hd * 0.07;
         e = _cproj[n++];
         if (!e) { e = _cproj[n - 1] = {}; }
