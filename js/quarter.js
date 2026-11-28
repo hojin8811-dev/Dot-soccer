@@ -172,35 +172,59 @@
   }
 
   /* ─────────────────────────  관중석  ───────────────────────── */
+  /* v36 — 성긴 막대기 관중 → 빨강·파랑·노랑·흰색 상의 + 동글한 머리 도트 관중.
+     · 계단 13단 × 104명(양 사이드)을 빽빽하게 채운다.
+     · 그리는 순서는 '계단(뒤→앞)' 하나, 계단 안에서는 상의 색으로 미리 정렬해
+       fillStyle 변경을 계단당 5~8회로 줄인다(60fps 유지).
+     · 사람은 머리(원) + 몸통(둥근 사각) 2도트 — 원경에서도 사람으로 읽힌다. */
+  var CROWD_SHIRTS = ['#cf4242', '#3a63c8', '#ddb545', '#e8e4d8', '#3f8f5c', '#a85050', '#6f4f9a', '#c9c5bb'];
+  var CROWD_SKINS = ['#e8c9a6', '#d9ad80', '#b8804f', '#8a5a38'];
+  var CROWD_HAIR = ['#2a2230', '#4a2f1c', '#5e3b20', '#c8ae6a', '#7d786c'];
   var crowdCache = null;
-  /* 관중 — 계단마다 한 줄로 앉힌다(줄이 흐트러지면 공중에 뜬 색종이처럼 보인다).
-     몸통 = 색 사각형, 머리 = 살색 사각형. 픽셀 도트 감성 그대로. */
+  var crowdT = 0;
+
   function buildCrowd() {
-    var rows = [], i, tier, n;
-    function band(x0, x1, tiers, count) {
+    var rows = [], rowIdx = 0;
+    /* xNear 에서 뒤로 한 단씩 물러나며(xStep) 한 단씩 높아진다(zStep) */
+    function band(xNear, xStep, tiers, count) {
+      var tier, i, t, dir = xStep > 0 ? 1 : -1;
       for (tier = 0; tier < tiers; tier++) {
-        var xa = x0 + (x1 - x0) * (tiers === 1 ? 0 : tier / (tiers - 1));
+        var xa = xNear + dir * tier * Math.abs(xStep);
+        var zz = 0.75 + tier * 1.5;
+        var ppl = [];
         for (i = 0; i < count; i++) {
-          var t = (i + 0.5) / count;
-          rows.push({
-            x: xa + (Math.random() - 0.5) * 0.5,
-            y: -14 + 128 * t,
-            z: 0.45 + tier * 0.95 + Math.random() * 0.25,
-            h: 1.0 + Math.random() * 0.28,
-            c: CROWD_COLS[(i * 5 + tier * 3 + ((Math.random() * 3) | 0)) % CROWD_COLS.length],
-            ph: Math.random() * 6.28
+          t = (i + 0.5) / count;
+          ppl.push({
+            y: -15 + 130 * t + (Math.random() - 0.5) * 0.30,
+            z: zz + Math.random() * 0.06,
+            h: 0.95 + Math.random() * 0.22,
+            c: (i * 7 + tier * 3 + ((Math.random() * 3) | 0)) % CROWD_SHIRTS.length,
+            sk: (i * 5 + tier) % CROWD_SKINS.length,
+            hr: (i * 3 + tier * 5) % CROWD_HAIR.length,
+            ph: Math.random() * 6.283,
+            jump: Math.random() < 0.09
           });
         }
+        ppl.sort(function (a, b) { return a.c - b.c; });   /* 색 버킷 정렬 */
+        rows.push({ x: xa, ppl: ppl, idx: rowIdx++ });
       }
     }
     /* 먼 터치라인 뒤(화면 위) · 가까운 터치라인 뒤(화면 아래) */
-    band(-24.6, -3.6, 11, 76);
-    band(102.6, 123.6, 11, 74);
-    /* 골 뒤 */
-    for (i = 0; i < 40; i++) {
-      var tz = (Math.random() * 4) | 0;
-      rows.push({ x: -3.0 - tz * 2.4, y: -12 + (i * 4.3) % 126, z: 0.5 + tz * 1.05, h: 1.0 + Math.random() * 0.28, c: CROWD_COLS[(i * 3) % CROWD_COLS.length], ph: Math.random() * 6.28 });
-      rows.push({ x: 102.4 + tz * 2.4, y: -12 + (i * 4.9) % 126, z: 0.5 + tz * 1.05, h: 1.0 + Math.random() * 0.28, c: CROWD_COLS[(i * 7) % CROWD_COLS.length], ph: Math.random() * 6.28 });
+    band(-4.8, -2.2, 9, 132);
+    band(105.2, 2.3, 7, 128);
+    /* 골 뒤쪽 코너 메움 */
+    for (var i = 0; i < 3; i++) {
+      var xa2 = -3.6 - i * 2.0, xb2 = 103.6 + i * 2.0, zz2 = 0.8 + i * 1.5;
+      var pa = [], pb = [];
+      for (var j = 0; j < 34; j++) {
+        var t2 = (j + 0.5) / 34;
+        pa.push({ y: -14 + 128 * t2, z: zz2, h: 0.95 + Math.random() * 0.2, c: (j * 5 + i) % 8, sk: (j + i) % 4, hr: (j * 2 + i) % 5, ph: Math.random() * 6.28, jump: Math.random() < 0.09 });
+        pb.push({ y: -14 + 128 * t2, z: zz2, h: 0.95 + Math.random() * 0.2, c: (j * 3 + i) % 8, sk: (j + i * 2) % 4, hr: (j * 3 + i) % 5, ph: Math.random() * 6.28, jump: Math.random() < 0.09 });
+      }
+      pa.sort(function (a, b) { return a.c - b.c; });
+      pb.sort(function (a, b) { return a.c - b.c; });
+      rows.push({ x: xa2, ppl: pa, idx: rowIdx++ });
+      rows.push({ x: xb2, ppl: pb, idx: rowIdx++ });
     }
     crowdCache = rows;
   }
@@ -208,12 +232,13 @@
   /* 계단식 스탠드 단(段) — 관중이 앉은 계단면 */
   function standTiers(ctx) {
     var i, x0, x1, z0, z1;
-    var far = [[-3.2, -5.9], [-5.9, -8.6], [-8.6, -11.3], [-11.3, -14.0], [-14.0, -16.7], [-16.7, -19.4], [-19.4, -22.1], [-22.1, -24.8]];
-    var near = [[102.6, 105.3], [105.3, 108.0], [108.0, 110.7], [110.7, 113.4], [113.4, 116.1], [116.1, 118.8], [118.8, 121.5], [121.5, 124.2]];
+    var far = [], near = [], ti;
+    for (ti = 0; ti < 9; ti++) { far.push([-3.4 - ti * 2.2, -5.6 - ti * 2.2]); }
+    for (ti = 0; ti < 7; ti++) { near.push([103.0 + ti * 2.3, 105.2 + ti * 2.3]); }
     function tierRow(list, flip) {
       for (i = 0; i < list.length; i++) {
         x0 = list[i][0]; x1 = list[i][1];
-        z0 = 0.55 + i * 1.55; z1 = z0 + 1.55;
+        z0 = 0.45 + i * 1.5; z1 = z0 + 1.5;
         /* 계단면(수직) */
         wpoly(ctx, [[x0, -18, z1], [x0, 138, z1], [x1, 138, z1], [x1, -18, z1]], i % 2 ? '#2b5f47' : '#316b50');
         /* 단 입면 */
@@ -225,24 +250,58 @@
     tierRow(near, false);
   }
 
+  var _cproj = [];
   function drawStands(ctx, t) {
     if (!crowdCache) { buildCrowd(); }
-    var i, c, p, s, hpx, rpx, bob, bw, bh, hd;
-    for (i = 0; i < crowdCache.length; i++) {
-      c = crowdCache[i];
-      p = Q.project(c.x, c.y, c.z || 0);
-      if (p.x < -20 || p.x > W + 20 || p.y < -14 || p.y > H + 14) { continue; }
-      s = p.s;
-      hpx = Math.max(2.2, c.h * PPM * s * 0.42);
-      rpx = Math.max(1.0, hpx * 0.34);
-      bob = Math.sin((t || 0) * 2.1 + c.ph) * hpx * 0.08;
-      bw = Math.max(2, Math.round(rpx * 2.4));
-      bh = Math.max(2, Math.round(hpx * 0.66));
-      hd = Math.max(1.4, Math.round(rpx * 1.5));
-      ctx.fillStyle = c.c;
-      ctx.fillRect(Math.round(p.x - bw / 2), Math.round(p.y - bh + bob), bw, bh);
-      ctx.fillStyle = c.s || '#f4dcc0';
-      ctx.fillRect(Math.round(p.x - hd / 2), Math.round(p.y - bh - hd + bob), hd, hd);
+    var ri, k, c, p, s, hd, bw, bh, bob, row, n, e;
+    var col = -1, sk = -1, hr = -1;
+    for (ri = 0; ri < crowdCache.length; ri++) {
+      row = crowdCache[ri];
+      n = 0;
+      for (k = 0; k < row.ppl.length; k++) {
+        c = row.ppl[k];
+        p = Q.project(row.x, c.y, c.z || 0);
+        if (p.x < -24 || p.x > W + 24 || p.y < -18 || p.y > H + 18) { continue; }
+        s = p.s;
+        hd = Math.max(1.7, c.h * PPM * s * 0.50);
+        bw = Math.max(2, Math.round(hd * 0.92));
+        bh = Math.max(2, Math.round(hd * 1.05));
+        bob = c.jump ? Math.sin((t || 0) * 5.2 + c.ph) * hd * 0.42 : Math.sin((t || 0) * 2.0 + c.ph) * hd * 0.07;
+        e = _cproj[n++];
+        if (!e) { e = _cproj[n - 1] = {}; }
+        e.x = Math.round(p.x);
+        e.y = Math.round(p.y - bh - hd * 0.55 + bob);
+        e.bw = bw; e.bh = bh; e.hd = hd;
+        e.c = c.c; e.sk = c.sk; e.hr = c.hr;
+      }
+      /* ① 몸통 — 상의 색으로 묶어 그린다 */
+      col = -1;
+      for (k = 0; k < n; k++) {
+        e = _cproj[k];
+        if (col !== e.c) { col = e.c; ctx.fillStyle = CROWD_SHIRTS[e.c]; }
+        ctx.fillRect(e.x - (e.bw >> 1), e.y + Math.round(e.hd * 0.62), e.bw, e.bh);
+      }
+      /* ② 머리 — 동그란 점, 피부톤으로 묶어 그린다(작은 점은 사각 1~2px로 대체) */
+      sk = -1;
+      for (k = 0; k < n; k++) {
+        e = _cproj[k];
+        if (sk !== e.sk) { sk = e.sk; ctx.fillStyle = CROWD_SKINS[e.sk]; }
+        if (e.hd < 3.0) {
+          ctx.fillRect(e.x - 1, e.y, 2, 2);
+        } else {
+          ctx.beginPath();
+          ctx.arc(e.x, e.y + e.hd * 0.5, e.hd * 0.5, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+      /* ③ 가까운 줄만 머리카락 한 줄 */
+      hr = -1;
+      for (k = 0; k < n; k++) {
+        e = _cproj[k];
+        if (e.hd < 2.8) { continue; }
+        if (hr !== e.hr) { hr = e.hr; ctx.fillStyle = CROWD_HAIR[e.hr]; }
+        ctx.fillRect(e.x - e.hd * 0.5, e.y + e.hd * 0.16, Math.max(1, e.hd), Math.max(1, e.hd * 0.30));
+      }
     }
   }
 
@@ -342,10 +401,10 @@
     wpoly(ctx, [[-260, -260], [360, -260], [360, 380], [-260, 380]], '#0b201a');
     wpoly(ctx, [[-34, -34], [134, -34], [134, 148], [-34, 148]], '#0e2620');
     /* 외곽 스탠드 벽 (관중석 뒤) */
-    wpoly(ctx, [[-27, -44, 15], [-27, 158, 15], [-27, 158, 0], [-27, -44, 0]], '#0c231c');
-    wpoly(ctx, [[127, -44, 15], [127, 158, 15], [127, 158, 0], [127, -44, 0]], '#0c231c');
-    wpoly(ctx, [[-44, -34, 15], [160, -34, 15], [160, -34, 0], [-44, -34, 0]], '#0a1f19');
-    wpoly(ctx, [[-44, 148, 15], [160, 148, 15], [160, 148, 0], [-44, 148, 0]], '#0a1f19');
+    wpoly(ctx, [[-27, -44, 18], [-27, 158, 18], [-27, 158, 0], [-27, -44, 0]], '#0c231c');
+    wpoly(ctx, [[127, -44, 18], [127, 158, 18], [127, 158, 0], [127, -44, 0]], '#0c231c');
+    wpoly(ctx, [[-44, -34, 18], [160, -34, 18], [160, -34, 0], [-44, -34, 0]], '#0a1f19');
+    wpoly(ctx, [[-44, 148, 18], [160, 148, 18], [160, 148, 0], [-44, 148, 0]], '#0a1f19');
 
     /* 피치 바깥 잔디 (러닝 트랙 · 잔디 여유) */
     wpoly(ctx, [[-20, -24], [120, -24], [120, 134], [-20, 134]], '#3f9b46');
@@ -354,6 +413,9 @@
     /* 관중석 — 피치 바깥에 세워진 계단식 스탠드 */
     standTiers(ctx);
     drawStands(ctx, t || 0);
+    /* 관중석을 한 겹 눌러 선수·피치가 먼저 읽히게(피치는 아래에서 다시 덮는다) */
+    ctx.fillStyle = 'rgba(5, 22, 17, 0.26)';
+    ctx.fillRect(0, 0, W, H);
 
     /* 잔디 줄무늬 — 길이축 띠 (터치라인과 나란한 세로 줄) */
     var bands = 14;

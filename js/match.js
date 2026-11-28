@@ -1579,7 +1579,12 @@
     }
     /* v35 — 픽셀 도트 치비는 이미지 프리로드가 필요 없다(코드로 찍어 캐시).
        첫 프레임에 22명 스프라이트를 미리 만들어 두어 킥오프 직후 끊김이 없게 한다. */
-    if (PX) { PX.warm(players); }
+    if (PX) {
+      /* v36 — 12종 캐릭터를 팀 안에서 겹치지 않게 배정(초상화 머리색·피부·액세서리로 매칭) */
+      PX.assignSquad(players.filter(function (q) { return q.side === 'home'; }));
+      PX.assignSquad(players.filter(function (q) { return q.side === 'away'; }));
+      PX.warm(players);
+    }
     benchState = (cfg.bench || []).map(function (b) {
       return { player: b.player, pos: b.player.pos, rating: DS.ratingOf(b.player), used: false };
     });
@@ -5779,6 +5784,7 @@
     tickLanes();
     updateCamera(dt);
     updateReferee(dt);
+    updateCoach(dt);
 
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
@@ -6106,19 +6112,19 @@
      v10: 피치 위 22명의 몸통을 지우고, 고유 얼굴을 담은 원형 토큰으로 그린다.
      원 바깥 두까운 링이 팀을 나누다 — 홈 = 생생한 파랑, 원정 = 생생한 빨강. */
   /* v25b — 팀 색은 유니폼이 아니라 고정 팔레트다.
-     홈(우리 팀) = 선명한 파랑 #2f8dff · 원정 = 선명한 빨강 #ff4b4b.
+     v36 — 유니폼과 같은 색: 홈(우리 팀) = 선명한 빨강 #ff4b4b · 원정 = 선명한 파랑 #2f8dff.
      v25에서는 유니폼 색으로 링을 칠했는데, 초록·검정·흰색 유니폼 구단을 만나면
      링이 잔디에 묻혀 누가 우리 선수인지 한눈에 안 보였다. 어떤 구단과 붙어도
      늘 같은 두 색으로 갈라 보이게 하고, 스코어보드·점유율 바·결과서 xG맵도
      이 두 색을 그대로 쓴다(DS.Match.teamColors). */
-  var HOME_COL = '#2f8dff', AWAY_COL = '#ff4b4b';
+  var HOME_COL = '#ff4b4b', AWAY_COL = '#2f8dff';
   var TEAM_FX_DEF = {
-    home: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' },
-    away: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' }
+    home: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' },
+    away: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' }
   };
   var TEAM_FX = {
-    home: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' },
-    away: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' }
+    home: { ring: '#ff4b4b', ring2: '#ff9c9c', glow: 'rgba(255,75,75,0.95)', base: 'rgba(58,10,12,0.94)', base2: 'rgba(104,20,20,0.94)', text: '#ffe2dc' },
+    away: { ring: '#2f8dff', ring2: '#8ec4ff', glow: 'rgba(47,141,255,0.95)', base: 'rgba(8,30,60,0.94)', base2: 'rgba(14,58,110,0.94)', text: '#d9ecff' }
   };
 
   function hexRgb(h) {
@@ -7526,6 +7532,36 @@
     });
   }
 
+  /* ═════════ v36 — 터치라인 감독 (연출 전용) ═════════
+     양복 차림 감독이 파 포스트 옆 기술 구역에 서서 경기를 지켜본다.
+     공이 공격 3분의 1에 들어오면 지시(point), 우리 팀 득점 직후엔 만세(cheer),
+     위기엔 외침(shout) — 시뮬레이션에는 전혀 관여하지 않는다. */
+  var coach = { kind: 'coach', x: 98.6, y: 58, px: 98.6, py: 58, gait: 0, dirView: 'down', face: 1, moving: false, _look: null, pose: 'idle', cheerT: 0, _lastHome: 0 };
+
+  function updateCoach(dt) {
+    if (!PX) { return; }
+    if (!coach._look) { coach._look = PX.COACH_LOOK; }
+    if (M.homeScore !== coach._lastHome) {
+      if (M.homeScore > coach._lastHome) { coach.cheerT = 3.4; }
+      coach._lastHome = M.homeScore;
+    }
+    if (coach.cheerT > 0) { coach.cheerT -= dt; coach.pose = 'cheer'; return; }
+    var adv = ball.y > WORLD_H * 0.62 ? 1 : 0;      /* 공이 상대 진영 깊숙이 */
+    if (adv && ball.kind === 'shot') { coach.pose = 'shout'; }
+    else if (adv) { coach.pose = 'point'; }
+    else { coach.pose = 'idle'; }
+  }
+
+  function drawCoach(c) {
+    var gp = QV.project(c.x, c.y, 0);
+    var sc = PX.scaleFor(SPR_H * PLAYER_K * gp.s * 1.24);
+    PX.shadow(ctx, gp.x, gp.y + Math.max(0.3, gp.s * 0.4), SPR_H * 0.19, Math.max(1.5, SPR_H * 0.07), 0);
+    PX.draw(ctx, {
+      x: gp.x, y: gp.y, dir: c.dirView, pose: c.pose,
+      gait: c.gait, t: simTime, look: c._look || PX.COACH_LOOK, sc: sc, face: 1
+    });
+  }
+
   function drawPlayer(p) {
     var gp = QV.project(p.x, p.y, 0);
     var gx = gp.x, gy = gp.y, gs = gp.s;
@@ -7625,10 +7661,11 @@
     if (PX) {
       var pxH = SPR_H * PLAYER_K * gs * 1.24;
       var psc = PX.scaleFor(pxH);
-      var lookKit = gk ? ((p.side === 'home' ? 'gk' : 'gk2')) : p.side;
-      if (!p._look || p._lookKit !== lookKit) {
+      var lookKit = gk ? ((p.side === 'home' ? 'gk_home' : 'gk_away')) : p.side;
+      if (!p._look || p._lookKit !== lookKit || p._lookCh !== p._ch) {
         p._lookKit = lookKit;
-        p._look = PX.lookOf((p.player && p.player.pic) || ((p.number || 1) * 7 % 500 + 1), lookKit);
+        p._lookCh = p._ch;
+        p._look = PX.lookOf((p.player && p.player.pic) || ((p.number || 1) * 7 % 500 + 1), lookKit, p._ch);
       }
       var pu = 0;
       if (pose === 'dive') { pu = clamp(1 - p.diveT / Math.max(0.01, p.diveD || 0.7), 0, 1); }
@@ -7825,7 +7862,7 @@
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.lineWidth = 1.6;
-    ctx.strokeStyle = home ? '#2f8dff' : '#ff4b4b';
+    ctx.strokeStyle = home ? '#ff4b4b' : '#2f8dff';
     roundRect(x, y, w, h, 10);
     ctx.stroke();
     /* 왼쪽 골드 바 */
@@ -8068,7 +8105,7 @@
 
     /* v31 — 쿼터뷰 원근 순서: 화면에서 먼(위쪽) 선수를 먼저 그린다 */
     var arr = players.slice();
-    if (PX) { arr.push(referee); }
+    if (PX) { arr.push(referee); arr.push(coach); }
     var ii0;
     for (ii0 = 0; ii0 < arr.length; ii0++) {
       arr[ii0]._sy = QV.project(arr[ii0].x, arr[ii0].y, 0).y;
@@ -8079,7 +8116,9 @@
     drawShotTrail();
 
     for (i = 0; i < arr.length; i++) {
-      if (arr[i].kind === 'ref') { drawReferee(arr[i]); } else { drawPlayer(arr[i]); }
+      if (arr[i].kind === 'ref') { drawReferee(arr[i]); }
+      else if (arr[i].kind === 'coach') { drawCoach(arr[i]); }
+      else { drawPlayer(arr[i]); }
     }
     /* v29 ② — 세트피스 니어/파포스트 라벨은 토큰 위에 */
     drawSetpieceLabels();
@@ -8445,6 +8484,26 @@
   M.report = function () { return reportData(); };
 
   /* 검증용 상태 조회 (포메이션·전술·카드가 실제 좌표에 반영됐는지) */
+  /* v36 QA — 특정 선수의 포즈를 강제로 잡아 스프라이트 프레임을 확인한다.
+     debugPose('tackle'|'kick'|'celebrate'|'dive'|'jump', 대상) · 대상: 'home'|'away'|'gk' */
+  M.debugPose = function (pose, who) {
+    var i, p, best = null;
+    for (i = 0; i < players.length; i++) {
+      p = players[i];
+      if (who === 'gk') {
+        if (!isGK(p) || p.side !== 'home') { continue; }
+      } else {
+        if (isGK(p)) { continue; }
+        if ((who === 'away' || who === 'home') && p.side !== who) { continue; }
+      }
+      if (!best || d2(p, ball) < d2(best, ball)) { best = p; }
+    }
+    if (!best) { return null; }
+    if (pose === 'dive') { best.diveT = 0.4; best.diveD = 0.7; best.diveDir = 1; best.x = ball.x + 5; best.y = ball.y; best.px = best.x; best.py = best.y; }
+    else { best.pose = pose; best.poseT = 6; best.poseD = 6; }
+    return { pos: best.pos, side: best.side, pose: pose, ch: best._ch };
+  };
+
   M.probe = function () {    var i, p, h = [], a = [];
     for (i = 0; i < players.length; i++) {
       p = players[i];
@@ -8460,7 +8519,7 @@
         stam: Math.round(p.stam), tokenR: Math.round(SPR_H * scr(p.x, p.y).s * TOKEN_R * tokenScale() * 10) / 10,
         ring: p.side === 'home' ? TEAM_FX.home.ring : TEAM_FX.away.ring, gk: isGK(p),
         carrier: ball.carrier === p, ringColor: (p.side === 'home' ? 'blue' : 'red'),
-        bodySprite: false,
+        bodySprite: false, ch: (p._ch == null ? null : p._ch), look: (p._look ? p._look.key : null),
         bubble: p.bubble ? p.bubble.text : null,
         screen: (function () {
           var g = scr(p.x, p.y);
